@@ -1,6 +1,7 @@
 package com.vivi.scarm
 
-import doobie.imports._
+import doobie._, doobie.implicits._
+import doobie.util.composite.Composite
 import cats.effect.IO
 import doobie.util.transactor.Transactor
 import java.util.UUID
@@ -143,8 +144,19 @@ object Demo {
       ).list
     println(run(getTeacherWithCoursesT2))
 
-
-//      Meta[(Option[String], Option[String], Option[String])].xmap(
+//    implicit val exampleCourse = Course(UUID.randomUUID(), "foo", UUID.randomUUID())
+/*
+    implicit def optionalComposite[A](composite: Composite[A])(implicit example: A): Composite[Option[A]] =
+      composite.imap(
+        (a:A) => Some(a): Option[A]
+      )((optionA: Option[A]) => optionA match {
+        case None => example
+        case Some(aa) => aa
+      })
+ */
+//    implicit val optionalCourseComposite =  doobie.util.composite.Composite.ogeneric[Course]
+//      optionalComposite[Course](Composite[Course])
+/*
     implicit lazy val optionalCourseComposite: Composite[Option[Course]] =
       //      Composite[(Option[String], Option[String], Option[String])].xmap(
       Composite[(Option[String], Option[String], Option[String])].imap(
@@ -157,13 +169,14 @@ object Demo {
           case None => (None, None, None)
           case Some(co) => (Some(co.id.toString), Some(co.name), Some(co.teacherId.toString))
         }
-      )
+      )*/
 
-    def getTeacherWithCoursesOptT: ConnectionIO[List[(Person,Option[Course])]] =
+    //    def getTeacherWithCoursesOptT: ConnectionIO[List[(Person,Option[Course])]] =
+    def getTeacherWithCoursesOptT: ConnectionIO[List[(Person, Option[Course])]] =
       (sql"""select p.*, co.*
          from people p
          left outer join course co on co.teacherId = p.id
-      """.query[(Person,Option[Course])]
+      """.query[(Person, Option[Course])]
       ).list
     println(run(getTeacherWithCoursesOptT))
   }
