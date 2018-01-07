@@ -3,7 +3,7 @@ scalaVersion := "2.12.4"
 scalacOptions ++= Seq("-Ypartial-unification", "-deprecation")
 
 //val doobieVersion = "0.4.1"
-val doobieVersion = "0.5.0-M9"
+val doobieVersion = "0.5.0-M11"
 
 libraryDependencies ++= Seq(
     "org.tpolecat" %% "doobie-h2"        % doobieVersion, // H2 driver 1.4.196 + type mappings.

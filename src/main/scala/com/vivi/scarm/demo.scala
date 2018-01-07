@@ -1,7 +1,6 @@
 package com.vivi.scarm
 
 import doobie._, doobie.implicits._
-import doobie.util.composite.Composite
 import cats.effect.IO
 import doobie.util.transactor.Transactor
 import java.util.UUID
