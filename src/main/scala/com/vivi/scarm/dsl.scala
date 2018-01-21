@@ -26,9 +26,10 @@ trait Entity[K] {
 case class Table[K,E<:Entity[K]](
   name: String
 ) extends DatabaseObject with Queryable[K,E] {
+  type PrimaryKey=K
   override def create: Update0 = null
   override def drop: Update0 = null
-  lazy val primaryKey = Index[K, E](name+"_pk", this, (e: E) => e.id)
+  lazy val primaryKey = Index[K, K, E](name+"_pk", this, (e: E) => e.id)
   override def query(key: K): Stream[ConnectionIO,E] = Stream()
 // def fetch(key: K): ConnectionIO[Option[E]] =  
 //    query(key).head
@@ -50,9 +51,9 @@ case class View[K,E](
   override def query(key: K): Stream[ConnectionIO,E] = Stream()
 }
 
-case class Index[K,E](
+case class Index[PK,K,E<:Entity[PK]](
   name: String,
-  table: Table[_,E],
+  table: Table[PK,E],
   id: E => K
 ) extends DatabaseObject with Queryable[K,E] {
   override def create: Update0 = null
@@ -61,29 +62,29 @@ case class Index[K,E](
 }
 
 
-case class ForeignKey[FROM,PK,TO](
-  from: Table[_,FROM],
-  fromKey: FROM => PK,
-  to: Table[PK,TO]
+case class ForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+  from: Table[FPK,FROM],
+  fromKey: FROM => TPK,
+  to: Table[TPK,TO]
 ) extends DatabaseObject {
   override def create: Update0 = null
   override def drop: Update0 = null
   override lazy val name = s"${from.name}_${to.name}_fk"
   lazy val manyToOne = ManyToOne(to, fromKey, to.primaryKey.id)
-  lazy val oneToMany = OneToMany[TO,PK,FROM](index, to.primaryKey.id, fromKey)
+  lazy val oneToMany = OneToMany[TO,TPK,FROM](index, to.primaryKey.id, fromKey)
   lazy val index = Index(name+"_ix", from, fromKey)
 }
 
-case class OptionalForeignKey[PK,FROM,TO](
-  from: Table[_,FROM],
-  fromKey: FROM => PK,
-  to: Table[PK,TO]
+case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+  from: Table[FPK,FROM],
+  fromKey: FROM => TPK,
+  to: Table[TPK,TO]
 ) extends DatabaseObject {
   override def create: Update0 = null
   override def drop: Update0 = null
   override lazy val name = s"${from.name}_${to.name}_fk"
   lazy val manyToOne = OptionalManyToOne(to, fromKey, to.primaryKey.id)
-  lazy val oneToMany = OneToMany[TO,PK,FROM](index, to.primaryKey.id, fromKey)
+  lazy val oneToMany = OneToMany[TO,TPK,FROM](index, to.primaryKey.id, fromKey)
   lazy val index = Index(name+"_ix", from, fromKey)
 }
 

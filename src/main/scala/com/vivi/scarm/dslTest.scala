@@ -13,13 +13,13 @@ case class EnrollmentId(studentId: StudentId, sectionId: SectionId)
 case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
 case class Course(id: CourseId, subject: String, prerequisite: CourseId) extends Entity[CourseId]
 
-case class Section(sectionId: SectionId, instructor: TeacherId, 
+case class Section(id: SectionId, instructor: TeacherId, 
   room: String, time: Calendar) extends Entity[SectionId]
 
 case class Student(id: StudentId, name: String, level: Int)
     extends Entity[StudentId]
 
-case class Enrollment(enrollmentId: EnrollmentId, grade: Option[Char])
+case class Enrollment(id: EnrollmentId, grade: Option[Char])
     extends Entity[EnrollmentId]
 
 
@@ -49,20 +49,29 @@ class DSLTest {
     (teachers :: instructor.oneToMany).query(TeacherId(1))
 
   val teacherWithSectionsAndStudents
-      :Stream[ConnectionIO, (Teacher,Set[(Section,Set[(Enrollment, Student)])])]
+      :Stream[ConnectionIO, (Teacher,Set[(Section,Set[(Enrollment, Student)])])] =
     (teachers :: instructor.oneToMany :: enrollmentCourse.oneToMany ::
       enrollmentStudent.manyToOne).query(TeacherId(1))
 
   val teacherWithCourses: Stream[ConnectionIO, (Teacher,Set[(Section,Course)])] =
     (teachers :: instructor.oneToMany :: sectionCourse.manyToOne).query(TeacherId(1))
 
-  val foo = instructor.oneToMany :: sectionCourse.manyToOne
 
-/*    val teacherWithCoursesAndStudents: Stream[ConnectionIO, (Teacher,Set[((Section,Course), Set[(Enrollment,Student)])])] =
-      (teachers :: (instructor.oneToMany ::sectionCourse.manyToOne)
-          :: 
-      ).query(TeacherId(1))
- */
+  val pre_foo = instructor.oneToMany :: sectionCourse.manyToOne
+
+//  val foo = (instructor.oneToMany :: sectionCourse.manyToOne)  :: enrollmentCourse.oneToMany //:: enrollmentStudent.manyToOne
+
+  val foo2 = instructor.oneToMany  :: enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
+
+  val foo3: OneToMany[Section,SectionId,(Enrollment,Student)]
+  = enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
+
+//  val teacherWithCoursesAndStudents =
+//  :Stream[ConnectionIO, (Teacher,Set[((Section,Course), Set[(Enrollment,Student)])])] =
+//    (teachers :: (instructor.oneToMany :: sectionCourse.manyToOne) :: enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
+//    ).query(TeacherId(1))
+
+   
 
 
 }
