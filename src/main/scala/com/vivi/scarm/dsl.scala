@@ -25,7 +25,8 @@ sealed trait Queryable[K, T, F[_]] {
 sealed trait Joinable[K, T, F[_]]
 
 sealed trait JoinableQueryable[K, T, F[_]]
-    extends Queryable[K, T, F] with Joinable[K, T, F]
+    extends Queryable[K, T, F] with Joinable[K, T, F] {
+}
 
 
 trait Entity[K] {
@@ -43,9 +44,9 @@ case class Table[K,E<:Entity[K]](
 
   override def drop: Update0 = null
 
-  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, (e: E) => e.id)
-
   override def query(key: K): Stream[ConnectionIO,Id[E]] =  Stream()
+
+  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, (e: E) => e.id)
 
   // def fetch(key: K): ConnectionIO[Option[E]] =
 //    query(key).head
@@ -74,7 +75,7 @@ case class Index[PK,K,E<:Entity[PK]](
 ) extends DatabaseObject with JoinableQueryable[K,E,Set] {
   override def create: Update0 = null
   override def drop: Update0 = null
-  override def query(key: K): Stream[ConnectionIO,E] = Stream()
+  override def query(key: K): Stream[ConnectionIO,Set[E]] = Stream()
 }
 
 case class UniqueIndex[PK,K,E<:Entity[PK]](
@@ -84,7 +85,7 @@ case class UniqueIndex[PK,K,E<:Entity[PK]](
 ) extends DatabaseObject with JoinableQueryable[K,E,Option] {
   override def create: Update0 = null
   override def drop: Update0 = null
-  override def query(key: K): Stream[ConnectionIO,E] = Stream()
+  override def query(key: K): Stream[ConnectionIO,Option[E]] = Stream()
 }
 
 
@@ -120,16 +121,16 @@ case class ManyToOne[MANY,PK,ONE](
   oneKey: ONE => PK
 ) extends JoinableQueryable[MANY,ONE,Id]{
 
+  override def query(key: MANY): Stream[ConnectionIO,Id[ONE]] = Stream()
+
   def join[K,F[_]](left: Joinable[K,MANY,F]) =
     Join[K,MANY,F,PK,ONE,Id](left,manyKey,one)
 
-  def ::[K,F[_]](left: Queryable[K,MANY,F]) = join(left)
+  def ::[K,F[_]](left: Joinable[K,MANY,F]) = join(left)
 
-  def +:[K,F[_]](left: Queryable[K,MANY,F]) =
-    ManyToOneJoin[K,MANY,F,PK,MANY,ONE](left, this)
+  def +:[K,F[_]](left: Joinable[K,MANY,F]) =
+    ManyToOneJoin[K,F,PK,MANY,ONE](left, this)
 }
-
-
 
 case class OptionalManyToOne[MANY,PK,ONE](
   one: Queryable[PK,ONE,Option],
@@ -137,12 +138,14 @@ case class OptionalManyToOne[MANY,PK,ONE](
   oneKey: ONE => PK
 ) extends JoinableQueryable[MANY,ONE,Option]{
 
-  def join[K,F[_]](left: Queryable[K,MANY,F]) =
+  override def query(key: MANY): Stream[ConnectionIO,Option[ONE]] = Stream()
+
+  def join[K,F[_]](left: Joinable[K,MANY,F]) =
     Join[K,MANY,F,PK,ONE,Option](left,manyKey,one)
 
-  def ::[K,F[_]](left: Queryable[K,MANY,F]) = join(left)
+  def ::[K,F[_]](left: Joinable[K,MANY,F]) = join(left)
 
-  def +:[K,F[_]](left: Queryable[K,MANY,F]) =  OptionalManyToOneJoin(left, this)
+  def +:[K,F[_]](left: Joinable[K,MANY,F]) =  OptionalManyToOneJoin(left, this)
 }
 
 case class OneToMany[ONE,PK,MANY](
@@ -150,39 +153,59 @@ case class OneToMany[ONE,PK,MANY](
   manyKey: MANY => PK,
   oneKey: ONE => PK
 ) extends JoinableQueryable[ONE,MANY,Set] {
-  def join[K,F[_]](left: Queryable[K,ONE,F]): Queryable[K,(ONE,Set[MANY]),F]  =
+
+  override def query(key: ONE): Stream[ConnectionIO,Set[MANY]] = Stream()
+
+  def join[K,F[_]](left: Joinable[K,ONE,F])  =
     Join[K,ONE,F,PK,MANY,Set](left,oneKey,many)
 
-  def ::[K,F[_]](left: Queryable[K,ONE,F]) = join(left)
+  def ::[K,F[_]](left: Joinable[K,ONE,F]) = join(left)
 
-//  def +:[K,F[_]](left: Queryable[K,ONE,F]) = join(left)
+  def +:[K,F[_]](left: Joinable[K,ONE,F]) = join(left)
 }
 
-sealed trait JoinTrait[LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]]
-    extends Joinable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF] {
+case class Join[LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]](
+  left: Joinable[LEFTK,LEFTT,LEFTF],
+  key: LEFTT => RIGHTK,
+  right: Queryable[RIGHTK,RIGHTT,RIGHTF]
+) extends Joinable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF] 
+    with Queryable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF] {
 
   override def query(key: LEFTK) = Stream()
 
   def identity[T](t: T) = t
-  def join[K,F[_]](left: Queryable[K,LEFTK,F]) =
-    Join[K,LEFTK,F, LEFTK,(LEFTT,RIGHTF[RIGHTT]), LEFTF](left, identity(_), this)
-  def ::[K,F[_]](left: Queryable[K,LEFTK,F]) = join(left)
+  def join[K,F[_]](left: Joinable[K,LEFTK,F]) =
+    Join[K,LEFTK,F, LEFTK,(LEFTT,RIGHTF[RIGHTT]), LEFTF](left,identity(_),this)
+  def ::[K,F[_]](left: Joinable[K,LEFTK,F]) = join(left)
 }
 
-case class Join[LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]](
-  left: Queryable[LEFTK,LEFTT,LEFTF],
-  key: LEFTT => RIGHTK,
-  right: Queryable[RIGHTK,RIGHTT,RIGHTF]
-) extends JoinTrait[LEFTK,LEFTT,LEFTF, RIGHTK, RIGHTT, RIGHTF] 
-    with Queryable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF] 
-
-case class ManyToOneJoin[LEFTK,LEFTT,LEFTF[_], PK, MANY, ONE](
-  left: Queryable[LEFTK,MANY,LEFTF],
+case class ManyToOneJoin[LEFTK, LEFTF[_], PK, MANY, ONE](
+  left: Joinable[LEFTK,MANY,LEFTF],
   right: ManyToOne[MANY,PK,ONE]
-) extends JoinTrait[LEFTK, LEFTT, LEFTF, MANY, ONE, Id]
+) extends Joinable[LEFTK, MANY, LEFTF]
+    with Queryable[LEFTK, (MANY,Id[ONE]), LEFTF] {
 
-case class OptionalManyToOneJoin[LEFTK,LEFTT,LEFTF[_], PK, MANY, ONE](
-  left: Queryable[LEFTK,MANY,LEFTF],
+  override def query(key: LEFTK) = Stream()
+
+  def identity[T](t: T) = t
+  def join[K,F[_]](left: Joinable[K,LEFTK,F]) =
+    Join[K,LEFTK,F, LEFTK,(MANY,Id[ONE]), LEFTF](left,identity(_),this)
+  def ::[K,F[_]](left: Joinable[K,LEFTK,F]) = join(left)
+}
+
+
+case class OptionalManyToOneJoin[LEFTK, LEFTF[_], PK, MANY, ONE](
+  left: Joinable[LEFTK,MANY,LEFTF],
   right: OptionalManyToOne[MANY,PK,ONE]
-) extends JoinTrait[LEFTK, LEFTT, LEFTF, MANY, ONE, Option]
+) extends Joinable[LEFTK, MANY, LEFTF]
+    with Queryable[LEFTK, (MANY,Option[ONE]), LEFTF] {
+
+  override def query(key: LEFTK) = Stream()
+
+  def identity[T](t: T) = t
+  def join[K,F[_]](left: Joinable[K,LEFTK,F]) =
+    Join[K,LEFTK,F, LEFTK,(MANY,Option[ONE]), LEFTF](left,identity(_),this)
+  def ::[K,F[_]](left: Joinable[K,LEFTK,F]) = join(left)
+}
+
 
