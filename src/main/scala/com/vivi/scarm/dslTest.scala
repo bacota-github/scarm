@@ -56,20 +56,18 @@ class DSLTest {
   val teacherWithCourses: Stream[ConnectionIO, (Teacher,Set[(Section,Course)])] =
     (teachers :: instructor.oneToMany :: sectionCourse.manyToOne).query(TeacherId(1))
 
-
-  val pre_foo = instructor.oneToMany :: sectionCourse.manyToOne
+  val pre_foo = instructor.oneToMany +: sectionCourse.manyToOne
 
 //  val foo = (instructor.oneToMany :: sectionCourse.manyToOne)  :: enrollmentCourse.oneToMany //:: enrollmentStudent.manyToOne
 
   val foo2 = instructor.oneToMany  :: enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
 
-  val foo3: OneToMany[Section,SectionId,(Enrollment,Student)]
-  = enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
+  val foo3 = enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
 
-//  val teacherWithCoursesAndStudents =
-//  :Stream[ConnectionIO, (Teacher,Set[((Section,Course), Set[(Enrollment,Student)])])] =
-//    (teachers :: (instructor.oneToMany :: sectionCourse.manyToOne) :: enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
-//    ).query(TeacherId(1))
+  val teacherWithCoursesAndStudents:
+  Stream[ConnectionIO, (Teacher,Set[((Section,Course), Set[(Enrollment,Student)])])] =
+    (teachers :: (instructor.oneToMany +: sectionCourse.manyToOne) :: enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
+    ).query(TeacherId(1))
 
    
 
