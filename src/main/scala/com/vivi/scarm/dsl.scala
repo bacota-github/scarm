@@ -9,6 +9,8 @@ import scala.util.{Failure,Success,Try}
 import scala.language.higherKinds
 
 import cats.Id
+import doobie._
+import doobie.implicits._
 
 
 sealed trait DatabaseObject {
@@ -18,7 +20,12 @@ sealed trait DatabaseObject {
 }
 
 sealed trait Queryable[K, T, F[_]] {
-  def query(key: K): Stream[ConnectionIO,F[T]]
+  def sql: String = ""
+  def keyFields: Composite[K] = null
+  def resultFields: Composite[T]  = null
+  def doobieQuery(key: K) =
+    Fragment(sql, key)(keyFields).query(resultFields).process
+  def query(key: K):  Stream[ConnectionIO,F[T]] = Stream()
 }
 
 
@@ -44,8 +51,6 @@ case class Table[K,E<:Entity[K]](
 
   override def drop: Update0 = null
 
-  override def query(key: K): Stream[ConnectionIO,Id[E]] =  Stream()
-
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, (e: E) => e.id)
 
   // def fetch(key: K): ConnectionIO[Option[E]] =
@@ -65,7 +70,6 @@ case class View[K,E,F[_]](
 ) extends DatabaseObject with JoinableQueryable[K,E,F] {
   override def create: Update0 = null
   override def drop: Update0 = null 
-  override def query(key: K): Stream[ConnectionIO,F[E]] = Stream()
 }
 
 case class Index[PK,K,E<:Entity[PK]](
@@ -75,7 +79,6 @@ case class Index[PK,K,E<:Entity[PK]](
 ) extends DatabaseObject with JoinableQueryable[K,E,Set] {
   override def create: Update0 = null
   override def drop: Update0 = null
-  override def query(key: K): Stream[ConnectionIO,Set[E]] = Stream()
 }
 
 case class UniqueIndex[PK,K,E<:Entity[PK]](
@@ -85,7 +88,6 @@ case class UniqueIndex[PK,K,E<:Entity[PK]](
 ) extends DatabaseObject with JoinableQueryable[K,E,Option] {
   override def create: Update0 = null
   override def drop: Update0 = null
-  override def query(key: K): Stream[ConnectionIO,Option[E]] = Stream()
 }
 
 
@@ -121,8 +123,6 @@ case class ManyToOne[MANY,PK,ONE](
   oneKey: ONE => PK
 ) extends JoinableQueryable[MANY,ONE,Id]{
 
-  override def query(key: MANY): Stream[ConnectionIO,Id[ONE]] = Stream()
-
   def join[K,F[_]](left: Joinable[K,MANY,F]) =
     Join[K,MANY,F,PK,ONE,Id](left,manyKey,one)
 
@@ -138,8 +138,6 @@ case class OptionalManyToOne[MANY,PK,ONE](
   oneKey: ONE => PK
 ) extends JoinableQueryable[MANY,ONE,Option]{
 
-  override def query(key: MANY): Stream[ConnectionIO,Option[ONE]] = Stream()
-
   def join[K,F[_]](left: Joinable[K,MANY,F]) =
     Join[K,MANY,F,PK,ONE,Option](left,manyKey,one)
 
@@ -153,8 +151,6 @@ case class OneToMany[ONE,PK,MANY](
   manyKey: MANY => PK,
   oneKey: ONE => PK
 ) extends JoinableQueryable[ONE,MANY,Set] {
-
-  override def query(key: ONE): Stream[ConnectionIO,Set[MANY]] = Stream()
 
   def join[K,F[_]](left: Joinable[K,ONE,F])  =
     Join[K,ONE,F,PK,MANY,Set](left,oneKey,many)
