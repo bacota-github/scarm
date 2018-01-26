@@ -20,11 +20,14 @@ sealed trait DatabaseObject {
 }
 
 sealed trait Queryable[K, T, F[_]] {
+
+  def keyNames: Seq[String]
   def sql: String = ""
-  def keyFields: Composite[K] = null
-  def resultFields: Composite[T]  = null
-  def doobieQuery(key: K) =
-    Fragment(sql, key)(keyFields).query(resultFields).process
+
+  def doobieQuery(prefix: String, key: K)
+    (implicit keyComposite: Composite[K], compositeT: Composite[T]) =
+    Fragment(sql, key)(keyComposite).query[T](compositeT).process
+
   def query(key: K):  Stream[ConnectionIO,F[T]] = Stream()
 }
 
@@ -37,21 +40,20 @@ sealed trait JoinableQueryable[K, T, F[_]]
 
 
 trait Entity[K] {
-  type KEY=K
   def id: K
 }
 
 case class Table[K,E<:Entity[K]](
-  name: String
+  override val name: String,
+  override val keyNames: Seq[String] = Seq("id")
 ) extends DatabaseObject with JoinableQueryable[K,E,Id] {
 
-  type PrimaryKey=K
+  override def sql: String = primaryKey.sql
 
   override def create: Update0 = null
-
   override def drop: Update0 = null
 
-  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, (e: E) => e.id)
+  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, (e: E) => e.id, keyNames)
 
   // def fetch(key: K): ConnectionIO[Option[E]] =
 //    query(key).head
@@ -64,27 +66,32 @@ case class Table[K,E<:Entity[K]](
   //def updateReturning(entities: E*): Try[Seq[E]]
 }
 
+
 case class View[K,E,F[_]](
-  name: String,
-  id: E => K
+  override val name: String,
+  override val sql: String,
+  id: E => K,
+  override val keyNames: Seq[String]
 ) extends DatabaseObject with JoinableQueryable[K,E,F] {
   override def create: Update0 = null
   override def drop: Update0 = null 
 }
 
 case class Index[PK,K,E<:Entity[PK]](
-  name: String,
+  override val name: String,
   table: Table[PK,E],
-  id: E => K
+  id: E => K,
+  override val keyNames: Seq[String]
 ) extends DatabaseObject with JoinableQueryable[K,E,Set] {
   override def create: Update0 = null
   override def drop: Update0 = null
 }
 
 case class UniqueIndex[PK,K,E<:Entity[PK]](
-  name: String,
+  override val name: String,
   table: Table[PK,E],
-  id: E => K
+  id: E => K,
+  override val keyNames: Seq[String]
 ) extends DatabaseObject with JoinableQueryable[K,E,Option] {
   override def create: Update0 = null
   override def drop: Update0 = null
@@ -94,27 +101,29 @@ case class UniqueIndex[PK,K,E<:Entity[PK]](
 case class ForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   from: Table[FPK,FROM],
   fromKey: FROM => TPK,
-  to: Table[TPK,TO]
+  to: Table[TPK,TO],
+  override val keyNames: Seq[String]
 ) extends DatabaseObject {
   override def create: Update0 = null
   override def drop: Update0 = null
-  override lazy val name = s"${from.name}_${to.name}_fk"
+  override lazy val name: String = s"${from.name}_${to.name}_fk"
   lazy val manyToOne = ManyToOne(to, fromKey, to.primaryKey.id)
   lazy val oneToMany = OneToMany[TO,TPK,FROM](index, fromKey, to.primaryKey.id)
-  lazy val index = Index(name+"_ix", from, fromKey)
+  lazy val index = Index(name+"_ix", from, fromKey, keyNames)
 }
 
 case class OptionalForeignKey[FPK,MANY<:Entity[FPK],TPK,TO<:Entity[TPK]](
   from: Table[FPK,MANY],
   fromKey: MANY => TPK,
-  to: Table[TPK,TO]
+  to: Table[TPK,TO],
+  override val keyNames: Seq[String]
 ) extends DatabaseObject {
   override def create: Update0 = null
   override def drop: Update0 = null
   override lazy val name = s"${from.name}_${to.name}_fk"
   lazy val manyToOne = OptionalManyToOne(to.primaryKey, fromKey, to.primaryKey.id)
   lazy val oneToMany = OneToMany[TO,TPK,MANY](index, fromKey, to.primaryKey.id)
-  lazy val index = Index(name+"_ix", from, fromKey)
+  lazy val index = Index(name+"_ix", from, fromKey, keyNames)
 }
 
 case class ManyToOne[MANY,PK,ONE](

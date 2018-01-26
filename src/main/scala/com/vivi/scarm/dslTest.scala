@@ -31,14 +31,30 @@ class DSLTest {
   val enrollments = Table[EnrollmentId, Enrollment]("enrollments")
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
-    (s: Section) =>  s.id.semester
+    (s: Section) =>  s.id.semester,
+    Seq("semester")
   )
 
-  val instructor = ForeignKey(sections,(s: Section) => s.instructor, teachers)
-  val prerequisite = OptionalForeignKey(courses, (c: Course) => c.prerequisite, courses)
-  val sectionCourse = ForeignKey(sections, (s: Section) => s.id.courseId, courses)
-  val enrollmentCourse = ForeignKey(enrollments, (e: Enrollment) => e.id.sectionId, sections)
-  val enrollmentStudent = ForeignKey(enrollments, (e: Enrollment) => e.id.studentId, students)
+  val instructor = ForeignKey(sections,
+    (s: Section) => s.instructor, teachers,
+    Seq("instructor")
+  )
+
+  val prerequisite = OptionalForeignKey(courses,
+    (c: Course) => c.prerequisite, courses,
+    Seq("prerequisite"))
+
+  val sectionCourse = ForeignKey(sections,
+    (s: Section) => s.id.courseId, courses,
+    Seq("courseId"))
+
+  val enrollmentCourse = ForeignKey(enrollments,
+    (e: Enrollment) => e.id.sectionId, sections,
+    Seq("sectionId"))
+
+  val enrollmentStudent = ForeignKey(enrollments,
+    (e: Enrollment) => e.id.studentId, students,
+    Seq("studentId"))
 
   val teacher: Stream[ConnectionIO,Teacher]  = teachers.query(TeacherId(1))
 
