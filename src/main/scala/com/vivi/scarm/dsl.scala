@@ -43,10 +43,9 @@ trait Entity[K] {
   def id: K
 }
 
-case class Table[K,E<:Entity[K]](
-  override val name: String,
-  override val keyNames: Seq[String] = Seq("id")
-) extends DatabaseObject with JoinableQueryable[K,E,Id] {
+trait Table[K,E<:Entity[K]]
+    extends DatabaseObject
+    with JoinableQueryable[K,E,Id] {
 
   override def sql: String = primaryKey.sql
 
@@ -64,6 +63,28 @@ case class Table[K,E<:Entity[K]](
   //def savveReturning(entities: E*): Try[Seq[E]]
   def update(enties: E*): Try[Unit] = Success(Unit)
   //def updateReturning(entities: E*): Try[Seq[E]]
+}
+
+
+case class CompositeKeyTable[K,E<:Entity[K]](
+  override val name: String,
+  override val keyNames: Seq[String]
+) extends Table[K,E]
+
+
+case class IdTable[K<:AnyVal,E<:Entity[K]](
+  override val name: String,
+) extends Table[K,E] {
+  override val keyNames: Seq[String] = Seq("id")
+}
+
+
+object Table {
+
+  def apply[K,E<:Entity[K]](name:String, keyNames: Seq[String]) =
+    CompositeKeyTable[K,E](name,keyNames)
+
+  def apply[K<:AnyVal,E<:Entity[K]](name: String) = IdTable[K,E](name)
 }
 
 
@@ -102,7 +123,7 @@ case class ForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   from: Table[FPK,FROM],
   fromKey: FROM => TPK,
   to: Table[TPK,TO],
-  override val keyNames: Seq[String]
+  val keyNames: Seq[String]
 ) extends DatabaseObject {
   override def create: Update0 = null
   override def drop: Update0 = null
@@ -116,7 +137,7 @@ case class OptionalForeignKey[FPK,MANY<:Entity[FPK],TPK,TO<:Entity[TPK]](
   from: Table[FPK,MANY],
   fromKey: MANY => TPK,
   to: Table[TPK,TO],
-  override val keyNames: Seq[String]
+  val keyNames: Seq[String]
 ) extends DatabaseObject {
   override def create: Update0 = null
   override def drop: Update0 = null

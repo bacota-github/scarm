@@ -26,9 +26,11 @@ case class Enrollment(id: EnrollmentId, grade: Option[Char])
 class DSLTest {
   val teachers = Table[TeacherId,Teacher]("teachers")
   val courses = Table[CourseId,Course]("courses")
-  val sections = Table[SectionId,Section]("sections")
+  val sections = Table[SectionId,Section]("sections",
+    Seq("courseId", "semester", "number"))
   val students = Table[StudentId,Student]("students")
-  val enrollments = Table[EnrollmentId, Enrollment]("enrollments")
+  val enrollments = Table[EnrollmentId, Enrollment]("enrollments",
+    Seq("studentId", "sectionId"))
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
     (s: Section) =>  s.id.semester,
