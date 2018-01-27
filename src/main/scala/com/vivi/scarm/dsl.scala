@@ -19,6 +19,7 @@ sealed trait DatabaseObject {
   def name: String
 }
 
+
 sealed trait Queryable[K, T, F[_]] {
 
   def keyNames: Seq[String]
@@ -32,21 +33,30 @@ sealed trait Queryable[K, T, F[_]] {
 }
 
 
-sealed trait Joinable[K, T, F[_]]
-
-sealed trait JoinableQueryable[K, T, F[_]]
-    extends Queryable[K, T, F] with Joinable[K, T, F] {
+sealed trait UniqueQueryable[K,T] extends Queryable[K,T,Id] {
+  def +:[LK, LT, G[_]](query: Queryable[LK,LT,G], relation: Relation[LT,K,T]) =
+    join(query,relation)
 }
+
+sealed trait OptionQueryable[K,T] extends Queryable[K,T,Option] {
+  def +:[LK, LT, G[_]](query: Queryable[LK,LT,G], relation: Relation[LT,K,T]) =
+    join(query,relation)
+}
+
+case class Relation[L, K, R](
+  leftKey: L => K,
+  rightKey: R => K,
+  keyNames: Seq[(String,String)]
+)
 
 
 trait Entity[K] {
   def id: K
 }
 
-trait Table[K,E<:Entity[K]]
-    extends DatabaseObject
-    with JoinableQueryable[K,E,Id] {
+trait Table[K,E<:Entity[K]] extends DatabaseObject with UniqueQueryable[K,E] {
 
+  override def key: E => K = { _.id }
   override def sql: String = primaryKey.sql
 
   override def create: Update0 = null
@@ -91,120 +101,89 @@ object Table {
 case class View[K,E,F[_]](
   override val name: String,
   override val sql: String,
-  id: E => K,
+  override val key: E => K,
   override val keyNames: Seq[String]
-) extends DatabaseObject with JoinableQueryable[K,E,F] {
+) extends DatabaseObject with Queryable[K,E,F] {
   override def create: Update0 = null
   override def drop: Update0 = null 
 }
 
-case class Index[PK,K,E<:Entity[PK]](
+case class Index[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
-  id: E => K,
+  override val key: E => K,
   override val keyNames: Seq[String]
-) extends DatabaseObject with JoinableQueryable[K,E,Set] {
+) extends DatabaseObject with Queryable[K,E,Set] {
   override def create: Update0 = null
   override def drop: Update0 = null
 }
 
-case class UniqueIndex[PK,K,E<:Entity[PK]](
+case class UniqueIndex[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
-  id: E => K,
+  override val key: E => K,
   override val keyNames: Seq[String]
-) extends DatabaseObject with JoinableQueryable[K,E,Option] {
+) extends DatabaseObject with OptionQueryable[K,E] {
   override def create: Update0 = null
   override def drop: Update0 = null
 }
 
 
-case class ForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
-  from: Table[FPK,FROM],
-  fromKey: FROM => TPK,
-  to: Table[TPK,TO],
-  val keyNames: Seq[String]
-) extends DatabaseObject {
+sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
+    extends Queryable[FPK,TPK,F] {
+
+  def from: Table[FPK,FROM]
+  def fromKey: FROM => TPK
+  def to: Table[TPK,TO]
+  def keyNames: Seq[String]
   override def create: Update0 = null
   override def drop: Update0 = null
   override lazy val name: String = s"${from.name}_${to.name}_fk"
-  lazy val manyToOne = ManyToOne(to, fromKey, to.primaryKey.id)
-  lazy val oneToMany = OneToMany[TO,TPK,FROM](index, fromKey, to.primaryKey.id)
-  lazy val index = Index(name+"_ix", from, fromKey, keyNames)
+  lazy val manyToOne = Relation(fromKey, to.key, keyNames zip to.keyNames)
+  lazy val oneToMany = Relation(to.key, fromKey, to.keyNames zip keyNames)
+
+  lazy val index: Index[TPK,FPK,FROM] = Index(name+"_ix", from, fromKey, keyNames)
+
+  def join[K, G[_]](query: Queryable[K,TO,G]): Queryable[K,(TO,Set[FROM]),G] =
+    Join(query, oneToMany, index)
+
+  def ::[K,G[_]](query: Queryable[K,TO,G]) = join(query)
 }
 
-case class OptionalForeignKey[FPK,MANY<:Entity[FPK],TPK,TO<:Entity[TPK]](
-  from: Table[FPK,MANY],
-  fromKey: MANY => TPK,
-  to: Table[TPK,TO],
-  val keyNames: Seq[String]
-) extends DatabaseObject {
-  override def create: Update0 = null
-  override def drop: Update0 = null
-  override lazy val name = s"${from.name}_${to.name}_fk"
-  lazy val manyToOne = OptionalManyToOne(to.primaryKey, fromKey, to.primaryKey.id)
-  lazy val oneToMany = OneToMany[TO,TPK,MANY](index, fromKey, to.primaryKey.id)
-  lazy val index = Index(name+"_ix", from, fromKey, keyNames)
+
+
+case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+  override val from: Table[FPK,FROM],
+  override val fromKey: FROM => TPK,
+  override val to: Table[TPK,TO],
+  override val  keyNames: Seq[String]
+) extends ForeignKey[FPK,FROM,TPK,TO,Id] {
+
+  def +:[K,G[_]](query: Queryable[K,FROM,G]): Queryable[K, (FROM,Id[TO]), G] =
+    Join (query, manyToOne, to)
 }
 
-case class ManyToOne[MANY,PK,ONE](
-  one: Queryable[PK,ONE,Id],
-  manyKey: MANY => PK,
-  oneKey: ONE => PK
-) extends JoinableQueryable[MANY,ONE,Id]{
 
-  def join[K,F[_]](left: Joinable[K,MANY,F]) =
-    Join[K,MANY,F,PK,ONE,Id](left,manyKey,one)
-
-  def ::[K,F[_]](left: Joinable[K,MANY,F]) = join(left)
-
-  def +:[K,F[_]](left: Joinable[K,MANY,F]) =
-    ManyToOneJoin[K,F,PK,MANY,ONE](left, this)
+case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+  override val from: Table[FPK,FROM],
+  override val fromKey: FROM => TPK,
+  override val to: Table[TPK,TO],
+  override val  keyNames: Seq[String]
+) extends ForeignKey[FPK,FROM,TPK,TO,Option] {
+  def +:[K,G[_]](query: Queryable[K,FROM,G]): Queryable[K, (FROM,Option[TO]), G] =
+    Join (query, manyToOne, to.primaryKey)
 }
 
-case class OptionalManyToOne[MANY,PK,ONE](
-  one: Queryable[PK,ONE,Option],
-  manyKey: MANY => PK,
-  oneKey: ONE => PK
-) extends JoinableQueryable[MANY,ONE,Option]{
-
-  def join[K,F[_]](left: Joinable[K,MANY,F]) =
-    Join[K,MANY,F,PK,ONE,Option](left,manyKey,one)
-
-  def ::[K,F[_]](left: Joinable[K,MANY,F]) = join(left)
-
-  def +:[K,F[_]](left: Joinable[K,MANY,F]) =  OptionalManyToOneJoin(left, this)
-}
-
-case class OneToMany[ONE,PK,MANY](
-  many: Queryable[PK,MANY,Set],
-  manyKey: MANY => PK,
-  oneKey: ONE => PK
-) extends JoinableQueryable[ONE,MANY,Set] {
-
-  def join[K,F[_]](left: Joinable[K,ONE,F])  =
-    Join[K,ONE,F,PK,MANY,Set](left,oneKey,many)
-
-  def ::[K,F[_]](left: Joinable[K,ONE,F]) = join(left)
-
-  def +:[K,F[_]](left: Joinable[K,ONE,F]) = join(left)
-}
 
 case class Join[LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]](
-  left: Joinable[LEFTK,LEFTT,LEFTF],
-  key: LEFTT => RIGHTK,
+  left: Queryable[LEFTK,LEFTT,LEFTF],
+  relation: Relation[LEFTT, RIGHTK, RIGHTT],
   right: Queryable[RIGHTK,RIGHTT,RIGHTF]
-) extends Joinable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF] 
-    with Queryable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF] {
-
-  override def query(key: LEFTK) = Stream()
-
-  def identity[T](t: T) = t
-  def join[K,F[_]](left: Joinable[K,LEFTK,F]) =
-    Join[K,LEFTK,F, LEFTK,(LEFTT,RIGHTF[RIGHTT]), LEFTF](left,identity(_),this)
-  def ::[K,F[_]](left: Joinable[K,LEFTK,F]) = join(left)
+) extends Queryable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF] {
+  override def keyNames = left.keyNames
 }
 
+/*
 case class ManyToOneJoin[LEFTK, LEFTF[_], PK, MANY, ONE](
   left: Joinable[LEFTK,MANY,LEFTF],
   right: ManyToOne[MANY,PK,ONE]
@@ -235,3 +214,4 @@ case class OptionalManyToOneJoin[LEFTK, LEFTF[_], PK, MANY, ONE](
 }
 
 
+ */

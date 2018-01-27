@@ -37,7 +37,7 @@ class DSLTest {
     Seq("semester")
   )
 
-  val instructor = ForeignKey(sections,
+  val instructor = MandatoryForeignKey(sections,
     (s: Section) => s.instructor, teachers,
     Seq("instructor")
   )
@@ -46,33 +46,32 @@ class DSLTest {
     (c: Course) => c.prerequisite, courses,
     Seq("prerequisite"))
 
-  val sectionCourse = ForeignKey(sections,
+  val sectionCourse = MandatoryForeignKey(sections,
     (s: Section) => s.id.courseId, courses,
     Seq("courseId"))
 
-  val enrollmentCourse = ForeignKey(enrollments,
+  val enrollmentCourse = MandatoryForeignKey(enrollments,
     (e: Enrollment) => e.id.sectionId, sections,
     Seq("sectionId"))
 
-  val enrollmentStudent = ForeignKey(enrollments,
+  val enrollmentStudent = MandatoryForeignKey(enrollments,
     (e: Enrollment) => e.id.studentId, students,
     Seq("studentId"))
 
   val teacher: Stream[ConnectionIO,Teacher]  = teachers.query(TeacherId(1))
 
   val courseWithTeacher: Stream[ConnectionIO, (Section,Teacher)] =
-    (sections :: instructor.manyToOne).query(SectionId(CourseId(1), 1, 1))
+    (sections +: instructor).query(SectionId(CourseId(1), 1, 1))
 
   val teacherWithSections: Stream[ConnectionIO, (Teacher,Set[Section])] =
-    (teachers :: instructor.oneToMany).query(TeacherId(1))
+    (teachers :: instructor).query(TeacherId(1))
 
   val teacherWithSectionsAndStudents
       :Stream[ConnectionIO, (Teacher,Set[(Section,Set[(Enrollment, Student)])])] =
-    (teachers :: instructor.oneToMany :: enrollmentCourse.oneToMany ::
-      enrollmentStudent.manyToOne).query(TeacherId(1))
+    (teachers :: instructor :: enrollmentCourse) :: enrollmentStudent).query(TeacherId(1))
 
   val teacherWithCourses: Stream[ConnectionIO, (Teacher,Set[(Section,Course)])] =
-    (teachers :: instructor.oneToMany :: sectionCourse.manyToOne).query(TeacherId(1))
+    (teachers :: instructor +: sectionCourse).query(TeacherId(1))
 
   val teacherWithCoursesAndStudents:
   Stream[ConnectionIO, (Teacher,Set[((Section,Course), Set[(Enrollment,Student)])])] =
