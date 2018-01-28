@@ -33,28 +33,42 @@ sealed trait Queryable[K, T, F[_]] {
 }
 
 
-sealed trait UniqueQueryable[K,T] extends Queryable[K,T,Id] {
-  def +:[LK, LT, G[_]](query: Queryable[LK,LT,G], relation: Relation[LT,K,T]) =
-    join(query,relation)
+sealed trait Relation[L, K, R] {
+  def leftKey: L => K
+  def rightKey: R => K
+  def keyPairs: Seq[(String,String)]
 }
 
-sealed trait OptionQueryable[K,T] extends Queryable[K,T,Option] {
-  def +:[LK, LT, G[_]](query: Queryable[LK,LT,G], relation: Relation[LT,K,T]) =
-    join(query,relation)
+
+sealed trait Joinable[L,K,R,F[_]] {
+  def relation: Relation[L,K,R]
+  def rightQuery: Queryable[K,R,F]
+
+  def join[K2, G[_]](query: SimpleQueryable[K2,L,G]): SimpleQueryable[K2,(L,F[R]),G] =
+    SimpleJoin(query,relation,rightQuery)
+
+  def ::[LK, G[_]](query: SimpleQueryable[LK,L,G]) = join(query)
+
+  def join[LK, L2,K2,T,G[_]](query: JoinableQueryable[LK,L2,K2,L,T,G]):
+      JoinableQueryable[LK,L2,K2,L,(T,F[R]),G]  =
+    JoinableQueryable(query.relation, 
+
+  def ::[LK, L2,K2,T,G[_]](query: JoinableQueryable[LK,L2,K2,L,T,G]) = join(query)
 }
 
-case class Relation[L, K, R](
-  leftKey: L => K,
-  rightKey: R => K,
-  keyNames: Seq[(String,String)]
-)
+
+sealed trait SimpleQueryable[K,T,F[_]]
+    extends Queryable[K,T,F]
+
+sealed trait JoinableQueryable[LK,L,K,R,T,F[_]]
+    extends Queryable[LK,T,F] with Joinable[L,K,R,F]
 
 
 trait Entity[K] {
   def id: K
 }
 
-trait Table[K,E<:Entity[K]] extends DatabaseObject with UniqueQueryable[K,E] {
+trait Table[K,E<:Entity[K]] extends DatabaseObject with SimpleQueryable[K,E,Id] {
 
   override def key: E => K = { _.id }
   override def sql: String = primaryKey.sql
@@ -103,7 +117,7 @@ case class View[K,E,F[_]](
   override val sql: String,
   override val key: E => K,
   override val keyNames: Seq[String]
-) extends DatabaseObject with Queryable[K,E,F] {
+) extends DatabaseObject with SimpleQueryable[K,E,F] {
   override def create: Update0 = null
   override def drop: Update0 = null 
 }
@@ -113,7 +127,7 @@ case class Index[K,PK,E<:Entity[PK]](
   table: Table[PK,E],
   override val key: E => K,
   override val keyNames: Seq[String]
-) extends DatabaseObject with Queryable[K,E,Set] {
+) extends DatabaseObject with SimpleQueryable[K,E,Set] {
   override def create: Update0 = null
   override def drop: Update0 = null
 }
@@ -123,33 +137,31 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
   table: Table[PK,E],
   override val key: E => K,
   override val keyNames: Seq[String]
-) extends DatabaseObject with OptionQueryable[K,E] {
+) extends DatabaseObject with SimpleQueryable[K,E,Option] {
   override def create: Update0 = null
   override def drop: Update0 = null
 }
 
 
 sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
-    extends Queryable[FPK,TPK,F] {
-
+extends Relation[FROM,TPK,TO] {
   def from: Table[FPK,FROM]
   def fromKey: FROM => TPK
   def to: Table[TPK,TO]
   def keyNames: Seq[String]
+
+  override def leftKey = fromKey
+  override def rightKey = { _.id }
+  override lazy val keyPairs = keyNames zip to.keyNames
+
   override def create: Update0 = null
   override def drop: Update0 = null
   override lazy val name: String = s"${from.name}_${to.name}_fk"
-  lazy val manyToOne = Relation(fromKey, to.key, keyNames zip to.keyNames)
-  lazy val oneToMany = Relation(to.key, fromKey, to.keyNames zip keyNames)
+
+  lazy val oneToMany = ReverseForeignKey(this)
 
   lazy val index: Index[TPK,FPK,FROM] = Index(name+"_ix", from, fromKey, keyNames)
-
-  def join[K, G[_]](query: Queryable[K,TO,G]): Queryable[K,(TO,Set[FROM]),G] =
-    Join(query, oneToMany, index)
-
-  def ::[K,G[_]](query: Queryable[K,TO,G]) = join(query)
 }
-
 
 
 case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
@@ -159,8 +171,10 @@ case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   override val  keyNames: Seq[String]
 ) extends ForeignKey[FPK,FROM,TPK,TO,Id] {
 
-  def +:[K,G[_]](query: Queryable[K,FROM,G]): Queryable[K, (FROM,Id[TO]), G] =
-    Join (query, manyToOne, to)
+  def join[K, G[_]](query: SimpleQueryable[K,FROM,G]): SimpleQueryable[K,(FROM,Id[TO]),G] =
+    SimpleJoin(query, this, to)
+
+  def ::[K,G[_]](query: SimpleQueryable[K,FROM,G]) = join(query)
 }
 
 
@@ -170,18 +184,69 @@ case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   override val to: Table[TPK,TO],
   override val  keyNames: Seq[String]
 ) extends ForeignKey[FPK,FROM,TPK,TO,Option] {
-  def +:[K,G[_]](query: Queryable[K,FROM,G]): Queryable[K, (FROM,Option[TO]), G] =
-    Join (query, manyToOne, to.primaryKey)
+
+  def join[K, G[_]](query: SimpleQueryable[K,FROM,G]): SimpleQueryable[K,(FROM,Option[TO]),G] =
+    SimpleJoin(query, this, to.primaryKey)
+
+  def ::[K,G[_]](query: SimpleQueryable[K,FROM,G]) = join(query)
 }
 
 
-case class Join[LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]](
-  left: Queryable[LEFTK,LEFTT,LEFTF],
+case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
+  val foreignKey: ForeignKey[FPK,FROM,TPK,TO,F]
+) extends Relation[TO,TPK,FROM] {
+  override def leftKey = foreignKey.rightKey
+  override def rightKey = foreignKey.leftKey
+  override lazy val keyPairs = foreignKey.to.keyNames zip foreignKey.keyNames
+
+  def join[K, G[_]](query: SimpleQueryable[K,TO,G]): SimpleQueryable[K,(TO,Set[FROM]),G] =
+    SimpleJoin(query, this, foreignKey.index)
+
+  def ::[K,G[_]](query: SimpleQueryable[K,TO,G]) = join(query)
+}
+
+
+sealed trait Join[LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]] {
+  override def keyNames = left.keyNames
+  def left: SimpleQueryable[LEFTK,LEFTT,LEFTF]
+  def relation: Relation[LEFTT, RIGHTK, RIGHTT]
+  def right: Queryable[RIGHTK,RIGHTT,RIGHTF]
+}
+
+
+case class SimpleJoin[LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]](
+  override val left: SimpleQueryable[LEFTK,LEFTT,LEFTF],
+  override val relation: Relation[LEFTT, RIGHTK, RIGHTT],
+  override val right: Queryable[RIGHTK,RIGHTT,RIGHTF]
+) extends Join[LEFTK,LEFTT,LEFTF, RIGHTK,RIGHTT,RIGHTF]
+    with SimpleQueryable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF]
+
+
+
+case class JoinableJoin[K, T, LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]](
+  leftRelation: Relation[T, LEFTK, LEFTT],
+  override val left: JoinableQueryable[K,T,LEFTK,LEFTT,RIGHTT,LEFTF]
+  override val relation: Relation[LEFTT, RIGHTK, RIGHTT],
+  override val right: Queryable[RIGHTK,RIGHTT,RIGHTF]
+) extends Join[LEFTK,LEFTT,LEFTF, RIGHTK,RIGHTT,RIGHTF]
+    with JoinableQueryable[K, T, LEFTK, RIGHTT, (LEFTT,RIGHTF[RIGHTT]), LEFTF]
+
+
+
+//case class CompoundJoin
+/*
+
+case class JoinableJoin[
+  FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_],
+  LEFTK,LEFTT,LEFTF[_], RIGHTK, RIGHTT, RIGHTF[_]](
+  foreignKey: ForeignKey[FPK,FROM,TPK,TO,F],
+  left: SimpleQueryable[LEFTK,LEFTT,LEFTF],
   relation: Relation[LEFTT, RIGHTK, RIGHTT],
-  right: Queryable[RIGHTK,RIGHTT,RIGHTF]
+  right: SimpleQueryable[RIGHTK,RIGHTT,RIGHTF]
 ) extends Queryable[LEFTK, (LEFTT, RIGHTF[RIGHTT]), LEFTF] {
   override def keyNames = left.keyNames
 }
+ */
 
 /*
 case class ManyToOneJoin[LEFTK, LEFTF[_], PK, MANY, ONE](
