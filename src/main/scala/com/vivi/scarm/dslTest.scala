@@ -33,7 +33,7 @@ class DSLTest {
     Seq("studentId", "sectionId"))
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
-    (s: Section) =>  s.id.semester,
+//    (s: Section) =>  s.id.semester,
     Seq("semester")
   )
 
@@ -50,7 +50,7 @@ class DSLTest {
     (s: Section) => s.id.courseId, courses,
     Seq("courseId"))
 
-  val enrollmentCourse = MandatoryForeignKey(enrollments,
+  val enrollmentSection = MandatoryForeignKey(enrollments,
     (e: Enrollment) => e.id.sectionId, sections,
     Seq("sectionId"))
 
@@ -66,18 +66,21 @@ class DSLTest {
   val teacherWithSections: Stream[ConnectionIO, (Teacher,Set[Section])] =
     (teachers :: instructor.oneToMany).query(TeacherId(1))
 
-  val foo = instructor.oneToMany :: enrollmentCourse
+  val foo1 = instructor.reverse :: enrollmentSection.oneToMany
+
+  val foo = 
+    teachers :: instructor.reverse :: enrollmentSection.oneToMany
 
   val teacherWithSectionsAndStudents
       :Stream[ConnectionIO, (Teacher,Set[(Section,Set[(Enrollment, Student)])])] =
-    (teachers :: instructor :: enrollmentCourse.oneToMany) :: enrollmentStudent).query(TeacherId(1))
+    (teachers :: instructor.reverse :: enrollmentSection.oneToMany :: enrollmentStudent).query(TeacherId(1))
 
   val teacherWithCourses: Stream[ConnectionIO, (Teacher,Set[(Section,Course)])] =
     (teachers :: instructor +: sectionCourse).query(TeacherId(1))
 
   val teacherWithCoursesAndStudents:
   Stream[ConnectionIO, (Teacher,Set[((Section,Course), Set[(Enrollment,Student)])])] =
-    (teachers :: (instructor.oneToMany +: sectionCourse.manyToOne) :: enrollmentCourse.oneToMany :: enrollmentStudent.manyToOne
+    (teachers :: (instructor.oneToMany +: sectionCourse.manyToOne) :: enrollmentSection.oneToMany :: enrollmentStudent.manyToOne
     ).query(TeacherId(1))
 }
 
