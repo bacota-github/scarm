@@ -43,9 +43,11 @@ sealed trait Queryable[K, F[_], E] {
   def ::[LK,LF[_]](query: Queryable[LK,LF,K]): Queryable[LK,LF,(K,F[E])] =
     join(query)
 
-//  def :::[LEFTK,LEFTL, LEFTR, LEFTE, LEFTJ[_]](
-//    query: Queryable[LEFTK, (LEFTL,LEFTR), LEFTE, LEFTJ]
-//  ): Queryable[LEFTK, (
+  def nestedJoin[LK,LF[_],X](query: Queryable[LK,LF,(K,X)])
+        :Queryable[LK,LF,(K,X,F[E])] = NestedJoin(query,this)
+
+  def :::[LK,LF[_],X](query: Queryable[LK,LF,(K,X)])
+      :Queryable[LK,LF,(K,X,F[E])] = nestedJoin(query)
 }
 
 
@@ -158,5 +160,14 @@ case class Join[K,LF[_], JK, RF[_],E](
 ) extends Queryable[K,LF,(JK,RF[E])] {
   override def keyNames = left.keyNames
   override def joinKeyNames = right.joinKeyNames
+}
+
+
+case class NestedJoin[K,LF[_], JK,X, RF[_],E](
+  left: Queryable[K,LF,(JK,X)],
+  right: Queryable[JK,RF,E]
+) extends Queryable[K,LF,(JK,X,RF[E])] {
+  override def keyNames = left.keyNames
+  override def joinKeyNames = left.joinKeyNames
 }
 
