@@ -80,7 +80,7 @@ case class Table[K,E<:Entity[K]](
 case class View[K,E](
   override val name: String,
   override val sql: String,
-  override val key: E => K,
+//  override val key: E => K,
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E] {
   override def create: Update0 = null
