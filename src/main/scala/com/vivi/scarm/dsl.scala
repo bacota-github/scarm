@@ -180,6 +180,6 @@ case class NestedJoin[K,LF[_], JK,X, RF[_],E](
     s"J${ct}.*," + right.selectList(ct+1)
 
   override def tableList(ct: Int): String =
-    s"(${left.sql}) J${ct}"
+    s"(${left.sql}) J${ct}, " + right.tableList(ct+1)
 }
 
