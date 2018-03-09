@@ -19,9 +19,11 @@ trait Entity[K] {
 
 
 sealed trait DatabaseObject {
-  def create: Update0
-  def drop: Update0
   def name: String
+
+  def tname(ct: Int): String = s"${name}${ct}"
+  def selectList(ct: Int): String = tname(ct) + ".*"
+  def tableList(ct: Int): String = s"${name} AS ${tname(ct)}"
 }
 
 
@@ -29,7 +31,14 @@ sealed trait Queryable[K, F[_], E] {
 
   def keyNames: Seq[String]
   def joinKeyNames: Seq[String] = keyNames
-  def sql: String = ""
+
+  def selectList(ct: Int=0): String
+  def tableList(ct: Int=0): String
+  def whereClause: String = keyNames.map(_ + "=?").mkString(" AND ")
+
+
+  def sql: String =
+    s"SELECT ${selectList(1)} FROM ${tableList(1)} WHERE ${whereClause}"
 
   def doobieQuery(prefix: String, key: K)
     (implicit keyComposite: Composite[K], compositeT: Composite[F[E]]) =
@@ -51,24 +60,15 @@ sealed trait Queryable[K, F[_], E] {
 }
 
 
-
 case class Table[K,E<:Entity[K]](
   override val name: String,
   override val keyNames: Seq[String] = Seq("id")
 ) extends DatabaseObject with Queryable[K,Id,E] {
 
-//  override def key: E => K = { _.id }
-  override def sql: String = primaryKey.sql
-
-  override def create: Update0 = null
-  override def drop: Update0 = null
-
-//  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, (e: E) => e.id, keyNames)
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, keyNames)
 
   // def fetch(key: K): ConnectionIO[Option[E]] =
 //    query(key).head
-  def create(enties: E*): Try[Unit] = Success(Unit)
   //def createReturning(entities: E*): Try[Seq[E]]
   def delete(keys: K*): Try[Unit] = Success(Unit)
   def save(enties: E*): Try[Unit] = Success(Unit)
@@ -79,32 +79,26 @@ case class Table[K,E<:Entity[K]](
 
 case class View[K,E](
   override val name: String,
-  override val sql: String,
-//  override val key: E => K,
+  val definition: String,
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E] {
-  override def create: Update0 = null
-  override def drop: Update0 = null 
+  override def tableList(ct: Int = 0): String = s"(${definition}) AS ${tname(ct)}"
 }
 
 case class Index[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
-//  override val key: E => K,
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E] {
-  override def create: Update0 = null
-  override def drop: Update0 = null
+  override def tableList(ct: Int=0): String = s"${table.name} AS ${tname(ct)}"
 }
 
 case class UniqueIndex[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
-//  override val key: E => K,
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E] {
-  override def create: Update0 = null
-  override def drop: Update0 = null
+  override def tableList(ct: Int=0): String = s"${table.name} AS ${tname(ct)}"
 }
 
 
@@ -118,9 +112,10 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
   override def keyNames: Seq[String]
   override def joinKeyNames: Seq[String] = to.keyNames
 
-  override def create: Update0 = null
-  override def drop: Update0 = null
   override lazy val name: String = s"${from.name}_${to.name}_fk"
+
+  override def selectList(ct: Int): String = to.selectList(ct)
+  override def tableList(ct: Int): String = s"${to.name} AS ${tname(ct)}"
 
   lazy val oneToMany = ReverseForeignKey(this)
   lazy val reverse = oneToMany
@@ -148,9 +143,10 @@ case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
 case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
   val foreignKey: ForeignKey[TPK,TO,FPK,FROM,F]
 ) extends Queryable[FROM, Set, TO] {
-
   override def keyNames: Seq[String] = foreignKey.to.keyNames
   override def joinKeyNames: Seq[String] = foreignKey.from.keyNames
+  override def selectList(ct: Int): String = foreignKey.to.selectList(ct)
+  override def tableList(ct: Int): String = s"${foreignKey.to.name} AS ${foreignKey.tname(ct)}"
 }
 
 
@@ -158,8 +154,16 @@ case class Join[K,LF[_], JK, RF[_],E](
   left: Queryable[K,LF,JK],
   right: Queryable[JK,RF,E]
 ) extends Queryable[K,LF,(JK,RF[E])] {
+
   override def keyNames = left.keyNames
+
   override def joinKeyNames = right.joinKeyNames
+
+  override def selectList(ct: Int): String =
+    left.selectList(ct) +","+ right.selectList(ct+1)
+
+  override def tableList(ct: Int): String =
+    left.tableList(ct) +","+ right.selectList((ct+1))
 }
 
 
@@ -167,7 +171,15 @@ case class NestedJoin[K,LF[_], JK,X, RF[_],E](
   left: Queryable[K,LF,(JK,X)],
   right: Queryable[JK,RF,E]
 ) extends Queryable[K,LF,(JK,X,RF[E])] {
+
   override def keyNames = left.keyNames
+
   override def joinKeyNames = left.joinKeyNames
+
+  override def selectList(ct: Int): String =
+    s"J${ct}.*," + right.selectList(ct+1)
+
+  override def tableList(ct: Int): String =
+    s"(${left.sql}) J${ct}"
 }
 
