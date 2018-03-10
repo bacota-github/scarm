@@ -2,7 +2,6 @@ scalaVersion := "2.12.4"
 
 scalacOptions ++= Seq("-Ypartial-unification", "-deprecation")
 
-//val doobieVersion = "0.4.1"
 val doobieVersion = "0.5.1"
 
 libraryDependencies ++= Seq(
