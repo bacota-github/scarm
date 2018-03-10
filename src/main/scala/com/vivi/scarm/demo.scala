@@ -66,13 +66,13 @@ object Demo {
       (sql"""select id, name, email
          from people
       """.query[Person]
-      ).list
+      ).to[List]
 
     def getCourse: ConnectionIO[List[Course]] =
       (sql"""select *
          from course
       """.query[Course]
-      ).list
+      ).to[List]
 
     val p1 = Person(UUID.randomUUID(),"James Earl Douglas", "james@earldouglas.com")
     val p2 = Person(UUID.randomUUID(),"Johnny McDoe", "johnny@mcdoe")
@@ -104,7 +104,7 @@ object Demo {
          from course co 
          inner join people p on co.teacherId = p.id
       """.query[CourseWithTeacher]
-      ).list
+      ).to[List]
 
     run(getCoursesWithTeacher).foreach { case co => println(s"${co}") }
 
@@ -114,14 +114,14 @@ object Demo {
          from people p
          inner join course co on co.teacherId = p.id
       """.query[TeacherWithCourses]
-      ).list
+      ).to[List]
     println(run(getTeacherWithCourses))
 
     def getPeopleT: ConnectionIO[List[(Person)]] =
       (sql"""select id, name, email
          from people
       """.query[(Person)]
-      ).list
+      ).to[List]
 
     println("getPeopleT")
     println(run(getPeopleT))
@@ -131,7 +131,7 @@ object Demo {
          from people p
          inner join course co on co.teacherId = p.id
       """.query[(Person,Course)]
-      ).list
+      ).to[List]
     println(run(getTeacherWithCoursesT))
 
     def getTeacherWithCoursesT2: ConnectionIO[List[(Person,Course,Person)]] =
@@ -140,7 +140,7 @@ object Demo {
          inner join course co on co.teacherId = p.id
          inner join people p2 on co.teacherId = p2.id
       """.query[(Person,Course,Person)]
-      ).list
+      ).to[List]
     println(run(getTeacherWithCoursesT2))
 
 //    implicit val exampleCourse = Course(UUID.randomUUID(), "foo", UUID.randomUUID())
@@ -176,7 +176,7 @@ object Demo {
          from people p
          left outer join course co on co.teacherId = p.id
       """.query[(Person, Option[Course])]
-      ).list
+      ).to[List]
     println(run(getTeacherWithCoursesOptT))
   }
 }
