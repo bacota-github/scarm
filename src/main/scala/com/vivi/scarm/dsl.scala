@@ -17,32 +17,41 @@ trait Entity[K] {
   def id: K
 }
 
+object dslUtil {
+  def tname(ct: Int): String = "t" + ct
+  def alias(name: String, ct: Int): String = name + " AS " + tname(ct)
+}
+
+import dslUtil._
 
 sealed trait DatabaseObject {
   def name: String
 
-  def tname(ct: Int): String = s"${name}${ct}"
-  def selectList(ct: Int): String = tname(ct) + ".*"
-  def tableList(ct: Int): String = s"${name} AS ${tname(ct)}"
+  def selectList(ct: Int): String = tname(ct) +".*"
+  def tablect: Int = 1
+  def tableList(ct: Int): Seq[String] = Seq(alias(name, ct))
 }
 
 
 sealed trait Queryable[K, F[_], E] {
 
   def keyNames: Seq[String]
+  def innerJoinKeyNames: Seq[String] = joinKeyNames
   def joinKeyNames: Seq[String] = keyNames
 
   def selectList(ct: Int=0): String
-  def tableList(ct: Int=0): String
-  def whereClause: String = keyNames.map(_ + "=?").mkString(" AND ")
+  def tableList(ct: Int=0): Seq[String]
+  def tablect: Int
+  def whereClause: String = keyNames.map(k => s"t1.${k}=?").mkString(" AND ")
 
-
-  def sql: String =
-    s"SELECT ${selectList(1)} FROM ${tableList(1)} WHERE ${whereClause}"
+  def sql: String = {
+    val tables = tableList(1).mkString("\n")
+    s"SELECT ${selectList(1)} FROM ${tables}\n\tWHERE ${whereClause}"
+  }
 
   def doobieQuery(prefix: String, key: K)
     (implicit keyComposite: Composite[K], compositeT: Composite[F[E]]) =
-    Fragment(sql, key)(keyComposite).query[F[E]](compositeT).process
+    Fragment(sql, key)(keyComposite).query[F[E]](compositeT).stream
 
   def query(key: K):  Stream[ConnectionIO,F[E]] = Stream()
 
@@ -82,7 +91,8 @@ case class View[K,E](
   val definition: String,
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E] {
-  override def tableList(ct: Int = 0): String = s"(${definition}) AS ${tname(ct)}"
+  override def tableList(ct: Int = 0): Seq[String] =
+    Seq(alias(s"(${definition})", ct))
 }
 
 case class Index[K,PK,E<:Entity[PK]](
@@ -90,7 +100,7 @@ case class Index[K,PK,E<:Entity[PK]](
   table: Table[PK,E],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E] {
-  override def tableList(ct: Int=0): String = s"${table.name} AS ${tname(ct)}"
+  override def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
 }
 
 case class UniqueIndex[K,PK,E<:Entity[PK]](
@@ -98,7 +108,7 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
   table: Table[PK,E],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E] {
-  override def tableList(ct: Int=0): String = s"${table.name} AS ${tname(ct)}"
+  override def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
 }
 
 
@@ -115,7 +125,7 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
   override lazy val name: String = s"${from.name}_${to.name}_fk"
 
   override def selectList(ct: Int): String = to.selectList(ct)
-  override def tableList(ct: Int): String = s"${to.name} AS ${tname(ct)}"
+  override def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
 
   lazy val oneToMany = ReverseForeignKey(this)
   lazy val reverse = oneToMany
@@ -144,11 +154,12 @@ case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
   val foreignKey: ForeignKey[TPK,TO,FPK,FROM,F]
 ) extends Queryable[FROM, Set, TO] {
   override def keyNames: Seq[String] = foreignKey.to.keyNames
-  override def joinKeyNames: Seq[String] = foreignKey.from.keyNames
+  override def joinKeyNames: Seq[String] = foreignKey.keyNames
   override def selectList(ct: Int): String = foreignKey.to.selectList(ct)
-  override def tableList(ct: Int): String = s"${foreignKey.to.name} AS ${foreignKey.tname(ct)}"
+  override def tablect: Int = 1
+  override def tableList(ct: Int): Seq[String] =
+    Seq(alias(foreignKey.from.name, ct))
 }
-
 
 case class Join[K,LF[_], JK, RF[_],E](
   left: Queryable[K,LF,JK],
@@ -156,30 +167,58 @@ case class Join[K,LF[_], JK, RF[_],E](
 ) extends Queryable[K,LF,(JK,RF[E])] {
 
   override def keyNames = left.keyNames
-
-  override def joinKeyNames = right.joinKeyNames
+  override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
+  override def joinKeyNames = left.joinKeyNames
 
   override def selectList(ct: Int): String =
     left.selectList(ct) +","+ right.selectList(ct+1)
 
-  override def tableList(ct: Int): String =
-    left.tableList(ct) +","+ right.selectList((ct+1))
+  override def tablect: Int = left.tablect + right.tablect
+
+  private def joinCondition(ct: Int): String = {
+    val leftt = tname(ct+left.tablect-1)
+    val rightt = tname(ct+left.tablect)
+    (right.keyNames zip right.joinKeyNames).
+      map(p => s"${leftt}.${p._1} = ${rightt}.${p._2}").
+      mkString(" AND ")
+  }
+
+  override def tableList(ct: Int): Seq[String] = {
+    val rct = ct+left.tablect
+    val rtables = right.tableList(rct)
+    val rhead = s"\tLEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
+    (left.tableList(ct) :+ rhead) ++ rtables.tail
+  }
 }
 
 
 case class NestedJoin[K,LF[_], JK,X, RF[_],E](
   left: Queryable[K,LF,(JK,X)],
   right: Queryable[JK,RF,E]
-) extends Queryable[K,LF,(JK,X,RF[E])] {
+) extends Queryable[K,LF,(JK,X,RF[E])] { 
 
   override def keyNames = left.keyNames
-
+  override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
   override def joinKeyNames = left.joinKeyNames
 
   override def selectList(ct: Int): String =
-    s"J${ct}.*," + right.selectList(ct+1)
+    s"t${ct}.*," + right.selectList(ct+1)
 
-  override def tableList(ct: Int): String =
-    s"(${left.sql}) J${ct}, " + right.tableList(ct+1)
+  override def tablect: Int = left.tablect + right.tablect
+
+  private def joinCondition(ct: Int): String = {
+    val leftt = tname(ct)
+    val rightt = tname(ct+left.tablect)
+    (right.keyNames zip right.joinKeyNames).
+      map(p => s"${leftt}.${p._1} = ${rightt}.${p._2}").
+      mkString(" AND ")
+  }
+
+  override def tableList(ct: Int): Seq[String] = {
+    val rct = ct+left.tablect
+    val rtables = right.tableList(rct)
+    val rhead = s"\tLEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
+    (left.tableList(ct) :+ rhead) ++ rtables.tail
+  }
 }
 
