@@ -45,8 +45,8 @@ sealed trait Queryable[K, F[_], E] {
   def whereClause: String = keyNames.map(k => s"t1.${k}=?").mkString(" AND ")
 
   def sql: String = {
-    val tables = tableList(1).mkString("\n")
-    s"SELECT ${selectList(1)} FROM ${tables}\n\tWHERE ${whereClause}"
+    val tables = tableList(1).mkString(" ")
+    s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
   }
 
   def doobieQuery(prefix: String, key: K)
@@ -186,7 +186,7 @@ case class Join[K,LF[_], JK, RF[_],E](
   override def tableList(ct: Int): Seq[String] = {
     val rct = ct+left.tablect
     val rtables = right.tableList(rct)
-    val rhead = s"\tLEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
+    val rhead = s" LEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
     (left.tableList(ct) :+ rhead) ++ rtables.tail
   }
 }
@@ -217,7 +217,7 @@ case class NestedJoin[K,LF[_], JK,X, RF[_],E](
   override def tableList(ct: Int): Seq[String] = {
     val rct = ct+left.tablect
     val rtables = right.tableList(rct)
-    val rhead = s"\tLEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
+    val rhead = s" LEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
     (left.tableList(ct) :+ rhead) ++ rtables.tail
   }
 }
