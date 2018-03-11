@@ -10,7 +10,7 @@ object Demo {
   def main: Unit = {
     val xa = Transactor.fromDriverManager[IO](
       //        "org.h2.Driver", "jdbc:h2:mem:db" , "" , ""
-      "org.postgresql.Driver", "jdbc:postgresql:cccassess" , "cccassess" , "cccassess"
+      "org.postgresql.Driver", "jdbc:postgresql:scarm" , "scarm" , "scarm"
     )
     def run[A](query: ConnectionIO[A]): A =
       query.transact(xa).unsafeRunSync

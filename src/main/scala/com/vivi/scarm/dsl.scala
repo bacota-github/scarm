@@ -49,11 +49,10 @@ sealed trait Queryable[K, F[_], E] {
     s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
   }
 
-  def doobieQuery(prefix: String, key: K)
-    (implicit keyComposite: Composite[K], compositeT: Composite[F[E]]) =
-    Fragment(sql, key)(keyComposite).query[F[E]](compositeT).stream
+  def query(key: K)(implicit keyComposite: Composite[K], compositeT: Composite[F[E]]): Query0[F[E]] =
+    Fragment(sql, key)(keyComposite).query[F[E]](compositeT)
 
-  def query(key: K):  Stream[ConnectionIO,F[E]] = Stream()
+//  def query(key: K) = Fragment(sql, key)
 
   def join[LK,LF[_]](query: Queryable[LK,LF,K]): Queryable[LK,LF,(K,F[E])] =
     Join(query,this)
@@ -221,4 +220,3 @@ case class NestedJoin[K,LF[_], JK,X, RF[_],E](
     (left.tableList(ct) :+ rhead) ++ rtables.tail
   }
 }
-
