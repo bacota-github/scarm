@@ -187,7 +187,7 @@ case class Join[K,LF[_], JK, RF[_],E](
   override def tableList(ct: Int): Seq[String] = {
     val rct = ct+left.tablect
     val rtables = right.tableList(rct)
-    val rhead = s" LEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
+    val rhead = s"LEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
     (left.tableList(ct) :+ rhead) ++ rtables.tail
   }
 }
@@ -218,7 +218,7 @@ case class NestedJoin[K,LF[_], JK,X, RF[_],E](
   override def tableList(ct: Int): Seq[String] = {
     val rct = ct+left.tablect
     val rtables = right.tableList(rct)
-    val rhead = s" LEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
+    val rhead = s"LEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
     (left.tableList(ct) :+ rhead) ++ rtables.tail
   }
 }
