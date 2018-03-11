@@ -34,7 +34,7 @@ class DSLTest extends FunSuite {
     Seq("studentId", "course_id", "semester", "section_number"))
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
-    Seq("semester")
+    (s: Section) => s.id.semester, Seq("semester")
   )
 
   val instructor = MandatoryForeignKey(sections,
@@ -69,29 +69,35 @@ class DSLTest extends FunSuite {
   val teacherWithCoursesAndStudents =
       teachers :: (instructor.oneToMany :: sectionCourse) ::: enrollmentSection.reverse :: enrollmentStudent
 
+  val sectionsBySemesterWithInstructors =
+    sectionsBySemester :: instructor
 
-  test("teachers sql") {
+  test("sql for querying a table by primary key") {
     assert(teachers.sql == "SELECT t1.* FROM teachers AS t1 WHERE t1.id=?")
   }
 
-  test("courseWithTeacher sql") {
+  test("sql for a many to one join") {
     assert(courseWithTeacher.sql == "SELECT t1.*,t2.* FROM sections AS t1  LEFT OUTER JOIN teachers AS t2 ON t1.instructor = t2.id WHERE t1.course_id=? AND t1.semester=? AND t1.section_number=?")
   }
 
-  test("teacherWithSections sql") {
+  test("sql for one to many join") {
     assert(teacherWithSections.sql == "SELECT t1.*,t2.* FROM teachers AS t1  LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor WHERE t1.id=?")
   }
 
-  test("teacherWithSectionsAndStudents") {
-    assert(teacherWithSectionsAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.* FROM teachers AS t1  LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor  LEFT OUTER JOIN enrollments AS t3 ON t2.course_id = t3.course_id AND t2.semester = t3.semester AND t2.section_number = t3.section_number  LEFT OUTER JOIN students AS t4 ON t3.studentId = t4.id WHERE t1.id=?")
-  }
-
-  test("teacherWithCourses sql") {
+  test("sql for three table join") {
     assert(teacherWithCourses.sql == "SELECT t1.*,t2.*,t3.* FROM teachers AS t1  LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor  LEFT OUTER JOIN courses AS t3 ON t2.course_id = t3.id WHERE t1.id=?");
   }
 
-  test("teacherWithCoursesAndStudents sql") {
+  test("sql for four table join") {
+    assert(teacherWithSectionsAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.* FROM teachers AS t1  LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor  LEFT OUTER JOIN enrollments AS t3 ON t2.course_id = t3.course_id AND t2.semester = t3.semester AND t2.section_number = t3.section_number  LEFT OUTER JOIN students AS t4 ON t3.studentId = t4.id WHERE t1.id=?")
+  }
+
+  test("sql for join with two tables joined to root table") {
     assert(teacherWithCoursesAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.* FROM teachers AS t1  LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor  LEFT OUTER JOIN courses AS t3 ON t2.course_id = t3.id  LEFT OUTER JOIN enrollments AS t4 ON t2.course_id = t4.course_id AND t2.semester = t4.semester AND t2.section_number = t4.section_number  LEFT OUTER JOIN students AS t5 ON t4.studentId = t5.id WHERE t1.id=?")
+  }
+
+  test("sql for query by index") {
+    assert(sectionsBySemester.sql == "SELECT t1.* FROM sections AS t1 WHERE t1.semester=?")
   }
 
 }

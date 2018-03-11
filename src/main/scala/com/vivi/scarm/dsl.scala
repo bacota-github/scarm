@@ -49,10 +49,10 @@ sealed trait Queryable[K, F[_], E] {
     s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
   }
 
+//  def reduce(F[_], ConnectionIO[F[
+
   def query(key: K)(implicit keyComposite: Composite[K], compositeT: Composite[F[E]]): Query0[F[E]] =
     Fragment(sql, key)(keyComposite).query[F[E]](compositeT)
-
-//  def query(key: K) = Fragment(sql, key)
 
   def join[LK,LF[_]](query: Queryable[LK,LF,K]): Queryable[LK,LF,(K,F[E])] =
     Join(query,this)
@@ -73,7 +73,7 @@ case class Table[K,E<:Entity[K]](
   override val keyNames: Seq[String] = Seq("id")
 ) extends DatabaseObject with Queryable[K,Id,E] {
 
-  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, keyNames)
+  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, { _.id}, keyNames)
 
   // def fetch(key: K): ConnectionIO[Option[E]] =
 //    query(key).head
@@ -97,6 +97,7 @@ case class View[K,E](
 case class Index[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
+  key: E => K,
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E] {
   override def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
@@ -105,6 +106,7 @@ case class Index[K,PK,E<:Entity[PK]](
 case class UniqueIndex[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
+  key: E => K,
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E] {
   override def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
@@ -129,7 +131,7 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
   lazy val oneToMany = ReverseForeignKey(this)
   lazy val reverse = oneToMany
 
-  lazy val index: Index[TPK,FPK,FROM] = Index(name+"_ix", from, keyNames)
+  lazy val index: Index[TPK,FPK,FROM] = Index(name+"_ix", from, fromKey, keyNames)
 }
 
 
