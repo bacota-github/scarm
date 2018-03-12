@@ -98,7 +98,7 @@ class DSLTest extends FunSuite {
 
   test("sql for join with two tables joined to root table") {
     //println(teacherWithCoursesAndStudents.sql)
-    assert(teacherWithCoursesAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor LEFT OUTER JOIN courses AS t3 ON t2.course_id = t3.id LEFT OUTER JOIN enrollments AS t4 ON t2.course_id = t4.course_id AND t2.semester = t4.semester AND t2.section_number = t4.section_number LEFT OUTER JOIN students AS t5 ON t4.studentId = t5.id WHERE t1.id=? ORDER BY t1.id,t2.course_id,t2.semester,t2.section_number,t3.id,t4.studentId,t4.course_id,t4.semester,t4.section_number,t5.id")
+    assert(teacherWithCoursesAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.*,t5.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor LEFT OUTER JOIN courses AS t3 ON t2.course_id = t3.id LEFT OUTER JOIN enrollments AS t4 ON t2.course_id = t4.course_id AND t2.semester = t4.semester AND t2.section_number = t4.section_number LEFT OUTER JOIN students AS t5 ON t4.studentId = t5.id WHERE t1.id=? ORDER BY t1.id,t2.course_id,t2.semester,t2.section_number,t3.id,t4.studentId,t4.course_id,t4.semester,t4.section_number,t5.id")
   }
 
   test("sql for query by index") {

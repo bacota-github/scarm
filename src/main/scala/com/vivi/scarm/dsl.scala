@@ -226,7 +226,7 @@ case class NestedJoin[K,LF[_], JK,X, RF[_],E](
     left.orderBy(ct)+","+right.orderBy(ct+left.tablect)
 
   override def selectList(ct: Int): String =
-    s"t${ct}.*," + right.selectList(ct+1)
+    left.selectList(ct) +","+ right.selectList(ct+left.tablect)
 
   override def tablect: Int = left.tablect + right.tablect
 
