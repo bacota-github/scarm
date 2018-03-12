@@ -39,20 +39,22 @@ sealed trait Queryable[K, F[_], E] {
   def innerJoinKeyNames: Seq[String] = joinKeyNames
   def joinKeyNames: Seq[String] = keyNames
 
-  def selectList(ct: Int=0): String
-  def tableList(ct: Int=0): Seq[String]
+  def selectList(ct: Int): String
+  def tableList(ct: Int): Seq[String]
   def tablect: Int
   def whereClause: String = keyNames.map(k => s"t1.${k}=?").mkString(" AND ")
+  def orderBy(ct: Int): String
 
   def sql: String = {
     val tables = tableList(1).mkString(" ")
-    s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
-  }
+    s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause} ORDER BY ${orderBy(1)}" 
 
-//  def reduce(F[_], ConnectionIO[F[
+  }
 
   def query(key: K)(implicit keyComposite: Composite[K], compositeT: Composite[F[E]]): Query0[F[E]] =
     Fragment(sql, key)(keyComposite).query[F[E]](compositeT)
+
+//  def reduce(
 
   def join[LK,LF[_]](query: Queryable[LK,LF,K]): Queryable[LK,LF,(K,F[E])] =
     Join(query,this)
@@ -75,6 +77,9 @@ case class Table[K,E<:Entity[K]](
 
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, { _.id}, keyNames)
 
+  override def orderBy(ct: Int): String =
+    keyNames.map(k => tname(ct) +"."+k).mkString(",")
+
   // def fetch(key: K): ConnectionIO[Option[E]] =
 //    query(key).head
   //def createReturning(entities: E*): Try[Seq[E]]
@@ -92,6 +97,8 @@ case class View[K,E](
 ) extends DatabaseObject with Queryable[K,Option,E] {
   override def tableList(ct: Int = 0): Seq[String] =
     Seq(alias(s"(${definition})", ct))
+  override def orderBy(ct: Int): String =
+    keyNames.map(k => tname(ct) +"."+k).mkString(",")
 }
 
 case class Index[K,PK,E<:Entity[PK]](
@@ -101,6 +108,8 @@ case class Index[K,PK,E<:Entity[PK]](
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E] {
   override def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
+  override def orderBy(ct: Int): String =
+    table.keyNames.map(k => tname(ct) +"."+k).mkString(",")
 }
 
 case class UniqueIndex[K,PK,E<:Entity[PK]](
@@ -110,6 +119,8 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E] {
   override def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
+  override def orderBy(ct: Int): String =
+    table.keyNames.map(k => tname(ct) +"."+k).mkString(",")
 }
 
 
@@ -122,6 +133,9 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
   def to: Table[TPK,TO]
   override def keyNames: Seq[String]
   override def joinKeyNames: Seq[String] = to.keyNames
+
+  override def orderBy(ct: Int): String =
+    to.keyNames.map(k => tname(ct) +"."+k).mkString(",")
 
   override lazy val name: String = s"${from.name}_${to.name}_fk"
 
@@ -160,7 +174,10 @@ case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
   override def tablect: Int = 1
   override def tableList(ct: Int): Seq[String] =
     Seq(alias(foreignKey.from.name, ct))
+  override def orderBy(ct: Int): String =
+    foreignKey.from.keyNames.map(k => tname(ct) +"."+k).mkString(",")
 }
+
 
 case class Join[K,LF[_], JK, RF[_],E](
   left: Queryable[K,LF,JK],
@@ -170,6 +187,9 @@ case class Join[K,LF[_], JK, RF[_],E](
   override def keyNames = left.keyNames
   override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
   override def joinKeyNames = left.joinKeyNames
+
+  override def orderBy(ct: Int): String =
+    left.orderBy(ct)+","+right.orderBy(ct+left.tablect)
 
   override def selectList(ct: Int): String =
     left.selectList(ct) +","+ right.selectList(ct+1)
@@ -201,6 +221,9 @@ case class NestedJoin[K,LF[_], JK,X, RF[_],E](
   override def keyNames = left.keyNames
   override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
   override def joinKeyNames = left.joinKeyNames
+
+  override def orderBy(ct: Int): String =
+    left.orderBy(ct)+","+right.orderBy(ct+left.tablect)
 
   override def selectList(ct: Int): String =
     s"t${ct}.*," + right.selectList(ct+1)

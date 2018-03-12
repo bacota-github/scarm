@@ -73,36 +73,42 @@ class DSLTest extends FunSuite {
     sectionsBySemester :: instructor
 
   test("sql for querying a table by primary key") {
-    assert(teachers.sql == "SELECT t1.* FROM teachers AS t1 WHERE t1.id=?")
+    //println(teachers.sql)
+    assert(teachers.sql == "SELECT t1.* FROM teachers AS t1 WHERE t1.id=? ORDER BY t1.id")
   }
 
   test("sql for a many to one join") {
-    assert(courseWithTeacher.sql == "SELECT t1.*,t2.* FROM sections AS t1 LEFT OUTER JOIN teachers AS t2 ON t1.instructor = t2.id WHERE t1.course_id=? AND t1.semester=? AND t1.section_number=?")
+    //println(courseWithTeacher.sql)
+    assert(courseWithTeacher.sql == "SELECT t1.*,t2.* FROM sections AS t1 LEFT OUTER JOIN teachers AS t2 ON t1.instructor = t2.id WHERE t1.course_id=? AND t1.semester=? AND t1.section_number=? ORDER BY t1.course_id,t1.semester,t1.section_number,t2.id")
   }
 
   test("sql for one to many join") {
-    assert(teacherWithSections.sql == "SELECT t1.*,t2.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor WHERE t1.id=?")
+    //println(teacherWithSections.sql)
+    assert(teacherWithSections.sql == "SELECT t1.*,t2.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor WHERE t1.id=? ORDER BY t1.id,t2.course_id,t2.semester,t2.section_number")
   }
 
   test("sql for three table join") {
-    assert(teacherWithCourses.sql == "SELECT t1.*,t2.*,t3.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor LEFT OUTER JOIN courses AS t3 ON t2.course_id = t3.id WHERE t1.id=?");
+    //println(teacherWithCourses.sql)
+    assert(teacherWithCourses.sql == "SELECT t1.*,t2.*,t3.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor LEFT OUTER JOIN courses AS t3 ON t2.course_id = t3.id WHERE t1.id=? ORDER BY t1.id,t2.course_id,t2.semester,t2.section_number,t3.id")
   }
 
   test("sql for four table join") {
-    assert(teacherWithSectionsAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor LEFT OUTER JOIN enrollments AS t3 ON t2.course_id = t3.course_id AND t2.semester = t3.semester AND t2.section_number = t3.section_number LEFT OUTER JOIN students AS t4 ON t3.studentId = t4.id WHERE t1.id=?")
-  }
+    //println(teacherWithSectionsAndStudents.sql)
+    assert(teacherWithSectionsAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor LEFT OUTER JOIN enrollments AS t3 ON t2.course_id = t3.course_id AND t2.semester = t3.semester AND t2.section_number = t3.section_number LEFT OUTER JOIN students AS t4 ON t3.studentId = t4.id WHERE t1.id=? ORDER BY t1.id,t2.course_id,t2.semester,t2.section_number,t3.studentId,t3.course_id,t3.semester,t3.section_number,t4.id")  }
 
   test("sql for join with two tables joined to root table") {
-    assert(teacherWithCoursesAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor LEFT OUTER JOIN courses AS t3 ON t2.course_id = t3.id LEFT OUTER JOIN enrollments AS t4 ON t2.course_id = t4.course_id AND t2.semester = t4.semester AND t2.section_number = t4.section_number LEFT OUTER JOIN students AS t5 ON t4.studentId = t5.id WHERE t1.id=?")
+    //println(teacherWithCoursesAndStudents.sql)
+    assert(teacherWithCoursesAndStudents.sql == "SELECT t1.*,t2.*,t3.*,t4.* FROM teachers AS t1 LEFT OUTER JOIN sections AS t2 ON t1.id = t2.instructor LEFT OUTER JOIN courses AS t3 ON t2.course_id = t3.id LEFT OUTER JOIN enrollments AS t4 ON t2.course_id = t4.course_id AND t2.semester = t4.semester AND t2.section_number = t4.section_number LEFT OUTER JOIN students AS t5 ON t4.studentId = t5.id WHERE t1.id=? ORDER BY t1.id,t2.course_id,t2.semester,t2.section_number,t3.id,t4.studentId,t4.course_id,t4.semester,t4.section_number,t5.id")
   }
 
   test("sql for query by index") {
-    assert(sectionsBySemester.sql == "SELECT t1.* FROM sections AS t1 WHERE t1.semester=?")
+    //println(sectionsBySemester.sql)
+    assert(sectionsBySemester.sql == "SELECT t1.* FROM sections AS t1 WHERE t1.semester=? ORDER BY t1.course_id,t1.semester,t1.section_number")
   }
 
   test("sql for join on index") {
-    assert(sectionsBySemesterWithInstructors.sql ==
-      "SELECT t1.*,t2.* FROM sections AS t1 LEFT OUTER JOIN teachers AS t2 ON t1.instructor = t2.id WHERE t1.semester=?")
+    //println(sectionsBySemesterWithInstructors.sql)
+    assert(sectionsBySemesterWithInstructors.sql =="SELECT t1.*,t2.* FROM sections AS t1 LEFT OUTER JOIN teachers AS t2 ON t1.instructor = t2.id WHERE t1.semester=? ORDER BY t1.course_id,t1.semester,t1.section_number,t2.id")
   }
 
 }
