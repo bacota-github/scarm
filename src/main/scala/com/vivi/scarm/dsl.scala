@@ -9,6 +9,7 @@ import scala.util.{Failure,Success,Try}
 
 import scala.language.higherKinds
 
+import cats.Id
 import doobie._
 import doobie.implicits._
 
@@ -33,7 +34,7 @@ sealed trait DatabaseObject {
 }
 
 
-sealed trait Queryable[K, F[_] <: Traversable[_], E] {
+sealed trait Queryable[K, F[_], E] {
 
   type RowType
 
@@ -64,16 +65,16 @@ sealed trait Queryable[K, F[_] <: Traversable[_], E] {
     reduceResults(results)
   }
 
-  def join[LK,LF[_]<:Traversable[_]](query: Queryable[LK,LF,K]): Queryable[LK,LF,(K,F[E])] =
+  def join[LK,LF[_]](query: Queryable[LK,LF,K]): Queryable[LK,LF,(K,F[E])] =
     Join(query,this)
 
-  def ::[LK,LF[_]<:Traversable[_]](query: Queryable[LK,LF,K]): Queryable[LK,LF,(K,F[E])] =
+  def ::[LK,LF[_]](query: Queryable[LK,LF,K]): Queryable[LK,LF,(K,F[E])] =
     join(query)
 
-  def nestedJoin[LK,LF[_]<:Traversable[_],X](query: Queryable[LK,LF,(K,X)])
+  def nestedJoin[LK,LF[_],X](query: Queryable[LK,LF,(K,X)])
         :Queryable[LK,LF,(K,X,F[E])] = NestedJoin(query,this)
 
-  def :::[LK,LF[_]<:Traversable[_],X](query: Queryable[LK,LF,(K,X)])
+  def :::[LK,LF[_],X](query: Queryable[LK,LF,(K,X)])
       :Queryable[LK,LF,(K,X,F[E])] = nestedJoin(query)
 }
 
@@ -81,7 +82,7 @@ sealed trait Queryable[K, F[_] <: Traversable[_], E] {
 case class Table[K,E<:Entity[K]](
   override val name: String,
   override val keyNames: Seq[String] = Seq("id")
-) extends DatabaseObject with Queryable[K,Try,E] {
+) extends DatabaseObject with Queryable[K,Id,E] {
 
   type RowType = E
 
@@ -90,9 +91,7 @@ case class Table[K,E<:Entity[K]](
   override def orderBy(ct: Int): String =
     keyNames.map(k => tname(ct) +"."+k).mkString(",")
 
-  override def reduceResults(rows: Traversable[E]): Try[E] =
-    if (rows.isEmpty) Failure(new Exception("no row found"))
-    else Success(rows.head)
+  override def reduceResults(rows: Traversable[E]): Id[E] = rows.head
 
   // def fetch(key: K): ConnectionIO[Option[E]] =
 //    query(key).head
@@ -190,10 +189,8 @@ case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   override val fromKey: FROM => TPK,
   override val to: Table[TPK,TO],
   override val  keyNames: Seq[String]
-) extends ForeignKey[FPK,FROM,TPK,TO,Try] {
-  override def reduceResults(rows: Traversable[TO]): Try[TO] =
-    if (rows.isEmpty) Failure(new Exception("no row found"))
-    else Success(rows.head)
+) extends ForeignKey[FPK,FROM,TPK,TO,Id] {
+  override def reduceResults(rows: Traversable[TO]): Id[TO] = rows.head
 }
 
 
