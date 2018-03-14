@@ -65,11 +65,11 @@ sealed trait Queryable[K, F[_], E, RT] {
   }
 
   def join[LK,LF[_]](query: Queryable[LK,LF,K,_])
-      :Queryable[LK,LF, (K,F[E]), (K,RT)] =
+      :Queryable[LK,LF, (K,F[E]), (K,Option[RT])] =
     Join(query,this)
 
   def ::[LK,LF[_]](query: Queryable[LK,LF,K,_])
-      :Queryable[LK,LF, (K,F[E]), (K,RT)] =
+      :Queryable[LK,LF, (K,F[E]), (K,Option[RT])] =
     join(query)
 
   def nestedJoin[LK,LF[_],X,RT2](query: Queryable[LK,LF,(K,X),RT2])
@@ -227,7 +227,7 @@ case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
 case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
   left: Queryable[K,LF,JK,LRT],
   right: Queryable[JK,RF,E,RRT]
-) extends Queryable[K,LF,(JK,RF[E]), (JK,RRT)] {
+) extends Queryable[K,LF,(JK,RF[E]), (JK,Option[RRT])] {
 
   override def keyNames = left.keyNames
   override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
@@ -236,15 +236,18 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
   override def orderBy(ct: Int): String =
     left.orderBy(ct)+","+right.orderBy(ct+left.tablect)
 
-  override def reduceResults(rows: Traversable[(JK,RRT)]): Traversable[(JK,RF[E])] = 
+  override def reduceResults(rows: Traversable[(JK,Option[RRT])]): Traversable[(JK,RF[E])] = 
     rows.groupBy(_._1).
       mapValues(_.map(_._2)).
-      mapValues(s => right.collectResults(right.reduceResults(s)))
+      mapValues(t => {
+        val nonEmpty: Traversable[RRT] = t.collect { case Some(s) => s }
+        right.collectResults(right.reduceResults(nonEmpty))
+      })
+
 
 
   override def collectResults[T](reduced: Traversable[T]): LF[T] =
     left.collectResults(reduced)
-
 
   override def selectList(ct: Int): String =
     left.selectList(ct) +","+ right.selectList(ct+1)
@@ -285,7 +288,6 @@ case class NestedJoin[K,LF[_], LRT,JK,X, RF[_],E,RRT](
       mapValues(_.map(_._3)).
       mapValues(s => right.collectResults(right.reduceResults(s))).
       map(t => (t._1._1, t._1._2, t._2))
-
 
   override def collectResults[T](reduced: Traversable[T]): LF[T] =
     left.collectResults(reduced)
