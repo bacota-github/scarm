@@ -73,10 +73,10 @@ sealed trait Queryable[K, F[_], E, RT] {
     join(query)
 
   def nestedJoin[LK,LF[_],X,RT2](query: Queryable[LK,LF,(K,X),RT2])
-        :Queryable[LK,LF, (K,X,F[E]), (K,X,RT)] = NestedJoin(query,this)
+        :Queryable[LK,LF, (K,X,F[E]), (K,X,Option[RT])] = NestedJoin(query,this)
 
   def :::[LK,LF[_],X](query: Queryable[LK,LF,(K,X),_])
-      :Queryable[LK,LF, (K,X,F[E]), (K,X,RT)] = nestedJoin(query)
+      :Queryable[LK,LF, (K,X,F[E]), (K,X,Option[RT])] = nestedJoin(query)
 }
 
 
@@ -239,10 +239,8 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
   override def reduceResults(rows: Traversable[(JK,Option[RRT])]): Traversable[(JK,RF[E])] = 
     rows.groupBy(_._1).
       mapValues(_.map(_._2)).
-      mapValues(t => {
-        val nonEmpty: Traversable[RRT] = t.collect { case Some(s) => s }
-        right.collectResults(right.reduceResults(nonEmpty))
-      })
+      mapValues(_.collect { case Some(s) => s }).
+      mapValues(s =>  right.collectResults(right.reduceResults(s)))
 
 
 
@@ -274,7 +272,7 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
 case class NestedJoin[K,LF[_], LRT,JK,X, RF[_],E,RRT](
   left: Queryable[K,LF,(JK,X),LRT],
   right: Queryable[JK,RF,E,RRT]
-) extends Queryable[K,LF,(JK,X,RF[E]), (JK,X,RRT)] { 
+) extends Queryable[K,LF,(JK,X,RF[E]), (JK,X,Option[RRT])] { 
 
   override def keyNames = left.keyNames
   override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
@@ -283,9 +281,10 @@ case class NestedJoin[K,LF[_], LRT,JK,X, RF[_],E,RRT](
   override def orderBy(ct: Int): String =
     left.orderBy(ct)+","+right.orderBy(ct+left.tablect)
 
-  override def reduceResults(rows: Traversable[(JK,X,RRT)]): Traversable[(JK,X,RF[E])] = 
+  override def reduceResults(rows: Traversable[(JK,X,Option[RRT])]): Traversable[(JK,X,RF[E])] = 
     rows.groupBy(t => (t._1, t._2)).
       mapValues(_.map(_._3)).
+      mapValues(_.collect { case Some(s) => s }).
       mapValues(s => right.collectResults(right.reduceResults(s))).
       map(t => (t._1._1, t._1._2, t._2))
 
