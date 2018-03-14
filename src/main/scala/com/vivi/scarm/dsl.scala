@@ -85,7 +85,8 @@ case class Table[K,E<:Entity[K]](
   override val keyNames: Seq[String] = Seq("id")
 ) extends DatabaseObject with Queryable[K,Id,E,E] {
 
-  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, { _.id}, keyNames)
+  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this,
+    (e:E) => Some(e.id), keyNames)
 
   override def orderBy(ct: Int): String =
     keyNames.map(k => tname(ct) +"."+k).mkString(",")
@@ -124,7 +125,7 @@ case class View[K,E](
 case class Index[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
-  key: E => K,
+  key: E => Option[K],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E,E] {
 
@@ -141,7 +142,7 @@ case class Index[K,PK,E<:Entity[PK]](
 case class UniqueIndex[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
-  key: E => K,
+  key: E => Option[K],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
 
@@ -161,7 +162,7 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
     with Queryable[FROM, F, TO, TO] {
 
   def from: Table[FPK,FROM]
-  def fromKey: FROM => TPK
+  def fromKey: FROM => Option[TPK]
   def to: Table[TPK,TO]
   override def keyNames: Seq[String]
   override def joinKeyNames: Seq[String] = to.keyNames
@@ -183,10 +184,11 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
 
 case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   override val from: Table[FPK,FROM],
-  override val fromKey: FROM => TPK,
+  val indexKey: FROM => TPK,
   override val to: Table[TPK,TO],
   override val  keyNames: Seq[String]
 ) extends ForeignKey[FPK,FROM,TPK,TO,Id] {
+  override def fromKey = (f: FROM) => Some(indexKey(f))
   override def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
   override def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
 }
@@ -194,7 +196,7 @@ case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
 
 case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   override val from: Table[FPK,FROM],
-  override val fromKey: FROM => TPK,
+  override val fromKey: FROM => Option[TPK],
   override val to: Table[TPK,TO],
   override val  keyNames: Seq[String]
 ) extends ForeignKey[FPK,FROM,TPK,TO,Option] {
@@ -236,13 +238,13 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
   override def orderBy(ct: Int): String =
     left.orderBy(ct)+","+right.orderBy(ct+left.tablect)
 
-  override def reduceResults(rows: Traversable[(JK,Option[RRT])]): Traversable[(JK,RF[E])] = 
+  override def reduceResults(rows: Traversable[(JK,Option[RRT])]): Traversable[(JK,RF[E])] =  {
+    println("Reducing " + rows.toString())
     rows.groupBy(_._1).
       mapValues(_.map(_._2)).
       mapValues(_.collect { case Some(s) => s }).
       mapValues(s =>  right.collectResults(right.reduceResults(s)))
-
-
+  }
 
   override def collectResults[T](reduced: Traversable[T]): LF[T] =
     left.collectResults(reduced)

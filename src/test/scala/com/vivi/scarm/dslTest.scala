@@ -12,7 +12,7 @@ case class SectionId(courseId: CourseId, semester: Int, number: Int)
 case class EnrollmentId(studentId: StudentId, sectionId: SectionId)
 
 case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
-case class Course(id: CourseId, subject: String, prerequisite: CourseId) extends Entity[CourseId]
+case class Course(id: CourseId, subject: String, prerequisite: Option[CourseId]) extends Entity[CourseId]
 
 case class Section(id: SectionId, instructor: TeacherId, 
   room: String, time: java.sql.Time) extends Entity[SectionId]
@@ -34,7 +34,7 @@ class DSLTest extends FunSuite {
     Seq("student_id", "course_id", "semester", "section_number"))
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
-    (s: Section) => s.id.semester, Seq("semester")
+    (s: Section) => Some(s.id.semester), Seq("semester")
   )
 
   val instructor = MandatoryForeignKey(sections,
