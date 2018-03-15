@@ -39,7 +39,6 @@ sealed trait Queryable[K, F[_], E, RT] {
   def innerJoinKeyNames: Seq[String] = joinKeyNames
   def joinKeyNames: Seq[String] = keyNames
   def keyNames: Seq[String]
-  def orderBy(ct: Int): String
   def selectList(ct: Int): String
   def tableList(ct: Int): Seq[String]
   def tablect: Int
@@ -47,7 +46,7 @@ sealed trait Queryable[K, F[_], E, RT] {
 
   def sql: String = {
     val tables = tableList(1).mkString(" ")
-    s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause} ORDER BY ${orderBy(1)}" 
+    s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
 
   }
 
@@ -88,15 +87,9 @@ case class Table[K,E<:Entity[K]](
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this,
     (e:E) => Some(e.id), keyNames)
 
-  override def orderBy(ct: Int): String =
-    keyNames.map(k => tname(ct) +"."+k).mkString(",")
-
   override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
 
-  // def fetch(key: K): ConnectionIO[Option[E]] =
-//    query(key).head
-  //def createReturning(entities: E*): Try[Seq[E]]
   def delete(keys: K*): Try[Unit] = Success(Unit)
   def save(enties: E*): Try[Unit] = Success(Unit)
   //def saveReturning(entities: E*): Try[Seq[E]]
@@ -113,11 +106,9 @@ case class View[K,E](
   override def tableList(ct: Int = 0): Seq[String] =
     Seq(alias(s"(${definition})", ct))
 
-  override def orderBy(ct: Int): String =
-    keyNames.map(k => tname(ct) +"."+k).mkString(",")
-
   override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
-  override def collectResults[T](reduced: Traversable[T]): Option[T] = 
+
+  override def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
 }
 
@@ -128,12 +119,7 @@ case class Index[K,PK,E<:Entity[PK]](
   key: E => Option[K],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E,E] {
-
   override def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
-
-  override def orderBy(ct: Int): String =
-    table.keyNames.map(k => tname(ct) +"."+k).mkString(",")
-
   override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override def collectResults[T](reduced: Traversable[T]): Set[T] = reduced.toSet
 }
@@ -145,12 +131,7 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
   key: E => Option[K],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
-
   override def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
-
-  override def orderBy(ct: Int): String =
-    table.keyNames.map(k => tname(ct) +"."+k).mkString(",")
-
   override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
@@ -166,12 +147,7 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
   def to: Table[TPK,TO]
   override def keyNames: Seq[String]
   override def joinKeyNames: Seq[String] = to.keyNames
-
-  override def orderBy(ct: Int): String =
-    to.keyNames.map(k => tname(ct) +"."+k).mkString(",")
-
   override lazy val name: String = s"${from.name}_${to.name}_fk"
-
   override def selectList(ct: Int): String = to.selectList(ct)
   override def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
 
@@ -214,13 +190,8 @@ case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
   override def joinKeyNames: Seq[String] = foreignKey.keyNames
   override def selectList(ct: Int): String = foreignKey.to.selectList(ct)
   override def tablect: Int = 1
-
   override def tableList(ct: Int): Seq[String] =
     Seq(alias(foreignKey.from.name, ct))
-
-  override def orderBy(ct: Int): String =
-    foreignKey.from.keyNames.map(k => tname(ct) +"."+k).mkString(",")
-
   override def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
   override def collectResults[T](reduced: Traversable[T]): Set[T] =  reduced.toSet
 }
@@ -234,10 +205,6 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
   override def keyNames = left.keyNames
   override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
   override def joinKeyNames = left.joinKeyNames  
-
-  override def orderBy(ct: Int): String =
-    left.orderBy(ct)+","+right.orderBy(ct+left.tablect)
-
   override def reduceResults(rows: Traversable[(JK,Option[RRT])]): Traversable[(JK,RF[E])] =  {
     println("Reducing " + rows.toString())
     rows.groupBy(_._1).
@@ -279,9 +246,6 @@ case class NestedJoin[K,LF[_], LRT,JK,X, RF[_],E,RRT](
   override def keyNames = left.keyNames
   override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
   override def joinKeyNames = left.joinKeyNames
-
-  override def orderBy(ct: Int): String =
-    left.orderBy(ct)+","+right.orderBy(ct+left.tablect)
 
   override def reduceResults(rows: Traversable[(JK,X,Option[RRT])]): Traversable[(JK,X,RF[E])] = 
     rows.groupBy(t => (t._1, t._2)).
