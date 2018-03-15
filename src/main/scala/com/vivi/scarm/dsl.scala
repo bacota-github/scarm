@@ -90,11 +90,19 @@ case class Table[K,E<:Entity[K]](
   override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
 
-  def delete(keys: K*): Try[Unit] = Success(Unit)
-  def save(enties: E*): Try[Unit] = Success(Unit)
-  //def saveReturning(entities: E*): Try[Seq[E]]
-  def update(enties: E*): Try[Unit] = Success(Unit)
-  //def updateReturning(entities: E*): Try[Seq[E]]
+  def delete(keys: K*): Try[Unit] = ???
+/*
+  def insert(entity: E)(implicit xa: Transactor[IO], composite: Composite[E]): Try[Unit] = {
+    val sql = s"INSERT INTO ${name} values (
+    ???
+  }
+ */
+
+  def insertAll(entities: E*): Try[Seq[Unit]] = ???
+  def insertReturning(e: E): Try[K] = ???
+  def insertAllReturning(e: E): Try[Seq[K]] = ???
+  def save(enties: E*): Try[Unit] = ???
+  def update(enties: E*): Try[Unit] = ???
 }
 
 case class View[K,E](
