@@ -44,7 +44,7 @@ sealed trait Queryable[K, F[_], E, RT] {
   def tablect: Int
   def whereClause: String = keyNames.map(k => s"t1.${k}=?").mkString(" AND ")
 
-  def sql: String = {
+  lazy val sql: String = {
     val tables = tableList(1).mkString(" ")
     s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
 
@@ -90,17 +90,30 @@ case class Table[K,E<:Entity[K]](
   override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
 
-  def delete(keys: K*): Try[Unit] = ???
-/*
-  def insert(entity: E)(implicit xa: Transactor[IO], composite: Composite[E]): Try[Unit] = {
-    val sql = s"INSERT INTO ${name} values (
-    ???
+  private def doDelete(key: K)
+    (implicit xa: Transactor[IO], composite: Composite[K]): Unit = {
+    val sql = s"DELETE FROM ${name} AS ${tname(1)} WHERE ${whereClause}"
+    Fragment(sql, key)(composite).update.run.transact(xa).unsafeRunSync
   }
- */
 
-  def insertAll(entities: E*): Try[Seq[Unit]] = ???
-  def insertReturning(e: E): Try[K] = ???
-  def insertAllReturning(e: E): Try[Seq[K]] = ???
+  def delete(keys: K*)
+    (implicit xa: Transactor[IO], composite: Composite[K]): Unit = 
+    keys.foreach(doDelete(_)(xa, composite))
+
+  private def doInsert(entity: E)
+    (implicit xa: Transactor[IO], composite: Composite[E]): Unit = {
+    val values = List.fill(composite.length)("?").mkString(",")
+    val sql = s"INSERT INTO ${name} values (${values})"
+    Fragment(sql, entity)(composite).update.run.transact(xa).unsafeRunSync
+  }
+
+  def insert(entities: E*)
+    (implicit xa: Transactor[IO], composite: Composite[E]): Unit =
+    entities.foreach(doInsert(_)(xa, composite))
+
+
+  def insertReturning(e: E*): Try[K] = ???
+
   def save(enties: E*): Try[Unit] = ???
   def update(enties: E*): Try[Unit] = ???
 }
