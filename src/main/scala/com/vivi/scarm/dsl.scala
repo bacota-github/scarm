@@ -13,36 +13,46 @@ import cats.Id
 import doobie._
 import doobie.implicits._
 
+/** An object stored in a table.  Id is the primary key value. The
+  * entity can be described as a tuple (id,data) */
+
+trait EntityBase
 
 trait Entity[K] {
   def id: K
 }
 
-object dslUtil {
+
+private[scarm] object dslUtil {
   def tname(ct: Int): String = "t" + ct
   def alias(name: String, ct: Int): String = name + " AS " + tname(ct)
 }
 
 import dslUtil._
 
+/** An database object such as a table or index, created in the RDBMS. */
 sealed trait DatabaseObject {
   def name: String
 
-  def selectList(ct: Int): String = tname(ct) +".*"
-  def tablect: Int = 1
-  def tableList(ct: Int): Seq[String] = Seq(alias(name, ct))
+  private[scarm] def selectList(ct: Int): String = tname(ct) +".*"
+  private[scarm] def tablect: Int = 1
+  private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(name, ct))
 }
 
 
+/** A query that takes a K and returns an F[E].  RT is the tuple type
+  * of an individual row. */
+
 sealed trait Queryable[K, F[_], E, RT] {
 
-  def innerJoinKeyNames: Seq[String] = joinKeyNames
-  def joinKeyNames: Seq[String] = keyNames
   def keyNames: Seq[String]
-  def selectList(ct: Int): String
-  def tableList(ct: Int): Seq[String]
-  def tablect: Int
-  def whereClause: String = keyNames.map(k => s"t1.${k}=?").mkString(" AND ")
+
+  private[scarm] def innerJoinKeyNames: Seq[String] = joinKeyNames
+  private[scarm] def joinKeyNames: Seq[String] = keyNames
+  private[scarm] def selectList(ct: Int): String
+  private[scarm] def tableList(ct: Int): Seq[String]
+  private[scarm] def tablect: Int
+  private[scarm] def whereClause: String = keyNames.map(k => s"t1.${k}=?").mkString(" AND ")
 
   lazy val sql: String = {
     val tables = tableList(1).mkString(" ")
@@ -50,8 +60,8 @@ sealed trait Queryable[K, F[_], E, RT] {
 
   }
 
-  def reduceResults(rows: Traversable[RT]): Traversable[E]
-  def collectResults[T](reduced: Traversable[T]): F[T]
+  private[scarm] def reduceResults(rows: Traversable[RT]): Traversable[E]
+  private[scarm] def collectResults[T](reduced: Traversable[T]): F[T]
 
   def doobieQuery(key: K)(implicit keyComposite: Composite[K], compositeT: Composite[RT]): Query0[RT] =
     Fragment(sql, key)(keyComposite).query[RT](compositeT)
@@ -87,8 +97,8 @@ case class Table[K,E<:Entity[K]](
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this,
     (e:E) => Some(e.id), keyNames)
 
-  override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
-  override def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
+  override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
 
   private def doDelete(key: K)
     (implicit xa: Transactor[IO], composite: Composite[K]): Unit = {
@@ -97,7 +107,8 @@ case class Table[K,E<:Entity[K]](
   }
 
   def delete(keys: K*)
-    (implicit xa: Transactor[IO], composite: Composite[K]): Unit = 
+    (implicit xa: Transactor[IO], composite: Composite[K]): Unit =
+    //TODO: Batch delete
     keys.foreach(doDelete(_)(xa, composite))
 
   private def doInsert(entity: E)
@@ -109,6 +120,7 @@ case class Table[K,E<:Entity[K]](
 
   def insert(entities: E*)
     (implicit xa: Transactor[IO], composite: Composite[E]): Unit =
+    //TODO: Batch insert
     entities.foreach(doInsert(_)(xa, composite))
 
 
@@ -124,12 +136,12 @@ case class View[K,E](
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
 
-  override def tableList(ct: Int = 0): Seq[String] =
+  override private[scarm] def tableList(ct: Int = 0): Seq[String] =
     Seq(alias(s"(${definition})", ct))
 
-  override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
+  override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
 
-  override def collectResults[T](reduced: Traversable[T]): Option[T] =
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
 }
 
@@ -140,9 +152,9 @@ case class Index[K,PK,E<:Entity[PK]](
   key: E => Option[K],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E,E] {
-  override def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
-  override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
-  override def collectResults[T](reduced: Traversable[T]): Set[T] = reduced.toSet
+  override private[scarm] def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
+  override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Set[T] = reduced.toSet
 }
 
 
@@ -152,9 +164,9 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
   key: E => Option[K],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
-  override def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
-  override def reduceResults(rows: Traversable[E]): Traversable[E] = rows
-  override def collectResults[T](reduced: Traversable[T]): Option[T] =
+  override private[scarm] def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
+  override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
 }
 
@@ -167,10 +179,10 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
   def fromKey: FROM => Option[TPK]
   def to: Table[TPK,TO]
   override def keyNames: Seq[String]
-  override def joinKeyNames: Seq[String] = to.keyNames
+  override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
   override lazy val name: String = s"${from.name}_${to.name}_fk"
-  override def selectList(ct: Int): String = to.selectList(ct)
-  override def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
+  override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
+  override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
 
   lazy val oneToMany = ReverseForeignKey(this)
   lazy val reverse = oneToMany
@@ -186,8 +198,8 @@ case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   override val  keyNames: Seq[String]
 ) extends ForeignKey[FPK,FROM,TPK,TO,Id] {
   override def fromKey = (f: FROM) => Some(indexKey(f))
-  override def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
-  override def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
+  override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
 }
 
 
@@ -197,8 +209,8 @@ case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   override val to: Table[TPK,TO],
   override val  keyNames: Seq[String]
 ) extends ForeignKey[FPK,FROM,TPK,TO,Option] {
-  override def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
-  override def collectResults[T](reduced: Traversable[T]): Option[T] = 
+  override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] = 
     if (reduced.isEmpty) None else Some(reduced.head)
 }
 
@@ -224,9 +236,9 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
 ) extends Queryable[K,LF,(JK,RF[E]), (JK,Option[RRT])] {
 
   override def keyNames = left.keyNames
-  override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
-  override def joinKeyNames = left.joinKeyNames  
-  override def reduceResults(rows: Traversable[(JK,Option[RRT])]): Traversable[(JK,RF[E])] =  {
+  override private[scarm] def innerJoinKeyNames: Seq[String] = left.joinKeyNames
+  override private[scarm] def joinKeyNames = left.joinKeyNames  
+  override private[scarm] def reduceResults(rows: Traversable[(JK,Option[RRT])]): Traversable[(JK,RF[E])] =  {
     println("Reducing " + rows.toString())
     rows.groupBy(_._1).
       mapValues(_.map(_._2)).
@@ -234,15 +246,15 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
       mapValues(s =>  right.collectResults(right.reduceResults(s)))
   }
 
-  override def collectResults[T](reduced: Traversable[T]): LF[T] =
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): LF[T] =
     left.collectResults(reduced)
 
-  override def selectList(ct: Int): String =
+  override private[scarm] def selectList(ct: Int): String =
     left.selectList(ct) +","+ right.selectList(ct+1)
 
-  override def tablect: Int = left.tablect + right.tablect
+  override private[scarm] def tablect: Int = left.tablect + right.tablect
 
-  private def joinCondition(ct: Int): String = {
+  private[scarm] def joinCondition(ct: Int): String = {
     val leftt = tname(ct+left.tablect-1)
     val rightt = tname(ct+left.tablect)
     (right.keyNames zip right.joinKeyNames).
@@ -250,7 +262,7 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
       mkString(" AND ")
   }
 
-  override def tableList(ct: Int): Seq[String] = {
+  override private[scarm] def tableList(ct: Int): Seq[String] = {
     val rct = ct+left.tablect
     val rtables = right.tableList(rct)
     val rhead = s"LEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
@@ -265,25 +277,25 @@ case class NestedJoin[K,LF[_], LRT,JK,X, RF[_],E,RRT](
 ) extends Queryable[K,LF,(JK,X,RF[E]), (JK,X,Option[RRT])] { 
 
   override def keyNames = left.keyNames
-  override def innerJoinKeyNames: Seq[String] = left.joinKeyNames
-  override def joinKeyNames = left.joinKeyNames
+  override private[scarm] def innerJoinKeyNames: Seq[String] = left.joinKeyNames
+  override private[scarm] def joinKeyNames = left.joinKeyNames
 
-  override def reduceResults(rows: Traversable[(JK,X,Option[RRT])]): Traversable[(JK,X,RF[E])] = 
+  override private[scarm] def reduceResults(rows: Traversable[(JK,X,Option[RRT])]): Traversable[(JK,X,RF[E])] = 
     rows.groupBy(t => (t._1, t._2)).
       mapValues(_.map(_._3)).
       mapValues(_.collect { case Some(s) => s }).
       mapValues(s => right.collectResults(right.reduceResults(s))).
       map(t => (t._1._1, t._1._2, t._2))
 
-  override def collectResults[T](reduced: Traversable[T]): LF[T] =
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): LF[T] =
     left.collectResults(reduced)
 
-  override def selectList(ct: Int): String =
+  override private[scarm] def selectList(ct: Int): String =
     left.selectList(ct) +","+ right.selectList(ct+left.tablect)
 
-  override def tablect: Int = left.tablect + right.tablect
+  override private[scarm] def tablect: Int = left.tablect + right.tablect
 
-  private def joinCondition(ct: Int): String = {
+  private[scarm] def joinCondition(ct: Int): String = {
     val leftt = tname(ct)
     val rightt = tname(ct+left.tablect)
     (right.keyNames zip right.joinKeyNames).
@@ -291,7 +303,7 @@ case class NestedJoin[K,LF[_], LRT,JK,X, RF[_],E,RRT](
       mkString(" AND ")
   }
 
-  override def tableList(ct: Int): Seq[String] = {
+  override private[scarm] def tableList(ct: Int): Seq[String] = {
     val rct = ct+left.tablect
     val rtables = right.tableList(rct)
     val rhead = s"LEFT OUTER JOIN ${rtables.head} ON ${joinCondition(ct)}"
