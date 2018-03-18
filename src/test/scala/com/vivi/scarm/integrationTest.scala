@@ -1,10 +1,9 @@
-package com.vivi.scarm
+package com.vivi.scarm.test
 
-import java.util.Calendar
-import doobie._
-import doobie.implicits._
-import cats.effect.IO
 import org.scalatest.FunSuite
+import doobie._
+import cats.effect.IO
+import com.vivi.scarm._
 
 import com.vivi.scarm.test.TestObjects._
 
@@ -14,7 +13,7 @@ class DSLIntegrationTest extends FunSuite {
     "org.postgresql.Driver", "jdbc:postgresql:scarm" , "scarm" , "scarm"
   )
 
-  test("insert") {
+  test("After inserting an object, we can select the object by id") {
     val id = TeacherId(100)
     val newTeacher = Teacher(id, "Fred")
     teachers.insert(newTeacher)
@@ -23,8 +22,8 @@ class DSLIntegrationTest extends FunSuite {
     assert(teachers.primaryKey.query(TeacherId(100)) == None)
   }
 
-  test("print out some results") {
 
+  test("foo") {
     val teacherq = teachers.query(TeacherId(1))
     println("Teachers: " + teacherq)
 

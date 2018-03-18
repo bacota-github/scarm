@@ -1,8 +1,8 @@
-package com.vivi.scarm
+package com.vivi.scarm.test
 
 import org.scalatest.FunSuite
 
-import com.vivi.scarm.test.TestObjects._
+import TestObjects._
 
 class DSLTest extends FunSuite {
 
