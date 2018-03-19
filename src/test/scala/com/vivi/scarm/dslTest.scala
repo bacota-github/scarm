@@ -4,6 +4,7 @@ import org.scalatest.FunSuite
 
 import TestObjects._
 
+
 class DSLTest extends FunSuite {
 
   test("sql for querying a table by primary key") {

@@ -13,15 +13,6 @@ import cats.Id
 import doobie._
 import doobie.implicits._
 
-/** An object stored in a table.  Id is the primary key value. The
-  * entity can be described as a tuple (id,data) */
-
-trait EntityBase
-
-trait Entity[K] {
-  def id: K
-}
-
 
 private[scarm] object dslUtil {
   def tname(ct: Int): String = "t" + ct
@@ -29,6 +20,30 @@ private[scarm] object dslUtil {
 }
 
 import dslUtil._
+
+/** An object stored in a table.  Id is the primary key value. The
+  * entity can be described as a tuple (id,data) */
+
+trait Entity[K] {
+  def id: K
+
+  private[scarm] def deleteSQL[E<:Entity[K]](table: Table[K,E]): String =
+    s"DELETE FROM ${table.name} AS ${tname(1)} WHERE ${table.whereClause}"
+
+  private[scarm] def insertSQL[E<:Entity[K]](table: Table[K,E])
+    (implicit composite: Composite[E]): String = {
+    val values = List.fill(composite.length)("?").mkString(",")
+    s"INSERT INTO ${table.name} values (${values})"
+  }
+
+  /*
+  private[scarm] def updateSQL[E<:Entity[K]](table: Table[K,E])
+    (implicit composite: Composite[E]): String = {
+    val values = List.fill(composite.length)("?").mkString(",")
+    s"UPDATE ${table.name} SET
+  }
+   */
+}
 
 /** An database object such as a table or index, created in the RDBMS. */
 sealed trait DatabaseObject {
@@ -52,7 +67,9 @@ sealed trait Queryable[K, F[_], E, RT] {
   private[scarm] def selectList(ct: Int): String
   private[scarm] def tableList(ct: Int): Seq[String]
   private[scarm] def tablect: Int
-  private[scarm] def whereClause: String = keyNames.map(k => s"t1.${k}=?").mkString(" AND ")
+  private[scarm] def whereClause: String = keyNames.map(k =>
+    s"${tname(1)}.${k}=?").mkString(" AND "
+  )
 
   lazy val sql: String = {
     val tables = tableList(1).mkString(" ")
@@ -102,7 +119,7 @@ case class Table[K,E<:Entity[K]](
 
   private def doDelete(key: K)
     (implicit xa: Transactor[IO], composite: Composite[K]): Unit = {
-    val sql = s"DELETE FROM ${name} AS ${tname(1)} WHERE ${whereClause}"
+    val sql =  s"DELETE FROM ${name} AS ${tname(1)} WHERE ${whereClause}"
     Fragment(sql, key)(composite).update.run.transact(xa).unsafeRunSync
   }
 
@@ -113,8 +130,7 @@ case class Table[K,E<:Entity[K]](
 
   private def doInsert(entity: E)
     (implicit xa: Transactor[IO], composite: Composite[E]): Unit = {
-    val values = List.fill(composite.length)("?").mkString(",")
-    val sql = s"INSERT INTO ${name} values (${values})"
+    val sql = entity.insertSQL(this)(composite)
     Fragment(sql, entity)(composite).update.run.transact(xa).unsafeRunSync
   }
 
