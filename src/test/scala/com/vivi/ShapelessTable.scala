@@ -1,5 +1,6 @@
-import shapeless.{ HList, HNil, LabelledGeneric, Witness }
+import shapeless.{ HList, HNil, LabelledGeneric, Witness, :: }
 import scala.reflect.runtime.universe.{TypeTag, typeOf}
+import shapeless.labelled.FieldType
 
 
 /** Table: generic helper for getting field-names and insert statements.
