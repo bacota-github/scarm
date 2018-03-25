@@ -9,49 +9,48 @@ import shapeless.labelled.FieldType
   * http://limansky.me/posts/2017-02-02-generating-sql-queries-with-shapeless.html
   */
 
-trait FieldLister[A] {
+trait FieldList[A] {
   val names: List[String]
 }
 
-trait FieldListerLowPriority {
-  implicit def primitiveFieldLister[K <: Symbol, H, T <: HList](implicit
+trait FieldListLowPriority {
+  implicit def primitiveFieldList[K <: Symbol, H, T <: HList](implicit
     witness: Witness.Aux[K],
-    tLister: FieldLister[T]
-  ): FieldLister[FieldType[K, H] :: T] =
-    new FieldLister[FieldType[K, H] ::T] {
+    tLister: FieldList[T]
+  ): FieldList[FieldType[K, H] :: T] =
+    new FieldList[FieldType[K, H] ::T] {
       override val names = witness.value.name :: tLister.names
     }
 }
 
-object FieldLister extends FieldListerLowPriority {
+object FieldList extends FieldListLowPriority {
 
-  def apply[T](implicit fieldLister: FieldLister[T]): FieldLister[T] =
+  def apply[T](implicit fieldLister: FieldList[T]): FieldList[T] =
     fieldLister
-
 
   implicit def make[A,ARepr<:HList](
     implicit gen: LabelledGeneric.Aux[A, ARepr],
-    generator: FieldLister[ARepr]
-  ): FieldLister[A] = new FieldLister[A] {
+    generator: FieldList[ARepr]
+  ): FieldList[A] = new FieldList[A] {
     override val names = generator.names
   }
 
   def genericLister[A, R](implicit
     gen: LabelledGeneric.Aux[A, R],
-    lister: Lazy[FieldLister[R]]
-  ): FieldLister[A] = new FieldLister[A] {
+    lister: Lazy[FieldList[R]]
+  ): FieldList[A] = new FieldList[A] {
     override val names = lister.value.names
   }
 
-  implicit val hnilLister: FieldLister[HNil] = new FieldLister[HNil] {
+  implicit val hnilLister: FieldList[HNil] = new FieldList[HNil] {
     override val names = Nil
   }
 
   implicit def hconsLister[K, H, T <: HList](implicit
-    hLister: Lazy[FieldLister[H]],
-    tLister: FieldLister[T]
-  ): FieldLister[FieldType[K, H] :: T] =
-    new FieldLister[FieldType[K, H] :: T] {
+    hLister: Lazy[FieldList[H]],
+    tLister: FieldList[T]
+  ): FieldList[FieldType[K, H] :: T] =
+    new FieldList[FieldType[K, H] :: T] {
       override val names = hLister.value.names ++ tLister.names
     }
 }

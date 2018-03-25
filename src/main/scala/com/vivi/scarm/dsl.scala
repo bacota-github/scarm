@@ -152,8 +152,8 @@ case class Table[K,E<:Entity[K]](
 
 object Table {
   def apply[K,E<:Entity[K]](name: String)
-    (implicit fieldLister: FieldLister[E], keyLister: FieldLister[K]): Table[K,E] = 
-    Table(name, fieldLister.names, keyLister.names)
+    (implicit fieldList: FieldList[E], keyList: FieldList[K]): Table[K,E] = 
+    Table(name, fieldList.names, keyList.names)
 }
 
 case class View[K,E](
@@ -175,6 +175,11 @@ case class View[K,E](
     if (reduced.isEmpty) None else Some(reduced.head)
 }
 
+object View {
+  def apply[K,E](name: String, definition: String)
+    (implicit fieldList: FieldList[E], keyList: FieldList[K]): View[K,E] = 
+    View(name, definition, fieldList.names, keyList.names)
+}
 
 case class Index[K,PK,E<:Entity[PK]](
   override val name: String,
@@ -190,6 +195,14 @@ case class Index[K,PK,E<:Entity[PK]](
 }
 
 
+object Index {
+  def apply[K,PK,E<:Entity[PK]](name: String, table: Table[PK,E], key: E=>Option[K])
+    (implicit keyList: FieldList[K]): Index[K,PK,E] = 
+    Index(name, table, key, keyList.names)
+}
+
+
+
 case class UniqueIndex[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
@@ -202,6 +215,13 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
+}
+
+
+object UniqueIndex {
+  def apply[K,PK,E<:Entity[PK]](name: String, table: Table[PK,E], key: E=>Option[K])
+    (implicit keyList: FieldList[K]): UniqueIndex[K,PK,E] = 
+    UniqueIndex(name, table, key, keyList.names)
 }
 
 
@@ -239,6 +259,14 @@ case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
 }
 
 
+object MandatoryForeignKey {
+  def apply[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+    from: Table[FPK,FROM], indexKey: FROM=>TPK, to:Table[TPK,TO]
+  )(implicit keyList: FieldList[FROM]): MandatoryForeignKey[FPK,FROM,TPK,TO] =
+    MandatoryForeignKey(from, indexKey, to, keyList.names)
+}
+
+
 case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   override val from: Table[FPK,FROM],
   override val fromKey: FROM => Option[TPK],
@@ -250,6 +278,12 @@ case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
     if (reduced.isEmpty) None else Some(reduced.head)
 }
 
+object OptionalForeignKey {
+  def apply[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+    from: Table[FPK,FROM], indexKey: FROM=>Option[TPK], to:Table[TPK,TO]
+  )(implicit keyList: FieldList[FROM]): OptionalForeignKey[FPK,FROM,TPK,TO] =
+    OptionalForeignKey(from, indexKey, to, keyList.names)
+}
 
 case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
   val foreignKey: ForeignKey[TPK,TO,FPK,FROM,F]

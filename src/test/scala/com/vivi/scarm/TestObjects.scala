@@ -5,9 +5,6 @@ import doobie.ConnectionIO
 import fs2.Stream
 import org.scalatest.FunSuite
 import com.vivi.scarm._
-import com.vivi.scarm.FieldNames._
-import com.vivi.scarm.fl.FieldList
-import com.vivi.scarm.fl.FieldList._
 
 
 object TestObjects {
@@ -30,13 +27,6 @@ object TestObjects {
   case class Enrollment(id: EnrollmentId, grade: Option[String])
       extends Entity[EnrollmentId]
 
-  val teacherWitness = Teacher(TeacherId(0), "")
-  val courseWitness = Course(CourseId(0), "",None)
-  val sectionId = SectionId(CourseId(0),0,0)
-  val sectionWitness = Section(sectionId,TeacherId(0),"",null)
-  val studentWitness = Student(StudentId(0),"",0)
-  val enrollmentWitness = Enrollment(EnrollmentId(StudentId(0),sectionId),None)
-
   val teachers = Table[TeacherId,Teacher]("teachers")
   val courses = Table[CourseId,Course]("courses")
   val sections = Table[SectionId,Section]("sections")
@@ -48,25 +38,19 @@ object TestObjects {
   )
 
   val instructor = MandatoryForeignKey(sections,
-    (s: Section) => s.instructor, teachers,
-    Seq("instructor")
-  )
+    (s: Section) => s.instructor, teachers)
 
   val prerequisite = OptionalForeignKey(courses,
-    (c: Course) => c.prerequisite, courses,
-    Seq("prerequisite"))
+    (c: Course) => c.prerequisite, courses)
 
   val sectionCourse = MandatoryForeignKey(sections,
-    (s: Section) => s.id.courseId, courses,
-    Seq("course_id"))
+    (s: Section) => s.id.courseId, courses)
 
   val enrollmentSection = MandatoryForeignKey(enrollments,
-    (e: Enrollment) => e.id.sectionId, sections,
-    Seq("course_id", "semester", "section_number"))
+    (e: Enrollment) => e.id.sectionId, sections)
 
   val enrollmentStudent = MandatoryForeignKey(enrollments,
-    (e: Enrollment) => e.id.studentId, students,
-    Seq("student_id"))
+    (e: Enrollment) => e.id.studentId, students)
 
   val courseWithTeacher = sections :: instructor
   val teacherWithSections = (teachers :: instructor.oneToMany)
