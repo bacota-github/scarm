@@ -48,8 +48,7 @@ trait Entity[K] {
 /** An database object such as a table or index, created in the RDBMS. */
 sealed trait DatabaseObject {
   def name: String
-
-  private[scarm] def selectList(ct: Int): String = tname(ct) +".*"
+  def fieldNames: Seq[String]
   private[scarm] def tablect: Int = 1
   private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(name, ct))
 }
@@ -108,11 +107,15 @@ sealed trait Queryable[K, F[_], E, RT] {
 
 case class Table[K,E<:Entity[K]](
   override val name: String,
-  override val keyNames: Seq[String] = Seq("id")
+  override val fieldNames: Seq[String],
+  override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Id,E,E] {
 
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this,
     (e:E) => Some(e.id), keyNames)
+
+  override private[scarm] def selectList(ct: Int): String = 
+    fieldNames.map(f => s"${tname(ct)}.${f}").mkString(",")
 
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
@@ -146,11 +149,22 @@ case class Table[K,E<:Entity[K]](
   def update(enties: E*): Try[Unit] = ???
 }
 
+
+object Table {
+  def apply[K,E<:Entity[K]](name: String)
+    (implicit fieldLister: FieldLister[E], keyLister: FieldLister[K]): Table[K,E] = 
+    Table(name, fieldLister.names, keyLister.names)
+}
+
 case class View[K,E](
   override val name: String,
   val definition: String,
-  override val keyNames: Seq[String]
+  override val keyNames: Seq[String],
+  override val fieldNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
+
+  override private[scarm] def selectList(ct: Int): String = 
+    fieldNames.map(f => s"${tname(ct)}.${f}").mkString(",")
 
   override private[scarm] def tableList(ct: Int = 0): Seq[String] =
     Seq(alias(s"(${definition})", ct))
@@ -168,6 +182,8 @@ case class Index[K,PK,E<:Entity[PK]](
   key: E => Option[K],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E,E] {
+  override val fieldNames = table.fieldNames
+  override private[scarm] def selectList(ct: Int): String = table.selectList(ct)
   override private[scarm] def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Set[T] = reduced.toSet
@@ -180,6 +196,8 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
   key: E => Option[K],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
+  override val fieldNames = table.fieldNames
+  override private[scarm] def selectList(ct: Int): String = table.selectList(ct)
   override private[scarm] def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
@@ -194,6 +212,8 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
   def from: Table[FPK,FROM]
   def fromKey: FROM => Option[TPK]
   def to: Table[TPK,TO]
+
+  override val fieldNames = to.fieldNames
   override def keyNames: Seq[String]
   override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
   override lazy val name: String = s"${from.name}_${to.name}_fk"
@@ -235,7 +255,7 @@ case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
   val foreignKey: ForeignKey[TPK,TO,FPK,FROM,F]
 ) extends Queryable[FROM, Set, TO, TO] {
 
-  override def keyNames: Seq[String] = foreignKey.to.keyNames
+  override val keyNames: Seq[String] = foreignKey.to.keyNames
   override def joinKeyNames: Seq[String] = foreignKey.keyNames
   override def selectList(ct: Int): String = foreignKey.to.selectList(ct)
   override def tablect: Int = 1

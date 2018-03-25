@@ -5,6 +5,10 @@ import doobie.ConnectionIO
 import fs2.Stream
 import org.scalatest.FunSuite
 import com.vivi.scarm._
+import com.vivi.scarm.FieldNames._
+import com.vivi.scarm.fl.FieldList
+import com.vivi.scarm.fl.FieldList._
+
 
 object TestObjects {
 
@@ -26,13 +30,18 @@ object TestObjects {
   case class Enrollment(id: EnrollmentId, grade: Option[String])
       extends Entity[EnrollmentId]
 
-    val teachers = Table[TeacherId,Teacher]("teachers")
+  val teacherWitness = Teacher(TeacherId(0), "")
+  val courseWitness = Course(CourseId(0), "",None)
+  val sectionId = SectionId(CourseId(0),0,0)
+  val sectionWitness = Section(sectionId,TeacherId(0),"",null)
+  val studentWitness = Student(StudentId(0),"",0)
+  val enrollmentWitness = Enrollment(EnrollmentId(StudentId(0),sectionId),None)
+
+  val teachers = Table[TeacherId,Teacher]("teachers")
   val courses = Table[CourseId,Course]("courses")
-  val sections = Table[SectionId,Section]("sections",
-    Seq("course_id", "semester", "section_number"))
+  val sections = Table[SectionId,Section]("sections")
   val students = Table[StudentId,Student]("students")
-  val enrollments = Table[EnrollmentId, Enrollment]("enrollments",
-    Seq("student_id", "course_id", "semester", "section_number"))
+  val enrollments = Table[EnrollmentId, Enrollment]("enrollments")
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
     (s: Section) => Some(s.id.semester), Seq("semester")
