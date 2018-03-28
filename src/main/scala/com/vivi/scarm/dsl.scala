@@ -151,9 +151,58 @@ case class Table[K,E<:Entity[K]](
 
 
 object Table {
+
   def apply[K,E<:Entity[K]](name: String)
     (implicit fieldList: FieldList[E], keyList: FieldList[K]): Table[K,E] = 
     Table(name, fieldList.names, keyList.names)
+
+  import scala.reflect.runtime.universe._
+
+  private def typeName(tpe: Type, nullable: Boolean, overrides: Map[Type,String]): String = 
+    overrides.getOrElse(tpe, sqlTypeMap.get(tpe)) match {
+      case None => throw new RuntimeException(s"Could not find sql type for type ${tpe}")
+      case Some(typeString) => typeString + (if (nullable) "" else " not null")
+    }
+
+
+  //private[scarm]
+  def createSql[K,E<:Entity[K]](
+    table: Table[K,E],
+    fieldOverrides: Map[String, String] = Map(),
+    typeOverrides: Map[Type, String] = Map()
+  )(implicit fieldMap: FieldMap[E]): String = {
+    val columns = table.fieldNames.map(f => 
+      fieldOverrides.get(f) match {
+        case Some(typeString) => f+ " " + typeString
+        case None => fieldMap.mapping.get(f) match {
+          case None => throw new RuntimeException(s"Could not find type for ${f}")
+          case Some((tpe, nullable)) =>
+            f + " " + typeName(tpe, nullable, typeOverrides)
+        }
+      }).mkString(",")
+    val pkeyColumns = table.keyNames.mkString(",")
+    s"CREATE TABLE ${table.name} (${columns} PRIMARY KEY (${pkeyColumns})"
+  }
+
+  private[scarm] val sqlTypeMap: Map[Type, String] = Map(
+    typeOf[Char] -> "CHAR(1)",
+    typeOf[String] -> "VARCHAR(255)",
+    typeOf[Boolean] -> "BOOLEAN",
+    typeOf[Short] -> "SMALLINIT",
+    typeOf[Int] -> "INT",
+    typeOf[Float] -> "FLOAT",
+    typeOf[Double] -> "DOUBLE PRECISION",
+    typeOf[java.util.Date] -> "TIMESTAMP",
+    typeOf[java.sql.Date] -> "TIMESTAMP",
+    typeOf[java.time.Instant] -> "TIMESTAMP",
+    typeOf[java.time.LocalDate] -> "DATE",
+    typeOf[java.time.LocalDateTime] -> "TIMESTAMP",
+    typeOf[java.time.LocalTime] -> "TIME",
+    typeOf[java.time.MonthDay] -> "DATE",
+    typeOf[java.time.MonthDay] -> "DATE",
+    typeOf[java.time.Year] -> "DATE",
+    typeOf[java.time.YearMonth] -> "DATE"
+  )
 }
 
 case class View[K,E](

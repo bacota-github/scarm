@@ -12,7 +12,6 @@ import shapeless.labelled.FieldType
 trait FieldList[A] {
   val names: List[String]
 }
-
 trait FieldListLowPriority {
   implicit def primitiveFieldList[K <: Symbol, H, T <: HList](implicit
     witness: Witness.Aux[K],

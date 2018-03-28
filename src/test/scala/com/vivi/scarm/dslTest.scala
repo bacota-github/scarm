@@ -2,10 +2,16 @@ package com.vivi.scarm.test
 
 import org.scalatest.FunSuite
 
+import com.vivi.scarm._
+
 import TestObjects._
 
-
 class DSLTest extends FunSuite {
+
+  test("create sql") {
+    println(Table.createSql(teachers))
+    println(Table.createSql(courses))
+  }
 
   test("sql for querying a table by primary key") {
     println(teachers.sql)
