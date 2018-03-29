@@ -32,7 +32,7 @@ trait OptionFieldList extends PrimitiveFieldList {
   ): FieldList[FieldType[K, Option[H]] :: T] =
     new FieldList[FieldType[K, Option[H]] ::T] {
       override val names =
-        FieldList.prefix(witness.value.name, hList.value).names ++ tList.names
+        FieldList.prefix(witness.value.name, hList.value) ++ tList.names
     }
 }
 
@@ -59,13 +59,10 @@ object FieldList extends OptionFieldList {
   ): FieldList[FieldType[K, H] :: T] =
     new FieldList[FieldType[K, H] :: T] {
       override val names = 
-        prefix(witness.value.name, hList.value).names ++ tList.names
+        prefix(witness.value.name, hList.value) ++ tList.names
     }
 
   private[scarm] def prefix[A](prefix: String, list: FieldList[A]) =
-    new FieldList[A] {
-      override val names = 
         if (prefix == "id") list.names else list.names.map(prefix + "_" + _)
-    }
 }
 
