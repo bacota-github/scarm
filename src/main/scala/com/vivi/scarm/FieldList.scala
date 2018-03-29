@@ -14,7 +14,7 @@ trait FieldList[A] {
 }
 
 
-trait FieldListLowPriority {
+trait PrimitiveFieldList {
   implicit def primitiveFieldList[K <: Symbol, H, T <: HList](implicit
     witness: Witness.Aux[K],
     tList: FieldList[T]
@@ -24,7 +24,19 @@ trait FieldListLowPriority {
     }
 }
 
-object FieldList extends FieldListLowPriority {
+trait OptionFieldList extends PrimitiveFieldList {
+  implicit def optionFieldList[K <: Symbol, H, T <: HList](implicit
+    witness: Witness.Aux[K],
+    hList: Lazy[FieldList[H]],
+    tList: FieldList[T]
+  ): FieldList[FieldType[K, Option[H]] :: T] =
+    new FieldList[FieldType[K, Option[H]] ::T] {
+      override val names =
+        FieldList.prefix(witness.value.name, hList.value).names ++ tList.names
+    }
+}
+
+object FieldList extends OptionFieldList {
 
   def apply[T](implicit fieldList: FieldList[T]): FieldList[T] =
     fieldList
@@ -46,14 +58,14 @@ object FieldList extends FieldListLowPriority {
     tList: FieldList[T]
   ): FieldList[FieldType[K, H] :: T] =
     new FieldList[FieldType[K, H] :: T] {
-      override val names = {
-        val wname = witness.value.name
-        val hnames = hList.value.names
-        val mappedNames =
-          if (wname == "id") hnames
-          else hnames.map(name => witness.value.name + "_" + name)
-        mappedNames ++ tList.names
-      }
+      override val names = 
+        prefix(witness.value.name, hList.value).names ++ tList.names
+    }
+
+  private[scarm] def prefix[A](prefix: String, list: FieldList[A]) =
+    new FieldList[A] {
+      override val names = 
+        if (prefix == "id") list.names else list.names.map(prefix + "_" + _)
     }
 }
 
