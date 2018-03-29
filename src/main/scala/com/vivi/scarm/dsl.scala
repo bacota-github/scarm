@@ -153,8 +153,12 @@ case class Table[K,E<:Entity[K]](
 object Table {
 
   def apply[K,E<:Entity[K]](name: String)
-    (implicit fieldList: FieldList[E], keyList: FieldList[K]): Table[K,E] = 
+    (implicit keyList: FieldList[K], fieldList: FieldList[E]): Table[K,E] = 
     Table(name, fieldList.names, keyList.names)
+
+  def apply[K,E<:Entity[K]](name: String, keys: Seq[String])
+    (implicit fieldList: FieldList[E]): Table[K,E] = 
+    Table(name, fieldList.names, keys)
 
   import scala.reflect.runtime.universe._
 
@@ -171,7 +175,7 @@ object Table {
     fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
   )(implicit fieldMap: FieldMap[E]): String = {
-    println(fieldMap.mapping.toString)
+    println(fieldMap.mapping.mapValues(p => p._1.typeSymbol.name))
     val columns = table.fieldNames.map(f => 
       fieldOverrides.get(f) match {
         case Some(typeString) => f+ " " + typeString

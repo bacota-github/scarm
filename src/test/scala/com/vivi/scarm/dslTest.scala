@@ -6,11 +6,29 @@ import com.vivi.scarm._
 
 import TestObjects._
 
+case class IntId(id: Int)
+case class StringId(string: Int)
+
+case class IntEntity(id: Int, name: String, intval: Option[String])
+    extends Entity[Int]
+
+case class StringEntity(id: StringId, name: String, strval: Option[String], intval: Option[Int])
+    extends Entity[StringId]
+
+
+
 class DSLTest extends FunSuite {
 
+
   test("create sql") {
+
+    val intTable = Table[Int,IntEntity]("ints", Seq("id"))
+    val stringTable = Table[StringId,StringEntity]("stringss")
+
     println(Table.createSql(teachers))
     println(Table.createSql(courses))
+    println(Table.createSql(intTable))
+    println(Table.createSql(stringTable))
   }
 
   test("sql for querying a table by primary key") {

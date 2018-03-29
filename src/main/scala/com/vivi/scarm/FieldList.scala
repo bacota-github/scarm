@@ -12,6 +12,8 @@ import shapeless.labelled.FieldType
 trait FieldList[A] {
   val names: List[String]
 }
+
+
 trait FieldListLowPriority {
   implicit def primitiveFieldList[K <: Symbol, H, T <: HList](implicit
     witness: Witness.Aux[K],
@@ -33,14 +35,7 @@ object FieldList extends FieldListLowPriority {
   ): FieldList[A] = new FieldList[A] {
     override val names = generator.names
   }
-  /*
-  def genericList[A, R](implicit
-    gen: LabelledGeneric.Aux[A, R],
-    lister: Lazy[FieldList[R]]
-  ): FieldList[A] = new FieldList[A] {
-    override val names = lister.value.names
-  }
- */
+
   implicit val hnilList: FieldList[HNil] = new FieldList[HNil] {
     override val names = Nil
   }
