@@ -8,7 +8,6 @@ import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy, Witness }
 import shapeless.labelled.FieldType
 
 
-
 trait FieldMap[A] {
   //Maps field name to field type and nullability
   val mapping: Map[String,(Type, Boolean)]
@@ -26,22 +25,33 @@ trait PrimitiveFieldMap {
       witness: Witness.Aux[K],
       tMap: FieldMap[T],
       typeTag: TypeTag[H]
-    ): FieldMap[FieldType[K, H] :: T] =
-    new FieldMap[FieldType[K, H] ::T] {
+    ) = new FieldMap[FieldType[K, H] ::T] {
       override val mapping =
-        tMap.mapping + (witness.value.name.toString -> (typeTag.tpe, false))
+        tMap.mapping + (witness.value.name -> (typeTag.tpe, false))
     }
 
 }
 
-trait OptionFieldMap extends PrimitiveFieldMap {
+
+trait OptionPrimitiveFieldMap extends PrimitiveFieldMap {
+  implicit def optionPrimitiveFieldMap[K <: Symbol, H, T <: HList](implicit
+    witness: Witness.Aux[K],
+    tMap: FieldMap[T],
+    typeTag: TypeTag[H]
+  ) = new FieldMap[FieldType[K,Option[H]] :: T]  {
+      override val mapping =
+        tMap.mapping + (witness.value.name -> (typeTag.tpe, true))
+    }
+}
+
+
+trait OptionFieldMap extends OptionPrimitiveFieldMap {
   implicit def optionFieldMap[K <: Symbol, H, T <: HList](implicit
       witness: Witness.Aux[K],
       hMap: Lazy[FieldMap[H]],
       tMap: FieldMap[T]
-    ): FieldMap[FieldType[K, Option[H]] :: T] = {
+  ): FieldMap[FieldType[K, Option[H]] :: T] =
     hMap.value.nullable.prefix(witness.value.name.toString) ++ tMap
-  }
 }
 
 
@@ -52,7 +62,7 @@ object FieldMap extends OptionFieldMap {
   implicit def make[A,ARepr<:HList](implicit
     gen: LabelledGeneric.Aux[A, ARepr],
     generator: FieldMap[ARepr]
-  ): FieldMap[A] = new FieldMap[A] {
+  ) = new FieldMap[A] {
     override val mapping = generator.mapping
   }
 
@@ -60,8 +70,7 @@ object FieldMap extends OptionFieldMap {
       witness: Witness.Aux[K],
       tMap: FieldMap[T],
       typeTag: TypeTag[String]
-    ): FieldMap[FieldType[K, String] :: T] =
-    new FieldMap[FieldType[K, String] ::T] {
+    ) = new FieldMap[FieldType[K, String] ::T] {
       override val mapping =
         tMap.mapping + (witness.value.name.toString -> (typeTag.tpe, false))
     }
@@ -86,7 +95,7 @@ object FieldMap extends OptionFieldMap {
         else origin.map(p => (pre + "_" + p._1, p._2))
     }
 
-  private[scarm] def nullable[A](origin: Map[String, (Type,Boolean)]): FieldMap[A] =
+  private[scarm] def nullable[A](origin: Map[String, (Type,Boolean)]) =
     new FieldMap[A] {
       val mapping = origin.mapValues(p => (p._1,true))
     }
