@@ -19,6 +19,7 @@ trait FieldMap[A] {
 }
 
 trait FieldMapLowPriority {
+
   implicit def primitiveFieldMap[K <: Symbol, H, T <: HList]
   (implicit
     witness: Witness.Aux[K],
@@ -47,13 +48,20 @@ object FieldMap extends FieldMapLowPriority {
     override val mapping = Map()
   }
 
-  implicit def hconsMap[K, H, T <: HList](implicit
+  implicit def hconsMap[K<:Symbol, H, T <: HList](implicit
+    witness: Witness.Aux[K],
     hMap: Lazy[FieldMap[H]],
     tMap: FieldMap[T]
   ): FieldMap[FieldType[K, H] :: T] =
     new FieldMap[FieldType[K, H] :: T] {
-      override val mapping = hMap.value.mapping ++ tMap.mapping
+      override val mapping = {
+        val wname = witness.value.name
+        val hmapping = hMap.value.mapping
+        val mappedMap =
+          if (wname == "id") hmapping
+          else hmapping.map(p => (witness.value.name + "_" + p._1, p._2))
+        hmapping ++ tMap.mapping
+      }
     }
-
 }
 

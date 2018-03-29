@@ -171,6 +171,7 @@ object Table {
     fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
   )(implicit fieldMap: FieldMap[E]): String = {
+    println(fieldMap.mapping.toString)
     val columns = table.fieldNames.map(f => 
       fieldOverrides.get(f) match {
         case Some(typeString) => f+ " " + typeString

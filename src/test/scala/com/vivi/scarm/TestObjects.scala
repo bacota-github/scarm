@@ -12,8 +12,9 @@ object TestObjects {
   case class TeacherId(id: Int) extends AnyVal
   case class CourseId(id: Int) extends AnyVal
   case class StudentId(id: Int) extends AnyVal
-  case class SectionId(courseId: CourseId, semester: Int, number: Int)
-  case class EnrollmentId(studentId: StudentId, sectionId: SectionId)
+  case class SectionId(course: CourseId, semester: Int, number: Int)
+  case class EnrollmentId(student: StudentId, section: SectionId)
+  case class AssignmentId(id: Int) extends AnyVal
 
   case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
   case class Course(id: CourseId, subject: String, prerequisite: Option[CourseId]) extends Entity[CourseId]
@@ -27,11 +28,16 @@ object TestObjects {
   case class Enrollment(id: EnrollmentId, grade: Option[String])
       extends Entity[EnrollmentId]
 
+  case class Assignment(id: AssignmentId, name: String,
+    dueDate: java.time.LocalDate, section: SectionId
+  ) extends Entity[AssignmentId]
+
   val teachers = Table[TeacherId,Teacher]("teachers")
   val courses = Table[CourseId,Course]("courses")
   val sections = Table[SectionId,Section]("sections")
   val students = Table[StudentId,Student]("students")
   val enrollments = Table[EnrollmentId, Enrollment]("enrollments")
+  val assignments = Table[AssignmentId, Assignment]("assignments")
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
     (s: Section) => Some(s.id.semester), Seq("semester")
@@ -44,13 +50,13 @@ object TestObjects {
     (c: Course) => c.prerequisite, courses)
 
   val sectionCourse = MandatoryForeignKey(sections,
-    (s: Section) => s.id.courseId, courses)
+    (s: Section) => s.id.course, courses)
 
   val enrollmentSection = MandatoryForeignKey(enrollments,
-    (e: Enrollment) => e.id.sectionId, sections)
+    (e: Enrollment) => e.id.section, sections)
 
   val enrollmentStudent = MandatoryForeignKey(enrollments,
-    (e: Enrollment) => e.id.studentId, students)
+    (e: Enrollment) => e.id.student, students)
 
   val courseWithTeacher = sections :: instructor
   val teacherWithSections = (teachers :: instructor.oneToMany)

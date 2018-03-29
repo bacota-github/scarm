@@ -33,7 +33,7 @@ object FieldList extends FieldListLowPriority {
   ): FieldList[A] = new FieldList[A] {
     override val names = generator.names
   }
-/*
+  /*
   def genericList[A, R](implicit
     gen: LabelledGeneric.Aux[A, R],
     lister: Lazy[FieldList[R]]
@@ -45,12 +45,20 @@ object FieldList extends FieldListLowPriority {
     override val names = Nil
   }
 
-  implicit def hconsList[K, H, T <: HList](implicit
+  implicit def hconsList[K<:Symbol, H, T <: HList](implicit
+    witness: Witness.Aux[K],
     hList: Lazy[FieldList[H]],
     tList: FieldList[T]
   ): FieldList[FieldType[K, H] :: T] =
     new FieldList[FieldType[K, H] :: T] {
-      override val names = hList.value.names ++ tList.names
+      override val names = {
+        val wname = witness.value.name
+        val hnames = hList.value.names
+        val mappedNames =
+          if (wname == "id") hnames
+          else hnames.map(name => witness.value.name + "_" + name)
+        mappedNames ++ tList.names
+      }
     }
 }
 
