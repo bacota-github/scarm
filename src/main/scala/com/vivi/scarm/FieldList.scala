@@ -18,8 +18,7 @@ trait PrimitiveFieldList {
   implicit def primitiveFieldList[K <: Symbol, H, T <: HList](implicit
     witness: Witness.Aux[K],
     tList: FieldList[T]
-  ): FieldList[FieldType[K, H] :: T] =
-    new FieldList[FieldType[K, H] ::T] {
+  ) = new FieldList[FieldType[K, H] ::T] {
       override val names = witness.value.name :: tList.names
     }
 }
@@ -29,8 +28,7 @@ trait OptionFieldList extends PrimitiveFieldList {
     witness: Witness.Aux[K],
     hList: Lazy[FieldList[H]],
     tList: FieldList[T]
-  ): FieldList[FieldType[K, Option[H]] :: T] =
-    new FieldList[FieldType[K, Option[H]] ::T] {
+  ) =  new FieldList[FieldType[K, Option[H]] ::T] {
       override val names =
         FieldList.prefix(witness.value.name, hList.value) ++ tList.names
     }
@@ -44,7 +42,7 @@ object FieldList extends OptionFieldList {
   implicit def make[A,ARepr<:HList](
     implicit gen: LabelledGeneric.Aux[A, ARepr],
     generator: FieldList[ARepr]
-  ): FieldList[A] = new FieldList[A] {
+  ) = new FieldList[A] {
     override val names = generator.names
   }
 
