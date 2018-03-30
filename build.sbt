@@ -12,7 +12,8 @@ libraryDependencies ++= Seq(
   "org.tpolecat" %% "doobie-postgres"  % doobieVersion, // Postgres driver 42.1.4 + type mappings.
 //  "org.tpolecat" %% "doobie-specs2"    % doobieVersion, // Specs2 support for typechecking statements.
   "org.tpolecat" %% "doobie-scalatest" % doobieVersion,  // ScalaTest support for typechecking statements.
-  "org.scalatest" %% "scalatest" % "3.0.5" % "test"
+  "org.scalatest" %% "scalatest" % "3.0.5" % "test",
+  "org.hsqldb" % "hsqldb" % "2.4.0" % "test"
 )
 
 testOptions in Test += Tests.Argument("-oDF")

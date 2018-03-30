@@ -9,10 +9,15 @@ import com.vivi.scarm.test.TestObjects._
 
 class DSLIntegrationTest extends FunSuite {
 
+  val jdbcDriver ="org.postgresql.Driver"
+  val jdbcUrl = "jdbc:postgresql:scarm"
+  val jdbcUsername = "scarm"
+  val jdbcPassword = "scarm"
+
   implicit val xa: Transactor[IO] = Transactor.fromDriverManager[IO](
     "org.postgresql.Driver", "jdbc:postgresql:scarm" , "scarm" , "scarm"
   )
-
+/*
   test("After inserting an object, we can select the object by id") {
     val id = TeacherId(100)
     val newTeacher = Teacher(id, "Fred")
@@ -47,5 +52,5 @@ class DSLIntegrationTest extends FunSuite {
       teacherWithCoursesAndStudents.query(TeacherId(1)))
 
     //need tests with outer joins that have no related entities
-  }
+  }*/
 }

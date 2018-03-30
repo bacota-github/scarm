@@ -12,6 +12,8 @@ import scala.language.higherKinds
 import cats.Id
 import doobie._
 import doobie.implicits._
+import shapeless.ops.hlist.Prepend
+import shapeless.{ Generic, HList }
 
 private[scarm] object dslUtil {
   def tname(ct: Int): String = "t" + ct
