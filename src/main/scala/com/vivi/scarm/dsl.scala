@@ -6,13 +6,12 @@ import fs2.Stream
 import cats.effect.IO
 
 import scala.util.{Failure,Success,Try}
-
+import scala.reflect.runtime.universe.{Type,typeOf}
 import scala.language.higherKinds
 
 import cats.Id
 import doobie._
 import doobie.implicits._
-
 
 private[scarm] object dslUtil {
   def tname(ct: Int): String = "t" + ct
@@ -126,6 +125,13 @@ case class Table[K,E<:Entity[K]](
     Fragment(sql, key)(composite).update.run.transact(xa).unsafeRunSync
   }
 
+  def create(fieldOverrides: Map[String, String] = Map(),
+    typeOverrides: Map[Type, String] = Map())
+    (implicit xa: Transactor[IO], fieldMap: FieldMap[E]): ConnectionIO[Int] = {
+    val sqlText = Table.createSql(this,fieldOverrides,typeOverrides)
+    sql""""${sqlText}""".update.run
+  }
+
   def delete(keys: K*)
     (implicit xa: Transactor[IO], composite: Composite[K]): Unit =
     //TODO: Batch delete
@@ -160,22 +166,17 @@ object Table {
     (implicit fieldList: FieldList[E]): Table[K,E] = 
     Table(name, fieldList.names, keys)
 
-  import scala.reflect.runtime.universe._
-
   private def typeName(tpe: Type, nullable: Boolean, overrides: Map[Type,String]): String = 
     overrides.getOrElse(tpe, sqlTypeMap.get(tpe)) match {
       case None => throw new RuntimeException(s"Could not find sql type for type ${tpe}")
       case Some(typeString) => typeString + (if (nullable) "" else " not null")
     }
 
-
-  //private[scarm]
   def createSql[K,E<:Entity[K]](
     table: Table[K,E],
     fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
   )(implicit fieldMap: FieldMap[E]): String = {
-    println(fieldMap.mapping.mapValues(p => p._1.typeSymbol.name))
     val columns = table.fieldNames.map(f => 
       fieldOverrides.get(f) match {
         case Some(typeString) => f+ " " + typeString
@@ -186,7 +187,7 @@ object Table {
         }
       }).mkString(",")
     val pkeyColumns = table.keyNames.mkString(",")
-    s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
+    s"CREATE TABLE IF NOT EXISTS ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
   }
 
   private[scarm] val sqlTypeMap: Map[Type, String] = Map(
