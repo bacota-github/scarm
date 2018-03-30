@@ -1,4 +1,4 @@
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.5"
 
 scalacOptions ++= Seq("-Ypartial-unification", "-deprecation", "-feature")
 
