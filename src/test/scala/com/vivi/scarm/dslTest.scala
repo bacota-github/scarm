@@ -23,47 +23,57 @@ case class IntEntity(id: Int, name: String, intval: Option[String])
 case class StringEntity(id: StringId, name: String, strval: Option[String], intval: Option[Int])
     extends Entity[StringId]
 
-/*
-class DSLTest extends FunSuite {
-  val postgresqlParams =
-    ("org.postgresql.Driver", "jdbc:postgresql:scarm", "scarm", "scarm")
-  val hsqldbParams =
-    ("org.hsqldb.jdbc.JDBCDriver", "jdbc:hsqldb:file:testdb", "SA", "")
-
-  private def transactor(p: (String,String,String,String)) =
-    Transactor.fromDriverManager[IO](p._1, p._2, p._3, p._4)
-
-  override def run (testName: Option[String] = None,  args: Args): Status = {
-    val hsqldb = transactor(hsqldbParams)
-    val postgresql = transactor(postgresqlParams)
-
-
-
-    def runTest(xa: Transactor[IO]) =
-      Test.run(testName, args)
-
-    new CompositeStatus(Set(
-      runTest(hsqldb),
-      runTest(postgresql)
-    ))
+object DSLSuite {
+  val hsqldbCleanup = (xa:Transactor[IO]) => {
+    sql"""DROP SCHEMA PUBLIC CASCADE""".update.run.transact(xa).unsafeRunSync()
+    sql"""SHUTDOWN IMMEDIATELY""".update.run.transact(xa).unsafeRunSync()
+    false
   }
 }
- */
 
 class DSLSuite extends Suites(
-  new DSLTest("org.hsqldb.jdbc.JDBCDriver", "jdbc:hsqldb:file:testdb", "SA", ""),
+  new DSLTest("org.hsqldb.jdbc.JDBCDriver", "jdbc:hsqldb:file:testdb",
+    "SA", "", DSLSuite.hsqldbCleanup),
   new DSLTest("org.postgresql.Driver", "jdbc:postgresql:scarm", "scarm", "scarm")
 )
 
-class DSLTest(driver: String, url: String, username: String, pass: String) extends FunSuite {
+class DSLTest(driver: String,
+  url: String,
+  username: String,
+  pass: String,
+  cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
+) extends FunSuite with BeforeAndAfterAll {
 
   implicit val xa = Transactor.fromDriverManager[IO](driver, url, username, pass)
 
+  val simpleTable = Table[SimpleId,SimpleEntity]("simple_entity")
+
+  val tables = Seq(simpleTable)
+
+  private def createAll() = 
+    for (t <- tables) {
+      t.create().transact(xa).unsafeRunSync()
+    }
+
+  private def dropAll(xa: Transactor[IO]): Unit = 
+    for (t <-tables) {
+      try {
+        t.dropCascade(xa).transact(xa).unsafeRunSync()
+      } catch { case e: Exception =>
+          info(s"failed dropping ${t.name} ${e.getMessage()}")
+      }
+    }
+
+  override def beforeAll() {
+    createAll()
+  }
+
+  override def afterAll() {
+    if (cleanup(xa))  dropAll(xa) else ()
+  }
+
 
   test("after inserting an entity, it can be selected by primary key") {
-    val table = Table[SimpleId,SimpleEntity]("simple_entity")
-    table.create().transact(xa).unsafeRunSync()
-    table.drop.transact(xa).unsafeRunSync()
   }
 
   test("multiple entities can be inserted in one command") {

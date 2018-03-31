@@ -149,6 +149,11 @@ case class Table[K,E<:Entity[K]](
     Fragment(sql, ()).update.run
   }
 
+  def dropCascade(implicit xa: Transactor[IO]): ConnectionIO[Int] = {
+    val sql = s"DROP TABLE ${name} CASCADE"
+    Fragment(sql, ()).update.run
+  }
+
   private def doInsert(entity: E)
     (implicit xa: Transactor[IO], composite: Composite[E]): Unit = {
     val sql = entity.insertSQL(this)(composite)
