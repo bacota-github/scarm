@@ -4,7 +4,7 @@ import cats.effect.IO
 import doobie._
 import doobie.implicits._
 import doobie.util.transactor.Transactor
-import org.scalatest.FunSuite
+import org.scalatest._
 
 import com.vivi.scarm._
 
@@ -23,28 +23,42 @@ case class IntEntity(id: Int, name: String, intval: Option[String])
 case class StringEntity(id: StringId, name: String, strval: Option[String], intval: Option[Int])
     extends Entity[StringId]
 
+/*
 class DSLTest extends FunSuite {
-  /*
-  val jdbcDriver = "org.hsqldb.jdbc.JDBCDriver"
-  val jdbcUrl = "jdbc:hsqldb:file:testdb"
-  val jdbcUsername = "SA"
-  val jdbcPassword = ""
-   */
-  
-  val jdbcDriver = "org.postgresql.Driver"
-  val jdbcUrl = "jdbc:postgresql:scarm"
-  val jdbcUsername = "scarm"
-  val jdbcPassword = "scarm"
+  val postgresqlParams =
+    ("org.postgresql.Driver", "jdbc:postgresql:scarm", "scarm", "scarm")
+  val hsqldbParams =
+    ("org.hsqldb.jdbc.JDBCDriver", "jdbc:hsqldb:file:testdb", "SA", "")
+
+  private def transactor(p: (String,String,String,String)) =
+    Transactor.fromDriverManager[IO](p._1, p._2, p._3, p._4)
+
+  override def run (testName: Option[String] = None,  args: Args): Status = {
+    val hsqldb = transactor(hsqldbParams)
+    val postgresql = transactor(postgresqlParams)
 
 
-  implicit val xa: Transactor[IO] = Transactor.fromDriverManager[IO](
-    jdbcDriver, jdbcUrl, jdbcUsername, jdbcPassword
-  )
-  /*
-  implicit val xa: Transactor[IO] = Transactor.fromDriverManager[IO](
-    ", " , "scarm" , "scarm"
-  )
-   */
+
+    def runTest(xa: Transactor[IO]) =
+      Test.run(testName, args)
+
+    new CompositeStatus(Set(
+      runTest(hsqldb),
+      runTest(postgresql)
+    ))
+  }
+}
+ */
+
+class DSLSuite extends Suites(
+  new DSLTest("org.hsqldb.jdbc.JDBCDriver", "jdbc:hsqldb:file:testdb", "SA", ""),
+  new DSLTest("org.postgresql.Driver", "jdbc:postgresql:scarm", "scarm", "scarm")
+)
+
+class DSLTest(driver: String, url: String, username: String, pass: String) extends FunSuite {
+
+  implicit val xa = Transactor.fromDriverManager[IO](driver, url, username, pass)
+
 
   test("after inserting an entity, it can be selected by primary key") {
     val table = Table[SimpleId,SimpleEntity]("simple_entity")
@@ -52,7 +66,15 @@ class DSLTest extends FunSuite {
     table.drop.transact(xa).unsafeRunSync()
   }
 
-  test("after inserting multiple entities, they can each be selected by primary key") {
+  test("multiple entities can be inserted in one command") {
+    val table = Table[SimpleId,SimpleEntity]("simple_entity")
+  }
+
+  test("multiple entities can be deleted in one command") {
+    val table = Table[SimpleId,SimpleEntity]("simple_entity")
+  }
+
+  test(" multiple entities, they can each be selected by primary key") {
     val table = Table[SimpleId,SimpleEntity]("simple_entity")
   }
 
@@ -62,17 +84,19 @@ class DSLTest extends FunSuite {
 
   test("after dropping a table, the table cannot be used for inserts or selects") (pending)
 
-  test("SQL on a table with Date fields") (pending)
+  test("SQL on a table with date fields") (pending)
 
-  test("SQL on a table with a primitive Primary Key") (pending)
+  test("SQL on a table with a primitive primary key") (pending)
 
-  test("SQL on a table with a String Primary Key") (pending)
+  test("SQL on a table with a String primary key") (pending)
 
-  test("SQL on a table with a compound Primary Key") (pending)
+  test("SQL on a table with a compound primary key") (pending)
 
-  test("SQL on a table with a Dates in Primary Key") (pending)
+  test("SQL on a table with a dates in primary key") (pending)
 
   test("SQL on a table with nested objects") (pending)
+
+  test("SQL on a table with a primary key containing nested object") (pending)
 
   test("SQL on a table with nullable String fields") (pending)
 
@@ -129,4 +153,12 @@ class DSLTest extends FunSuite {
   test("Query three queries joined by many to one and one to many") (pending)
 
   test("Query with a Nested Join") (pending)
+
+  test("Query with Join with compound primary key") (pending)
+
+  test("Query with Join with primary key containing date") (pending)
+
+  test("Query with Join with primitive primary key") (pending)
+
+  test("Query with Join with compound primary key containing nested object") (pending)
 }
