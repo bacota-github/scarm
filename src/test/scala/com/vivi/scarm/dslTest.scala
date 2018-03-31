@@ -1,10 +1,18 @@
 package com.vivi.scarm.test
 
+import cats.effect.IO
+import doobie._
+import doobie.implicits._
+import doobie.util.transactor.Transactor
 import org.scalatest.FunSuite
 
 import com.vivi.scarm._
 
 import TestObjects._
+
+case class SimpleId(id: Int) extends AnyVal
+case class SimpleEntity(id: SimpleId, x: Int, name: String)
+    extends Entity[SimpleId]
 
 case class IntId(id: Int)
 case class StringId(string: Int)
@@ -15,19 +23,38 @@ case class IntEntity(id: Int, name: String, intval: Option[String])
 case class StringEntity(id: StringId, name: String, strval: Option[String], intval: Option[Int])
     extends Entity[StringId]
 
-
-
 class DSLTest extends FunSuite {
+  /*
+  val jdbcDriver = "org.hsqldb.jdbc.JDBCDriver"
+  val jdbcUrl = "jdbc:hsqldb:file:testdb"
+  val jdbcUsername = "SA"
+  val jdbcPassword = ""
+   */
+  
+  val jdbcDriver = "org.postgresql.Driver"
+  val jdbcUrl = "jdbc:postgresql:scarm"
+  val jdbcUsername = "scarm"
+  val jdbcPassword = "scarm"
 
-//  val jdbcDriver = config
 
+  implicit val xa: Transactor[IO] = Transactor.fromDriverManager[IO](
+    jdbcDriver, jdbcUrl, jdbcUsername, jdbcPassword
+  )
   /*
   implicit val xa: Transactor[IO] = Transactor.fromDriverManager[IO](
-    "org.postgresql.Driver", "jdbc:postgresql:scarm" , "scarm" , "scarm"
+    ", " , "scarm" , "scarm"
   )
    */
 
-  test("after inserting an entity, the object can be selected by primary key") (pending)
+  test("after inserting an entity, it can be selected by primary key") {
+    val table = Table[SimpleId,SimpleEntity]("simple_entity")
+    table.create().transact(xa).unsafeRunSync()
+    table.drop.transact(xa).unsafeRunSync()
+  }
+
+  test("after inserting multiple entities, they can each be selected by primary key") {
+    val table = Table[SimpleId,SimpleEntity]("simple_entity")
+  }
 
   test("after deleting an entity, the entity cannot be found by primary key") (pending)
 

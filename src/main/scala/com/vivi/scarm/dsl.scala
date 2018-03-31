@@ -128,16 +128,26 @@ case class Table[K,E<:Entity[K]](
   }
 
   def create(fieldOverrides: Map[String, String] = Map(),
-    typeOverrides: Map[Type, String] = Map())
-    (implicit xa: Transactor[IO], fieldMap: FieldMap[E]): ConnectionIO[Int] = {
-    val sqlText = Table.createSql(this,fieldOverrides,typeOverrides)
-    sql""""${sqlText}""".update.run
+    typeOverrides: Map[Type, String] = Map()
+  )(implicit fieldMap: FieldMap[E]): ConnectionIO[Int] = {
+    val sql = createSql(fieldOverrides, typeOverrides)(fieldMap)
+    Fragment(sql, ()).update.run
   }
+
+  def createSql(fieldOverrides: Map[String, String] = Map(),
+    typeOverrides: Map[Type, String] = Map()
+  )(implicit fieldMap: FieldMap[E]): String =
+    Table.createSql(this,fieldOverrides,typeOverrides)(fieldMap)
 
   def delete(keys: K*)
     (implicit xa: Transactor[IO], composite: Composite[K]): Unit =
     //TODO: Batch delete
     keys.foreach(doDelete(_)(xa, composite))
+
+  def drop(implicit xa: Transactor[IO]): ConnectionIO[Int] = {
+    val sql = s"DROP TABLE ${name}"
+    Fragment(sql, ()).update.run
+  }
 
   private def doInsert(entity: E)
     (implicit xa: Transactor[IO], composite: Composite[E]): Unit = {
@@ -185,11 +195,11 @@ object Table {
         case None => fieldMap.mapping.get(f) match {
           case None => throw new RuntimeException(s"Could not find type for ${f}")
           case Some((tpe, nullable)) =>
-            f + " " + typeName(tpe, nullable, typeOverrides)
+             f + " " + typeName(tpe, nullable, typeOverrides)
         }
-      }).mkString(",")
+      }).mkString(", ")
     val pkeyColumns = table.keyNames.mkString(",")
-    s"CREATE TABLE IF NOT EXISTS ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
+    s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
   }
 
   private[scarm] val sqlTypeMap: Map[Type, String] = Map(
