@@ -75,6 +75,10 @@ class DSLTest(driver: String,
 
 
   test("after inserting an entity, it can be selected by primary key") {
+    val e1 = SimpleEntity(SimpleId(1), 0, "entity1")
+    val e2 = SimpleEntity(SimpleId(2), 1, "entity2")
+    simpleTable.insert(e1)
+    simpleTable.insert(e2)
   }
 
   test("multiple entities can be inserted in one command") {

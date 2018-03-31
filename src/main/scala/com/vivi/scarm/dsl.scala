@@ -84,10 +84,10 @@ sealed trait Queryable[K, F[_], E, RT] {
     Fragment(sql, key)(keyComposite).query[RT](compositeT)
 
   def query(key: K)
-    (implicit xa: Transactor[IO], keyComposite: Composite[K], compositeT: Composite[RT]): F[E] = {
+    (implicit xa: Transactor[IO], keyComposite: Composite[K], compositeT: Composite[RT])
+      :ConnectionIO[F[E]] = {
     val dquery = doobieQuery(key)(keyComposite, compositeT)
-    val rows: Seq[RT] = dquery.to[List].transact(xa).unsafeRunSync
-    collectResults(reduceResults(rows))
+    dquery.to[List].map(reduceResults(_)).map(collectResults(_))
   }
 
   def join[LK,LF[_]](query: Queryable[LK,LF,K,_])
@@ -119,7 +119,8 @@ case class Table[K,E<:Entity[K]](
     fieldNames.map(f => s"${tname(ct)}.${f}").mkString(",")
 
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
-  override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] =
+    reduced.head
 
   private def doDelete(key: K)
     (implicit xa: Transactor[IO], composite: Composite[K]): Unit = {
@@ -154,17 +155,18 @@ case class Table[K,E<:Entity[K]](
     Fragment(sql, ()).update.run
   }
 
-  private def doInsert(entity: E)
+  def insert(entity: E)
     (implicit xa: Transactor[IO], composite: Composite[E]): Unit = {
     val sql = entity.insertSQL(this)(composite)
-    Fragment(sql, entity)(composite).update.run.transact(xa).unsafeRunSync
+    Fragment(sql, entity)(composite).update.run
   }
 
+  /*
   def insert(entities: E*)
-    (implicit xa: Transactor[IO], composite: Composite[E]): Unit =
+    (implicit xa: Transactor[IO], composite: Composite[E]): ConnectionIO[Unit] =
     //TODO: Batch insert
     entities.foreach(doInsert(_)(xa, composite))
-
+ */
 
   def insertReturning(e: E*): Try[K] = ???
 
