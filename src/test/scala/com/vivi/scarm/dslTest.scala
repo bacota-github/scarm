@@ -27,14 +27,15 @@ object DSLSuite {
   val hsqldbCleanup = (xa:Transactor[IO]) => {
     sql"""DROP SCHEMA PUBLIC CASCADE""".update.run.transact(xa).unsafeRunSync()
     sql"""SHUTDOWN IMMEDIATELY""".update.run.transact(xa).unsafeRunSync()
-    false
+      false
   }
 }
 
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver", "jdbc:hsqldb:file:testdb",
     "SA", "", DSLSuite.hsqldbCleanup),
-  new DSLTest("org.postgresql.Driver", "jdbc:postgresql:scarm", "scarm", "scarm")
+  new DSLTest("org.postgresql.Driver", "jdbc:postgresql:scarm", "scarm", "scarm"),
+  new DSLTest("com.mysql.cj.jdbc.Driver", "jdbc:mysql://localhost:3306/scarm?serverTimezone=UTC&useSSL=false", "scarm", "scarm")
 )
 
 class DSLTest(driver: String,
