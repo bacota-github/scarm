@@ -155,17 +155,10 @@ case class Table[K,E<:Entity[K]](
     Fragment(sql, ()).update.run
   }
 
-  def insert(entity: E)(implicit composite: Composite[E]): Unit = {
+  def insert(entity: E)(implicit composite: Composite[E]): ConnectionIO[Int] = {
     val sql = entity.insertSQL(this)(composite)
     Fragment(sql, entity)(composite).update.run
   }
-
-  /*
-  def insert(entities: E*)
-    (implicit xa: Transactor[IO], composite: Composite[E]): ConnectionIO[Unit] =
-    //TODO: Batch insert
-    entities.foreach(doInsert(_)(xa, composite))
- */
 
   def insertReturning(e: E*): Try[K] = ???
 

@@ -70,6 +70,7 @@ class DSLTest(driver: String,
   }
 
   override def afterAll() {
+    cleanup(xa)
     if (cleanup(xa))  dropAll(xa) else ()
   }
 
@@ -77,8 +78,18 @@ class DSLTest(driver: String,
   test("after inserting an entity, it can be selected by primary key") {
     val e1 = SimpleEntity(SimpleId(1), 0, "entity1")
     val e2 = SimpleEntity(SimpleId(2), 1, "entity2")
-    simpleTable.insert(e1)
-    simpleTable.insert(e2)
+    val op = for {
+      n1 <- simpleTable.insert(e1)
+      n2 <- simpleTable.insert(e2)
+      e2Result <- simpleTable.query(e2.id)
+      e1Result <- simpleTable.query(e1.id)
+    } yield {
+      assert(n1 == 1)
+      assert(n2 == 1)
+      assert(e1Result == e1)
+      assert(e2Result == e2)
+    }
+    op.transact(xa).unsafeRunSync()
   }
 
   test("multiple entities can be inserted in one command") {
