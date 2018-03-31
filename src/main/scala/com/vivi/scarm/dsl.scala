@@ -84,7 +84,7 @@ sealed trait Queryable[K, F[_], E, RT] {
     Fragment(sql, key)(keyComposite).query[RT](compositeT)
 
   def query(key: K)
-    (implicit xa: Transactor[IO], keyComposite: Composite[K], compositeT: Composite[RT])
+    (implicit keyComposite: Composite[K], compositeT: Composite[RT])
       :ConnectionIO[F[E]] = {
     val dquery = doobieQuery(key)(keyComposite, compositeT)
     dquery.to[List].map(reduceResults(_)).map(collectResults(_))
@@ -145,18 +145,17 @@ case class Table[K,E<:Entity[K]](
     //TODO: Batch delete
     keys.foreach(doDelete(_)(xa, composite))
 
-  def drop(implicit xa: Transactor[IO]): ConnectionIO[Int] = {
+  def drop: ConnectionIO[Int] = {
     val sql = s"DROP TABLE ${name}"
     Fragment(sql, ()).update.run
   }
 
-  def dropCascade(implicit xa: Transactor[IO]): ConnectionIO[Int] = {
+  def dropCascade: ConnectionIO[Int] = {
     val sql = s"DROP TABLE ${name} CASCADE"
     Fragment(sql, ()).update.run
   }
 
-  def insert(entity: E)
-    (implicit xa: Transactor[IO], composite: Composite[E]): Unit = {
+  def insert(entity: E)(implicit composite: Composite[E]): Unit = {
     val sql = entity.insertSQL(this)(composite)
     Fragment(sql, entity)(composite).update.run
   }

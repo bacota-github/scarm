@@ -59,7 +59,7 @@ class DSLTest(driver: String,
   private def dropAll(xa: Transactor[IO]): Unit = 
     for (t <-tables) {
       try {
-        t.dropCascade(xa).transact(xa).unsafeRunSync()
+        t.dropCascade.transact(xa).unsafeRunSync()
       } catch { case e: Exception =>
           info(s"failed dropping ${t.name} ${e.getMessage()}")
       }
