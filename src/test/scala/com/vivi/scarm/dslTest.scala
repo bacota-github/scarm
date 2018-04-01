@@ -52,6 +52,8 @@ class DSLTest(driver: String,
 
   val tables = Seq(teachers)
 
+  private def run[T](op: ConnectionIO[T]): T = op.transact(xa).unsafeRunSync()
+
   private def createAll() = 
     for (t <- tables) {
       t.create().transact(xa).unsafeRunSync()
@@ -90,7 +92,7 @@ class DSLTest(driver: String,
       assert(t1Result == Some(t1))
       assert(t2Result == Some(t2))
     }
-    op.transact(xa).unsafeRunSync()
+    run(op)
   }
 
 
@@ -103,7 +105,7 @@ class DSLTest(driver: String,
     } yield {
       assert(result == None)
     }
-    op.transact(xa).unsafeRunSync()
+    run(op)
   }
 
   test("after updating an entity, selecting the entity by primary key returns the new entity") (pending)
