@@ -2,7 +2,7 @@ scalaVersion := "2.12.5"
 
 scalacOptions ++= Seq("-Ypartial-unification", "-deprecation", "-feature")
 
-val doobieVersion = "0.5.1"
+val doobieVersion = "0.5.2"
 
 libraryDependencies ++= Seq(
 
@@ -15,7 +15,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.5" % "test",
   "org.hsqldb" % "hsqldb" % "2.4.0" % "test",
   "org.tpolecat" %% "doobie-postgres"  % doobieVersion % "test",
-  "mysql" % "mysql-connector-java" % "6.0.6"
+  "mysql" % "mysql-connector-java" % "6.0.6" % "test"
 )
 
 testOptions in Test += Tests.Argument("-oDF")
