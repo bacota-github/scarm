@@ -9,7 +9,6 @@ import scala.util.{Failure,Success,Try}
 import scala.reflect.runtime.universe.{Type,typeOf}
 import scala.language.higherKinds
 
-import cats.Id
 import doobie._
 import doobie.implicits._
 import shapeless.ops.hlist.Prepend
@@ -27,18 +26,8 @@ import dslUtil._
 
 trait Entity[K] {
   def id: K
-
-  private[scarm] def deleteSQL[E<:Entity[K]](table: Table[K,E]): String =
-    s"DELETE FROM ${table.name} AS ${tname(1)} WHERE ${table.whereClause}"
-
-  /*
-  private[scarm] def updateSQL[E<:Entity[K]](table: Table[K,E])
-    (implicit composite: Composite[E]): String = {
-    val values = List.fill(composite.length)("?").mkString(",")
-    s"UPDATE ${table.name} SET
-  }
-   */
 }
+
 
 /** An database object such as a table or index, created in the RDBMS. */
 sealed trait DatabaseObject {
@@ -104,7 +93,7 @@ case class Table[K,E<:Entity[K]](
   override val name: String,
   override val fieldNames: Seq[String],
   override val keyNames: Seq[String]
-) extends DatabaseObject with Queryable[K,Id,E,E] {
+) extends DatabaseObject with Queryable[K,Option,E,E] {
 
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this,
     (e:E) => Some(e.id), keyNames)
@@ -113,14 +102,9 @@ case class Table[K,E<:Entity[K]](
     fieldNames.map(f => s"${tname(ct)}.${f}").mkString(",")
 
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
-  override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] =
-    reduced.head
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
+    primaryKey.collectResults(reduced)
 
-  private def doDelete(key: K)
-    (implicit xa: Transactor[IO], composite: Composite[K]): Unit = {
-    val sql =  s"DELETE FROM ${name} AS ${tname(1)} WHERE ${whereClause}"
-    Fragment(sql, key)(composite).update.run.transact(xa).unsafeRunSync
-  }
 
   def create(fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
@@ -134,10 +118,11 @@ case class Table[K,E<:Entity[K]](
   )(implicit fieldMap: FieldMap[E]): String =
     Table.createSql(this,fieldOverrides,typeOverrides)(fieldMap)
 
-  def delete(keys: K*)
-    (implicit xa: Transactor[IO], composite: Composite[K]): Unit =
-    //TODO: Batch delete
-    keys.foreach(doDelete(_)(xa, composite))
+  def delete(key: K)(implicit composite: Composite[K]): ConnectionIO[Int] = {
+    val whereClause = keyNames.map(k => s"${k}=?").mkString(" AND ")
+    val sql =  s"DELETE FROM ${name} WHERE ${whereClause}"
+    Fragment(sql, key)(composite).update.run
+  }
 
   def drop: ConnectionIO[Int] = {
     val sql = s"DROP TABLE ${name}"
@@ -317,10 +302,11 @@ case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
   val indexKey: FROM => TPK,
   override val to: Table[TPK,TO],
   override val  keyNames: Seq[String]
-) extends ForeignKey[FPK,FROM,TPK,TO,Id] {
+) extends ForeignKey[FPK,FROM,TPK,TO,Option] {
   override def fromKey = (f: FROM) => Some(indexKey(f))
   override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
-  override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
+    to.collectResults(reduced)
 }
 
 

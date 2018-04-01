@@ -77,32 +77,34 @@ class DSLTest(driver: String,
 
 
   test("after inserting an entity, it can be selected by primary key") {
-    val e1 = Teacher(TeacherId(1),  "entity1")
-    val e2 = Teacher(TeacherId(2),  "entity2")
+    val t1 = Teacher(TeacherId(1),  "entity1")
+    val t2 = Teacher(TeacherId(2),  "entity2")
     val op = for {
-      n1 <- teachers.insert(e1)
-      n2 <- teachers.insert(e2)
-      e2Result <- teachers.query(e2.id)
-      e1Result <- teachers.query(e1.id)
+      n1 <- teachers.insert(t1)
+      n2 <- teachers.insert(t2)
+      t2Result <- teachers.query(t2.id)
+      t1Result <- teachers.query(t1.id)
     } yield {
       assert(n1 == 1)
       assert(n2 == 1)
-      assert(e1Result == e1)
-      assert(e2Result == e2)
+      assert(t1Result == Some(t1))
+      assert(t2Result == Some(t2))
     }
     op.transact(xa).unsafeRunSync()
   }
 
-  test("multiple entities can be inserted in one command") {
-  }
 
-  test("multiple entities can be deleted in one command") {
+  test("after deleting an entity, the entity cannot be found by primary key") {
+    val t = Teacher(TeacherId(3), "A Teacher")
+    val op = for {
+      _ <- teachers.insert(t)
+      _ <- teachers.delete(t.id)
+      result <- teachers.query(t.id)
+    } yield {
+      assert(result == None)
+    }
+    op.transact(xa).unsafeRunSync()
   }
-
-  test(" multiple entities, they can each be selected by primary key") {
-  }
-
-  test("after deleting an entity, the entity cannot be found by primary key") (pending)
 
   test("after updating an entity, selecting the entity by primary key returns the new entity") (pending)
 
