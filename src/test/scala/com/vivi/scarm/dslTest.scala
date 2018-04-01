@@ -25,9 +25,11 @@ case class StringEntity(id: StringId, name: String, strval: Option[String], intv
 
 object DSLSuite {
   val hsqldbCleanup = (xa:Transactor[IO]) => {
-    sql"""DROP SCHEMA PUBLIC CASCADE""".update.run.transact(xa).unsafeRunSync()
-    sql"""SHUTDOWN IMMEDIATELY""".update.run.transact(xa).unsafeRunSync()
-      false
+    val op = for { 
+      _ <- sql"""DROP SCHEMA PUBLIC CASCADE""".update.run
+      _ <- sql"""SHUTDOWN IMMEDIATELY""".update.run
+    } yield false
+    op.transact(xa).unsafeRunSync()
   }
 }
 
