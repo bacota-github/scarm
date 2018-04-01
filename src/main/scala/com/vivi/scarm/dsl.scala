@@ -11,6 +11,8 @@ import scala.language.higherKinds
 
 import doobie._
 import doobie.implicits._
+import shapeless.LabelledGeneric
+import shapeless.ops.hlist
 import shapeless.ops.hlist.Prepend
 import shapeless.{ Generic, HList }
 
@@ -51,8 +53,9 @@ sealed trait Queryable[K, F[_], E, RT] {
   private[scarm] def tableList(ct: Int): Seq[String]
   private[scarm] def tablect: Int
   private[scarm] def whereClause: String = keyNames.map(k =>
-    s"${tname(1)}.${k}=?").mkString(" AND "
-  )
+    s"${tname(1)}.${k}=?").mkString(" AND ")
+  private[scarm] def whereClauseNoAlias: String = keyNames.map(k =>
+    s"${k}=?").mkString(" AND ")
 
   lazy val sql: String = {
     val tables = tableList(1).mkString(" ")
@@ -89,7 +92,7 @@ sealed trait Queryable[K, F[_], E, RT] {
 }
 
 
-case class Table[K,E<:Entity[K]](
+case class Table[K, E<:Entity[K]](
   override val name: String,
   override val fieldNames: Seq[String],
   override val keyNames: Seq[String]
@@ -105,22 +108,15 @@ case class Table[K,E<:Entity[K]](
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     primaryKey.collectResults(reduced)
 
-
   def create(fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
   )(implicit fieldMap: FieldMap[E]): ConnectionIO[Int] = {
-    val sql = createSql(fieldOverrides, typeOverrides)(fieldMap)
+    val sql = Table.createSql(this,fieldOverrides,typeOverrides)(fieldMap)
     Fragment(sql, ()).update.run
   }
 
-  def createSql(fieldOverrides: Map[String, String] = Map(),
-    typeOverrides: Map[Type, String] = Map()
-  )(implicit fieldMap: FieldMap[E]): String =
-    Table.createSql(this,fieldOverrides,typeOverrides)(fieldMap)
-
   def delete(key: K)(implicit composite: Composite[K]): ConnectionIO[Int] = {
-    val whereClause = keyNames.map(k => s"${k}=?").mkString(" AND ")
-    val sql =  s"DELETE FROM ${name} WHERE ${whereClause}"
+    val sql =  s"DELETE FROM ${name} WHERE ${whereClauseNoAlias}"
     Fragment(sql, key)(composite).update.run
   }
 
@@ -147,14 +143,30 @@ case class Table[K,E<:Entity[K]](
   def insertReturning(e: E*): Try[K] = ???
 
   def save(enties: E*): Try[Unit] = ???
-  def update(enties: E*): Try[Unit] = ???
+
+  def update[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList]
+    (entity: E)(implicit
+      kGeneric: LabelledGeneric.Aux[K,KList],
+      eGeneric: LabelledGeneric.Aux[E,EList],
+      remList:  hlist.Diff.Aux[EList,KList,REMList],
+      revList: hlist.Prepend.Aux[REMList,KList,REVList],
+      revComposite: Composite[REVList],
+      revTupler: hlist.Tupler.Aux[REVList, REV]
+  ): ConnectionIO[Int] = {
+    val updatedCols = fieldNames.map(f => s"${f}=?").mkString(",")
+    val sql = s"UPDATE ${name} SET ${updatedCols} WHERE ${whereClauseNoAlias}"
+    val key: KList = kGeneric.to(entity.id)
+    val remainder: REMList = remList(eGeneric.to(entity))
+    val reversed: REVList = revList(remainder, key)
+    Fragment(sql, reversed)(revComposite).update.run
+  }
 }
 
 
 object Table {
 
   def apply[K,E<:Entity[K]](name: String)
-    (implicit keyList: FieldList[K], fieldList: FieldList[E]): Table[K,E] = 
+    (implicit keyList: FieldList[K], fieldList: FieldList[E]): Table[K,E] =
     Table(name, fieldList.names, keyList.names)
 
   def apply[K,E<:Entity[K]](name: String, keys: Seq[String])
