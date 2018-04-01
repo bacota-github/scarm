@@ -31,12 +31,6 @@ trait Entity[K] {
   private[scarm] def deleteSQL[E<:Entity[K]](table: Table[K,E]): String =
     s"DELETE FROM ${table.name} AS ${tname(1)} WHERE ${table.whereClause}"
 
-  private[scarm] def insertSQL[E<:Entity[K]](table: Table[K,E])
-    (implicit composite: Composite[E]): String = {
-    val values = List.fill(composite.length)("?").mkString(",")
-    s"INSERT INTO ${table.name} values (${values})"
-  }
-
   /*
   private[scarm] def updateSQL[E<:Entity[K]](table: Table[K,E])
     (implicit composite: Composite[E]): String = {
@@ -156,8 +150,13 @@ case class Table[K,E<:Entity[K]](
   }
 
   def insert(entity: E)(implicit composite: Composite[E]): ConnectionIO[Int] = {
-    val sql = entity.insertSQL(this)(composite)
+    val sql = insertSQL(composite)
     Fragment(sql, entity)(composite).update.run
+  }
+
+  private[scarm] def insertSQL(implicit composite: Composite[E]): String = {
+    val values = List.fill(composite.length)("?").mkString(",")
+    s"INSERT INTO ${name} values (${values})"
   }
 
   def insertReturning(e: E*): Try[K] = ???

@@ -10,9 +10,8 @@ import com.vivi.scarm._
 
 import TestObjects._
 
-case class SimpleId(id: Int) extends AnyVal
-case class SimpleEntity(id: SimpleId, x: Int, name: String)
-    extends Entity[SimpleId]
+case class TeacherId(id: Int) extends AnyVal
+case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
 
 case class IntId(id: Int)
 case class StringId(string: Int)
@@ -49,9 +48,9 @@ class DSLTest(driver: String,
 
   implicit val xa = Transactor.fromDriverManager[IO](driver, url, username, pass)
 
-  val simpleTable = Table[SimpleId,SimpleEntity]("simple_entity")
+  val teachers = Table[TeacherId,Teacher]("teachers")
 
-  val tables = Seq(simpleTable)
+  val tables = Seq(teachers)
 
   private def createAll() = 
     for (t <- tables) {
@@ -78,13 +77,13 @@ class DSLTest(driver: String,
 
 
   test("after inserting an entity, it can be selected by primary key") {
-    val e1 = SimpleEntity(SimpleId(1), 0, "entity1")
-    val e2 = SimpleEntity(SimpleId(2), 1, "entity2")
+    val e1 = Teacher(TeacherId(1),  "entity1")
+    val e2 = Teacher(TeacherId(2),  "entity2")
     val op = for {
-      n1 <- simpleTable.insert(e1)
-      n2 <- simpleTable.insert(e2)
-      e2Result <- simpleTable.query(e2.id)
-      e1Result <- simpleTable.query(e1.id)
+      n1 <- teachers.insert(e1)
+      n2 <- teachers.insert(e2)
+      e2Result <- teachers.query(e2.id)
+      e1Result <- teachers.query(e1.id)
     } yield {
       assert(n1 == 1)
       assert(n2 == 1)
@@ -95,20 +94,19 @@ class DSLTest(driver: String,
   }
 
   test("multiple entities can be inserted in one command") {
-    val table = Table[SimpleId,SimpleEntity]("simple_entity")
   }
 
   test("multiple entities can be deleted in one command") {
-    val table = Table[SimpleId,SimpleEntity]("simple_entity")
   }
 
   test(" multiple entities, they can each be selected by primary key") {
-    val table = Table[SimpleId,SimpleEntity]("simple_entity")
   }
 
   test("after deleting an entity, the entity cannot be found by primary key") (pending)
 
   test("after updating an entity, selecting the entity by primary key returns the new entity") (pending)
+
+  test("Update doesn't compile if primary key isn't a prefix") (pending)
 
   test("after dropping a table, the table cannot be used for inserts or selects") (pending)
 
