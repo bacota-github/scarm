@@ -228,7 +228,7 @@ object Table {
         }
       }).mkString(", ")
     val pkeyColumns = table.keyNames.mkString(",")
-    s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
+    s"CREATE TABLE IF NOT EXISTS ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
   }
 
   private[scarm] val sqlTypeMap: Map[Type, String] = Map(

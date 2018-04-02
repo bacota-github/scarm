@@ -100,16 +100,15 @@ class DSLTest(driver: String,
     case class Row(id: Int, name: String) extends Entity[Int]
     val table = Table[Int,Row]("scan_test", Seq("id"))
     val entities = Set(Row(1,"One"), Row(2,"Two"), Row(3, "three"))
-    run(table.drop)
-    run(table.create())
     val op = for {
+      _ <- table.create()
       _ <- table.insert(entities.toSeq: _*)
       results <- TableScan(table).query(Unit)
+     _ <-table.drop
     } yield {
       assert(results == entities)
     }
     run(op)
-    run(table.drop)
   }
 
   test("after deleting an entity, the entity cannot be found by primary key") {
