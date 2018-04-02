@@ -213,7 +213,12 @@ class DSLTest(driver: String,
     assert(Some(newT2) == run(teachers.query(t2.id)))
   }
 
-  test("Update doesn't compile if primary key isn't a prefix") (pending)
+  test("Update doesn't compile if primary key isn't a prefix") {
+    case class Row(name: String, id: Int) extends Entity[Int]
+    val table = Table[Int,Row]("update_test", Seq("id"))
+    val row = Row("One",1)
+    assertTypeError("table.update(row)")
+  }
 
   test("after dropping a table, the table cannot be used for inserts or selects") (pending)
 
