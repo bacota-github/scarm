@@ -108,6 +108,15 @@ case class Table[K, E<:Entity[K]](
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     primaryKey.collectResults(reduced)
 
+  private def foldDml[T](seq: Seq[T], composite: Composite[T],
+    f: (T, Composite[T]) => ConnectionIO[Int]): ConnectionIO[Int] = {
+    val first = f(seq.head, composite)
+    if (seq.tail.size == 0) first
+    else seq.tail.foldLeft(first)( (io,e) =>
+        io.flatMap(i => f(e, composite).map(_+i))
+      )
+  }
+
   def create(fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
   )(implicit fieldMap: FieldMap[E]): ConnectionIO[Int] = {
@@ -115,7 +124,10 @@ case class Table[K, E<:Entity[K]](
     Fragment(sql, ()).update.run
   }
 
-  def delete(key: K)(implicit composite: Composite[K]): ConnectionIO[Int] = {
+  def delete(keys: K*)(implicit composite: Composite[K]): ConnectionIO[Int] = 
+    foldDml(keys, composite, deleteOne)
+
+  private def deleteOne(key: K, composite: Composite[K]): ConnectionIO[Int] = {
     val sql =  s"DELETE FROM ${name} WHERE ${whereClauseNoAlias}"
     Fragment(sql, key)(composite).update.run
   }
@@ -130,7 +142,10 @@ case class Table[K, E<:Entity[K]](
     Fragment(sql, ()).update.run
   }
 
-  def insert(entity: E)(implicit composite: Composite[E]): ConnectionIO[Int] = {
+  def insert(entities: E*)(implicit composite: Composite[E]): ConnectionIO[Int] =
+    foldDml(entities, composite, insertOne)
+
+  private def insertOne(entity: E, composite: Composite[E]): ConnectionIO[Int] = {
     val sql = insertSQL(composite)
     Fragment(sql, entity)(composite).update.run
   }
@@ -145,7 +160,26 @@ case class Table[K, E<:Entity[K]](
   def save(enties: E*): Try[Unit] = ???
 
   def update[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList]
-    (entity: E)(implicit
+    (entities: E*)(implicit
+      kGeneric: LabelledGeneric.Aux[K,KList],
+      eGeneric: LabelledGeneric.Aux[E,EList],
+      remList:  hlist.Diff.Aux[EList,KList,REMList],
+      revList: hlist.Prepend.Aux[REMList,KList,REVList],
+      revComposite: Composite[REVList],
+      revTupler: hlist.Tupler.Aux[REVList, REV]
+  ): ConnectionIO[Int] = {
+    def f(e: E) = updateOne(e,kGeneric, eGeneric, remList, revList,
+      revComposite, revTupler)
+    val first = f(entities.head)
+    if (entities.tail.size == 0) first
+    else entities.tail.foldLeft(first)( (io,e) =>
+        io.flatMap(i => f(e).map(_+i))
+    )
+  }
+
+
+  private def updateOne[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList]
+    (entity: E,
       kGeneric: LabelledGeneric.Aux[K,KList],
       eGeneric: LabelledGeneric.Aux[E,EList],
       remList:  hlist.Diff.Aux[EList,KList,REMList],
@@ -216,6 +250,19 @@ object Table {
     typeOf[java.time.Year] -> "DATE",
     typeOf[java.time.YearMonth] -> "DATE"
   )
+}
+
+
+case class TableScan[K,E<:Entity[K]](table: Table[K,E])
+    extends Queryable[Unit, Set, E, E] {
+  def keyNames = Seq()
+  override private[scarm] def selectList(ct: Int): String = table.selectList(ct)
+  override private[scarm] def tableList(ct: Int): Seq[String] = table.tableList(ct)
+  override private[scarm] def tablect: Int = 1
+  override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] =
+    table.reduceResults(rows)
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Set[T] =
+    reduced.toSet
 }
 
 case class View[K,E](

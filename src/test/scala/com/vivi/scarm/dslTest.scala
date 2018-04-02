@@ -77,8 +77,10 @@ class DSLTest(driver: String,
     if (cleanup(xa))  dropAll(xa) else ()
   }
 
-  test("A table scan returns all the entities in the table") (pending)
-
+  test("A table scan returns all the entities in the table") {
+    case class Row(id: Int, name: String) extends Entity[Int]
+    val table = Table[Int,Row]("scan_test", Seq("id"))
+  }
 
   test("after inserting an entity, it can be selected by primary key") {
     val t1 = Teacher(TeacherId(1),  "entity1")
