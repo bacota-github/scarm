@@ -82,8 +82,8 @@ class DSLTest(driver: String,
     val t2 = Teacher(TeacherId(2),  "entity2")
     val op = for {
       n <- teachers.insert(t1, t2)
-      t2Result <- teachers.query(t2.id)
-      t1Result <- teachers.query(t1.id)
+      t2Result <- teachers(t2.id)
+      t1Result <- teachers(t1.id)
     } yield {
       assert(n == 2)
       assert(t1Result == Some(t1))
@@ -107,7 +107,7 @@ class DSLTest(driver: String,
     val op = for {
       _ <- table.create()
       _ <- table.insert(entities.toSeq: _*)
-      results <- TableScan(table).query(Unit)
+      results <- table.scan(Unit)
      _ <-table.drop
     } yield {
       assert(results == entities)
@@ -120,7 +120,7 @@ class DSLTest(driver: String,
     val op = for {
       _ <- teachers.insert(t)
       _ <- teachers.delete(t.id)
-      result <- teachers.query(t.id)
+      result <- teachers(t.id)
     } yield {
       assert(result == None)
     }
@@ -133,8 +133,8 @@ class DSLTest(driver: String,
     val op = for {
       _ <- teachers.insert(t1,t2)
       _ <- teachers.delete(t1.id)
-      r1 <- teachers.query(t1.id)
-      r2 <- teachers.query(t2.id)
+      r1 <- teachers(t1.id)
+      r2 <- teachers(t2.id)
     } yield {
       assert (r1 == None)
       assert (r2 == Some(t2))
@@ -152,8 +152,8 @@ class DSLTest(driver: String,
     val op = for {
       _ <- teachers.insert(t1,t2)
       n <- teachers.delete(t1.id,t2.id, TeacherId(-1))
-      t1Result <- teachers.query(t1.id)
-      t2Result <- teachers.query(t2.id)
+      t1Result <- teachers(t1.id)
+      t2Result <- teachers(t2.id)
     } yield {
       assert(n == 2)
       assert(t1Result == None)
@@ -168,7 +168,7 @@ class DSLTest(driver: String,
     val op = for {
       _ <- teachers.insert(t)
       n <- teachers.update(newT)
-      result <- teachers.query(t.id)
+      result <- teachers(t.id)
     } yield {
       assert(n == 1)
       assert(result == Some(newT))
@@ -183,7 +183,7 @@ class DSLTest(driver: String,
     val op = for {
       _ <- teachers.insert(t1,t2)
       n <- teachers.update(newT)
-      result <- teachers.query(t2.id)
+      result <- teachers(t2.id)
     } yield {
       assert(n == 1)
       assert(result == Some(t2))
@@ -209,8 +209,8 @@ class DSLTest(driver: String,
       assert(n == 2)
     }
     run(op)
-    assert(Some(newT1) == run(teachers.query(t1.id)))
-    assert(Some(newT2) == run(teachers.query(t2.id)))
+    assert(Some(newT1) == run(teachers(t1.id)))
+    assert(Some(newT2) == run(teachers(t2.id)))
   }
 
   test("Update doesn't compile if primary key isn't a prefix") {

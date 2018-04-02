@@ -47,6 +47,10 @@ sealed trait Queryable[K, F[_], E, RT] {
 
   def keyNames: Seq[String]
 
+  def apply(k: K)(implicit kComp: Composite[K], rtComp: Composite[RT])
+      :ConnectionIO[F[E]] = query(k)(kComp, rtComp)
+
+
   private[scarm] def innerJoinKeyNames: Seq[String] = joinKeyNames
   private[scarm] def joinKeyNames: Seq[String] = keyNames
   private[scarm] def selectList(ct: Int): String
@@ -66,13 +70,12 @@ sealed trait Queryable[K, F[_], E, RT] {
   private[scarm] def reduceResults(rows: Traversable[RT]): Traversable[E]
   private[scarm] def collectResults[T](reduced: Traversable[T]): F[T]
 
-  def doobieQuery(key: K)(implicit keyComposite: Composite[K], compositeT: Composite[RT]): Query0[RT] =
-    Fragment(sql, key)(keyComposite).query[RT](compositeT)
+  def doobieQuery(key: K)(implicit kComp: Composite[K], rtComp: Composite[RT]): Query0[RT] =
+    Fragment(sql, key)(kComp).query[RT](rtComp)
 
   def query(key: K)
-    (implicit keyComposite: Composite[K], compositeT: Composite[RT])
-      :ConnectionIO[F[E]] = {
-    val dquery = doobieQuery(key)(keyComposite, compositeT)
+    (implicit kComp: Composite[K], rtComp: Composite[RT]): ConnectionIO[F[E]] = {
+    val dquery = doobieQuery(key)(kComp, rtComp)
     dquery.to[List].map(reduceResults(_)).map(collectResults(_))
   }
 
@@ -108,12 +111,12 @@ case class Table[K, E<:Entity[K]](
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     primaryKey.collectResults(reduced)
 
-  private def foldDml[T](seq: Seq[T], composite: Composite[T],
+  private def foldDml[T](seq: Seq[T], comp: Composite[T],
     f: (T, Composite[T]) => ConnectionIO[Int]): ConnectionIO[Int] = {
-    val first = f(seq.head, composite)
+    val first = f(seq.head, comp)
     if (seq.tail.size == 0) first
     else seq.tail.foldLeft(first)( (io,e) =>
-        io.flatMap(i => f(e, composite).map(_+i))
+        io.flatMap(i => f(e, comp).map(_+i))
       )
   }
 
@@ -124,12 +127,12 @@ case class Table[K, E<:Entity[K]](
     Fragment(sql, ()).update.run
   }
 
-  def delete(keys: K*)(implicit composite: Composite[K]): ConnectionIO[Int] = 
-    foldDml(keys, composite, deleteOne)
+  def delete(keys: K*)(implicit comp: Composite[K]): ConnectionIO[Int] = 
+    foldDml(keys, comp, deleteOne)
 
-  private def deleteOne(key: K, composite: Composite[K]): ConnectionIO[Int] = {
+  private def deleteOne(key: K, comp: Composite[K]): ConnectionIO[Int] = {
     val sql =  s"DELETE FROM ${name} WHERE ${whereClauseNoAlias}"
-    Fragment(sql, key)(composite).update.run
+    Fragment(sql, key)(comp).update.run
   }
 
   def drop: ConnectionIO[Int] = {
@@ -142,22 +145,24 @@ case class Table[K, E<:Entity[K]](
     Fragment(sql, ()).update.run
   }
 
-  def insert(entities: E*)(implicit composite: Composite[E]): ConnectionIO[Int] =
-    foldDml(entities, composite, insertOne)
+  def insert(entities: E*)(implicit comp: Composite[E]): ConnectionIO[Int] =
+    foldDml(entities, comp, insertOne)
 
-  private def insertOne(entity: E, composite: Composite[E]): ConnectionIO[Int] = {
-    val sql = insertSQL(composite)
-    Fragment(sql, entity)(composite).update.run
+  private def insertOne(entity: E, comp: Composite[E]): ConnectionIO[Int] = {
+    val sql = insertSQL(comp)
+    Fragment(sql, entity)(comp).update.run
   }
 
-  private[scarm] def insertSQL(implicit composite: Composite[E]): String = {
-    val values = List.fill(composite.length)("?").mkString(",")
+  private[scarm] def insertSQL(implicit comp: Composite[E]): String = {
+    val values = List.fill(comp.length)("?").mkString(",")
     s"INSERT INTO ${name} values (${values})"
   }
 
   def insertReturning(e: E*): Try[K] = ???
 
   def save(enties: E*): Try[Unit] = ???
+
+  lazy val scan = TableScan(this)
 
   def update[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList]
     (entities: E*)(implicit
