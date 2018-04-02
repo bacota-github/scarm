@@ -133,12 +133,12 @@ case class Table[K, E<:Entity[K]](
   }
 
   def drop: ConnectionIO[Int] = {
-    val sql = s"DROP TABLE ${name}"
+    val sql = s"DROP TABLE IF EXISTS ${name}"
     Fragment(sql, ()).update.run
   }
 
   def dropCascade: ConnectionIO[Int] = {
-    val sql = s"DROP TABLE ${name} CASCADE"
+    val sql = s"DROP TABLE IF EXISTS ${name} CASCADE"
     Fragment(sql, ()).update.run
   }
 
@@ -263,6 +263,8 @@ case class TableScan[K,E<:Entity[K]](table: Table[K,E])
     table.reduceResults(rows)
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Set[T] =
     reduced.toSet
+
+  override lazy val sql: String = s"SELECT ${selectList(1)} FROM ${tableList(1).head}"
 }
 
 case class View[K,E](

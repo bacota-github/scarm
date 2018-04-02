@@ -77,11 +77,6 @@ class DSLTest(driver: String,
     if (cleanup(xa))  dropAll(xa) else ()
   }
 
-  test("A table scan returns all the entities in the table") {
-    case class Row(id: Int, name: String) extends Entity[Int]
-    val table = Table[Int,Row]("scan_test", Seq("id"))
-  }
-
   test("after inserting an entity, it can be selected by primary key") {
     val t1 = Teacher(TeacherId(1),  "entity1")
     val t2 = Teacher(TeacherId(2),  "entity2")
@@ -97,6 +92,24 @@ class DSLTest(driver: String,
       assert(t2Result == Some(t2))
     }
     run(op)
+  }
+
+  test("Multiple entities can be inserted in one operation") (pending)
+
+  test("A table scan returns all the entities in the table") {
+    case class Row(id: Int, name: String) extends Entity[Int]
+    val table = Table[Int,Row]("scan_test", Seq("id"))
+    val entities = Set(Row(1,"One"), Row(2,"Two"), Row(3, "three"))
+    run(table.drop)
+    run(table.create())
+    val op = for {
+      _ <- table.insert(entities.toSeq: _*)
+      results <- TableScan(table).query(Unit)
+    } yield {
+      assert(results == entities)
+    }
+    run(op)
+    run(table.drop)
   }
 
   test("after deleting an entity, the entity cannot be found by primary key") {
@@ -115,6 +128,8 @@ class DSLTest(driver: String,
 
   test("deleting a nonexistent entity affects nothing") (pending)
 
+  test("Multiple entities can be deleted in one operation") (pending)
+
   test("after updating an entity, selecting the entity by primary key returns the new entity") {
     val t = Teacher(TeacherId(4), "A Teacher")
     val newT = t.copy(name="Updated")
@@ -132,6 +147,8 @@ class DSLTest(driver: String,
   test("only the specified is affected by an update") (pending)
 
   test("updating a nonexistent entity affects nothing") (pending)
+
+  test("Multiple entities can be updated in one operation") (pending)
 
   test("Update doesn't compile if primary key isn't a prefix") (pending)
 
