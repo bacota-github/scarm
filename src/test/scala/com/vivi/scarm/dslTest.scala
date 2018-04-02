@@ -129,7 +129,19 @@ class DSLTest(driver: String,
     run(op)
   }
 
-  test("only the specified is affected by a delete") (pending)
+  test("only the specified entity is affected by a delete") {
+    val t1 = Teacher(TeacherId(14), "Teacher 14")
+    val t2 = Teacher(TeacherId(15), "Teacher 15")
+    val op = for {
+      _ <- teachers.insert(t1,t2)
+      _ <- teachers.delete(t1.id)
+      r1 <- teachers.query(t1.id)
+      r2 <- teachers.query(t2.id)
+    } yield {
+      assert (r1 == None)
+      assert (r2 == Some(t2))
+    }
+  }
 
   test("deleting a nonexistent entity affects nothing") (pending)
 
