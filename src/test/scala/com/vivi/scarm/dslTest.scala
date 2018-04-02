@@ -160,7 +160,6 @@ class DSLTest(driver: String,
       assert(t2Result == None)
     }
     run(op)
-
   }
 
   test("after updating an entity, selecting the entity by primary key returns the new entity") {
@@ -177,11 +176,42 @@ class DSLTest(driver: String,
     run(op)
   }
 
-  test("only the specified is affected by an update") (pending)
+  test("only the specified entity is affected by an update") {
+    val t1 = Teacher(TeacherId(18), "A Teacher")
+    val t2 = Teacher(TeacherId(19), "A Teacher")
+    val newT = t1.copy(name="Updated")
+    val op = for {
+      _ <- teachers.insert(t1,t2)
+      n <- teachers.update(newT)
+      result <- teachers.query(t2.id)
+    } yield {
+      assert(n == 1)
+      assert(result == Some(t2))
+    }
+    run(op)
+  }
 
-  test("updating a nonexistent entity affects nothing") (pending)
+  test("updating a nonexistent entity affects nothing") {
+    val t = Teacher(TeacherId(-1), "A Teacher")
+    assert(0 == run(teachers.update(t)))
+  }
 
-  test("Multiple entities can be updated in one operation") (pending)
+
+  test("Multiple entities can be updated in one operation") {
+    val t1 = Teacher(TeacherId(21), "A Teacher")
+    val t2 = Teacher(TeacherId(22), "A Teacher")
+    val newT1 = t1.copy(name="Updated")
+    val newT2 = t2.copy(name="Updated")
+    val op = for {
+      _ <- teachers.insert(t1,t2)
+      n <- teachers.update(newT1, newT2)
+    } yield {
+      assert(n == 2)
+    }
+    run(op)
+    assert(Some(newT1) == run(teachers.query(t1.id)))
+    assert(Some(newT2) == run(teachers.query(t2.id)))
+  }
 
   test("Update doesn't compile if primary key isn't a prefix") (pending)
 
