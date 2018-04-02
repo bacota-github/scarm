@@ -4,6 +4,7 @@ import cats.effect.IO
 import doobie._
 import doobie.implicits._
 import doobie.util.transactor.Transactor
+import java.sql.{ SQLException }
 import org.scalatest._
 
 import com.vivi.scarm._
@@ -220,7 +221,15 @@ class DSLTest(driver: String,
     assertTypeError("table.update(row)")
   }
 
-  test("after dropping a table, the table cannot be used for inserts or selects") (pending)
+  test("a dropped table cannot be used") { 
+    case class Row(name: String, id: Int) extends Entity[Int]
+    val table = Table[Int,Row]("drop_test", Seq("id"))
+    run(table.create())
+    run(table.drop)
+    assertThrows[SQLException] {
+      run(table.insert(Row("foo", 1)))
+    }
+  }
 
   test("SQL on a table with date fields") (pending)
 
