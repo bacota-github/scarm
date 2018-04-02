@@ -81,13 +81,11 @@ class DSLTest(driver: String,
     val t1 = Teacher(TeacherId(1),  "entity1")
     val t2 = Teacher(TeacherId(2),  "entity2")
     val op = for {
-      n1 <- teachers.insert(t1)
-      n2 <- teachers.insert(t2)
+      n <- teachers.insert(t1, t2)
       t2Result <- teachers.query(t2.id)
       t1Result <- teachers.query(t1.id)
     } yield {
-      assert(n1 == 1)
-      assert(n2 == 1)
+      assert(n == 2)
       assert(t1Result == Some(t1))
       assert(t2Result == Some(t2))
     }
@@ -143,9 +141,27 @@ class DSLTest(driver: String,
     }
   }
 
-  test("deleting a nonexistent entity affects nothing") (pending)
+  test("deleting a nonexistent entity affects nothing") {
+    val n = teachers.delete(TeacherId(-1))
+    assert (run(n) == 0)
+  }
 
-  test("Multiple entities can be deleted in one operation") (pending)
+  test("multiple entities can be deleted in one operation")  {
+    val t1 = Teacher(TeacherId(16),  "entity1")
+    val t2 = Teacher(TeacherId(17),  "entity2")
+    val op = for {
+      _ <- teachers.insert(t1,t2)
+      n <- teachers.delete(t1.id,t2.id, TeacherId(-1))
+      t1Result <- teachers.query(t1.id)
+      t2Result <- teachers.query(t2.id)
+    } yield {
+      assert(n == 2)
+      assert(t1Result == None)
+      assert(t2Result == None)
+    }
+    run(op)
+
+  }
 
   test("after updating an entity, selecting the entity by primary key returns the new entity") {
     val t = Teacher(TeacherId(4), "A Teacher")
