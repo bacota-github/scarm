@@ -94,7 +94,13 @@ class DSLTest(driver: String,
     run(op)
   }
 
-  test("Multiple entities can be inserted in one operation") (pending)
+  test("Multiple entities can be inserted in one operation") {
+    val newTeachers = Set(Teacher(TeacherId(10),"Fred"),
+      Teacher(TeacherId(11),"Barney"),
+      Teacher(TeacherId(12), "Wilma")
+    )
+    assert(newTeachers.size == run(teachers.insert(newTeachers.toSeq: _*)))
+  }
 
   test("A table scan returns all the entities in the table") {
     case class Row(id: Int, name: String) extends Entity[Int]
