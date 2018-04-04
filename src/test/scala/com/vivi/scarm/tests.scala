@@ -8,20 +8,9 @@ import java.sql.{ SQLException }
 import org.scalatest._
 
 import com.vivi.scarm._
+import com.vivi.scarm.FieldMap._
 
 import TestObjects._
-
-case class TeacherId(id: Int) extends AnyVal
-case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
-
-case class IntId(id: Int)
-case class StringId(string: Int)
-
-case class IntEntity(id: Int, name: String, intval: Option[String])
-    extends Entity[Int]
-
-case class StringEntity(id: StringId, name: String, strval: Option[String], intval: Option[Int])
-    extends Entity[StringId]
 
 object DSLSuite {
   val hsqldbCleanup = (xa:Transactor[IO]) => {
@@ -49,19 +38,15 @@ class DSLTest(driver: String,
 
   implicit val xa = Transactor.fromDriverManager[IO](driver, url, username, pass)
 
-  val teachers = Table[TeacherId,Teacher]("teachers")
-
-  val tables = Seq(teachers)
-
   private def run[T](op: ConnectionIO[T]): T = op.transact(xa).unsafeRunSync()
 
   private def createAll() = 
-    for (t <- tables) {
+    for (t <- allTables) {
       t.create().transact(xa).unsafeRunSync()
     }
 
   private def dropAll(xa: Transactor[IO]): Unit = 
-    for (t <-tables) {
+    for (t <-allTables) {
       try {
         t.dropCascade.transact(xa).unsafeRunSync()
       } catch { case e: Exception =>
@@ -70,14 +55,27 @@ class DSLTest(driver: String,
     }
 
   override def beforeAll() {
-    createAll()
+//    createAll()
   }
 
   override def afterAll() {
     cleanup(xa)
-    if (cleanup(xa))  dropAll(xa) else ()
+//    if (cleanup(xa))  dropAll(xa) else ()
   }
 
+  test("fieldLists") {
+    case class Foo(sectionId: SectionId, x: Int)
+    case class NestedId(sectionId: SectionId)
+    case class Foo2(nestedId: NestedId, x: Int)
+    println(FieldMap[(Int,Int,Int)].names)
+    println(FieldMap[SectionId].names)
+    println(FieldMap[(SectionId)].names)
+    println(FieldMap[(SectionId, Int)].names)
+    println(FieldMap[(Int,SectionId)].names)
+    println(FieldMap[Foo].names)
+//    println(FieldMap[Foo2].names)
+  }
+/*
   test("after inserting an entity, it can be selected by primary key") {
     val t1 = Teacher(TeacherId(1),  "entity1")
     val t2 = Teacher(TeacherId(2),  "entity2")
@@ -197,7 +195,6 @@ class DSLTest(driver: String,
     assert(0 == run(teachers.update(t)))
   }
 
-
   test("Multiple entities can be updated in one operation") {
     val t1 = Teacher(TeacherId(21), "A Teacher")
     val t2 = Teacher(TeacherId(22), "A Teacher")
@@ -308,4 +305,9 @@ class DSLTest(driver: String,
   test("Query with Join with primitive primary key") (pending)
 
   test("Query with Join with compound primary key containing nested object") (pending)
+
+  test("field name overrides work") (pending)
+
+  test("sql type overrides work") (pending)
+ */
 }

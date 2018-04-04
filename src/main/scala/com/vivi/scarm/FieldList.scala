@@ -5,7 +5,7 @@ import shapeless.Witness
 import shapeless.labelled.FieldType
 
 /**
-  * Based on Mike Limansky's blog post at
+  * Loosely ased on Mike Limansky's blog post at
   * http://limansky.me/posts/2017-02-02-generating-sql-queries-with-shapeless.html
   */
 
@@ -19,7 +19,7 @@ trait PrimitiveFieldList {
     witness: Witness.Aux[K],
     tList: FieldList[T]
   ) = new FieldList[FieldType[K, H] ::T] {
-      override val names = witness.value.name :: tList.names
+      override val names = "primitive_"+witness.value.name :: tList.names
     }
 }
 
@@ -30,37 +30,37 @@ trait OptionFieldList extends PrimitiveFieldList {
     tList: FieldList[T]
   ) =  new FieldList[FieldType[K, Option[H]] ::T] {
       override val names =
-        FieldList.prefix(witness.value.name, hList.value) ++ tList.names
-    }
+        FieldList.prefix("option_"+witness.value.name, hList.value) ++ tList.names
+  }
 }
 
 object FieldList extends OptionFieldList {
 
-  def apply[T](implicit fieldList: FieldList[T]): FieldList[T] =
-    fieldList
+  def apply[T](implicit fieldList: FieldList[T]): FieldList[T] = fieldList
 
-  implicit def make[A,ARepr<:HList](
-    implicit gen: LabelledGeneric.Aux[A, ARepr],
+  implicit def makeFieldList[A,ARepr<:HList](implicit
+    gen: LabelledGeneric.Aux[A, ARepr],
     generator: FieldList[ARepr]
   ) = new FieldList[A] {
-    override val names = generator.names
+    override val names = generator.names.map("make_" + _)
   }
 
-  implicit val hnilList: FieldList[HNil] = new FieldList[HNil] {
+
+  implicit val hnilFieldList: FieldList[HNil] = new FieldList[HNil] {
     override val names = Nil
   }
 
-  implicit def hconsList[K<:Symbol, H, T <: HList](implicit
+  implicit def hconsFieldList[K<:Symbol, H, T <: HList](implicit
     witness: Witness.Aux[K],
     hList: Lazy[FieldList[H]],
     tList: FieldList[T]
-  ): FieldList[FieldType[K, H] :: T] =
-    new FieldList[FieldType[K, H] :: T] {
+  ): FieldList[FieldType[K,H] ::T]= new FieldList[FieldType[K, H] :: T] {
       override val names = 
-        prefix(witness.value.name, hList.value) ++ tList.names
+        prefix("hcons_"+witness.value.name, hList.value) ++ tList.names
     }
 
-  private[scarm] def prefix[A](prefix: String, list: FieldList[A]) =
-        if (prefix == "id") list.names else list.names.map(prefix + "_" + _)
+
+  private[scarm] def prefix[A](prefix: String, list: FieldList[A]): List[String] =
+    if (prefix == "id") list.names else list.names.map(prefix + "_" + _)
 }
 

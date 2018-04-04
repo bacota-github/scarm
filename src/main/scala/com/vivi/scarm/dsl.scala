@@ -16,6 +16,8 @@ import shapeless.ops.hlist
 import shapeless.ops.hlist.Prepend
 import shapeless.{ Generic, HList }
 
+import FieldMap._
+
 private[scarm] object dslUtil {
   def tname(ct: Int): String = "t" + ct
   def alias(name: String, ct: Int): String = name + " AS " + tname(ct)
@@ -97,9 +99,11 @@ sealed trait Queryable[K, F[_], E, RT] {
 
 case class Table[K, E<:Entity[K]](
   override val name: String,
-  override val fieldNames: Seq[String],
+  fieldMap: FieldMap[E],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
+
+  lazy val fieldNames: Seq[String] = fieldMap.names
 
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this,
     (e:E) => Some(e.id), keyNames)
@@ -122,8 +126,8 @@ case class Table[K, E<:Entity[K]](
 
   def create(fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
-  )(implicit fieldMap: FieldMap[E]): ConnectionIO[Int] = {
-    val sql = Table.createSql(this,fieldOverrides,typeOverrides)(fieldMap)
+  ): ConnectionIO[Int] = {
+    val sql = Table.createSql(this,fieldOverrides,typeOverrides)
     Fragment(sql, ()).update.run
   }
 
@@ -204,13 +208,13 @@ case class Table[K, E<:Entity[K]](
 
 object Table {
 
-  def apply[K,E<:Entity[K]](name: String)
-    (implicit keyList: FieldList[K], fieldList: FieldList[E]): Table[K,E] =
-    Table(name, fieldList.names, keyList.names)
+  def apply[K,E<:Entity[K]](name: String) 
+    (implicit kmap: FieldMap[K], fmap: FieldMap[E]): Table[K,E] =
+    Table(name, fmap, kmap.names)
 
-  def apply[K,E<:Entity[K]](name: String, keys: Seq[String])
-    (implicit fieldList: FieldList[E]): Table[K,E] = 
-    Table(name, fieldList.names, keys)
+  def apply[K,E<:Entity[K]](name: String, keyNames: Seq[String])
+    (implicit fmap: FieldMap[E]): Table[K,E] = 
+    Table(name, fmap, keyNames)
 
   private def typeName(tpe: Type, nullable: Boolean, overrides: Map[Type,String]): String = 
     overrides.getOrElse(tpe, sqlTypeMap.get(tpe)) match {
@@ -222,11 +226,13 @@ object Table {
     table: Table[K,E],
     fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
-  )(implicit fieldMap: FieldMap[E]): String = {
+  ): String = {
+    println(s"fieldNames for ${table.name} is ${table.fieldNames}")
+    println(s"fieldMap for ${table.name} is ${table.fieldMap.mapping}")
     val columns = table.fieldNames.map(f => 
       fieldOverrides.get(f) match {
         case Some(typeString) => f+ " " + typeString
-        case None => fieldMap.mapping.get(f) match {
+        case None => table.fieldMap.mapping.get(f) match {
           case None => throw new RuntimeException(s"Could not find type for ${f}")
           case Some((tpe, nullable)) =>
              f + " " + typeName(tpe, nullable, typeOverrides)
@@ -426,7 +432,6 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
   override private[scarm] def innerJoinKeyNames: Seq[String] = left.joinKeyNames
   override private[scarm] def joinKeyNames = left.joinKeyNames  
   override private[scarm] def reduceResults(rows: Traversable[(JK,Option[RRT])]): Traversable[(JK,RF[E])] =  {
-    println("Reducing " + rows.toString())
     rows.groupBy(_._1).
       mapValues(_.map(_._2)).
       mapValues(_.collect { case Some(s) => s }).

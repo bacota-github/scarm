@@ -1,6 +1,5 @@
 package com.vivi.scarm.test
 
-import java.util.Calendar
 import doobie.ConnectionIO
 import fs2.Stream
 import org.scalatest.FunSuite
@@ -17,10 +16,14 @@ object TestObjects {
   case class AssignmentId(id: Int) extends AnyVal
 
   case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
-  case class Course(id: CourseId, subject: String, prerequisite: Option[CourseId]) extends Entity[CourseId]
+
+  case class Course(id: CourseId, subject: String,
+    prerequisite: Option[CourseId]) extends Entity[CourseId]
 
   case class Section(id: SectionId, instructor: TeacherId,
-    room: String, time: java.sql.Time) extends Entity[SectionId]
+    room: String, meetingTime: java.time.LocalTime,
+    startDate: java.time.LocalDate, endDate: java.time.LocalDate)
+      extends Entity[SectionId]
 
   case class Student(id: StudentId, name: String, level: Int)
       extends Entity[StudentId]
@@ -38,6 +41,8 @@ object TestObjects {
   val students = Table[StudentId,Student]("students")
   val enrollments = Table[EnrollmentId, Enrollment]("enrollments")
   val assignments = Table[AssignmentId, Assignment]("assignments")
+
+  val allTables = Seq(teachers)//,courses, sections, students,enrollments,assignments)
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
     (s: Section) => Some(s.id.semester), Seq("semester")
