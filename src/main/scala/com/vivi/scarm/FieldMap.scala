@@ -19,20 +19,28 @@ trait FieldMap[A] {
 
   def ++[B<:HList](other: FieldMap[B]):FieldMap[A::B] = FieldMap.concat(this,other)
 
-  def prefix(pre: String, fields: Seq[FieldMap.Item]) =
-    fields.map(it => it.copy(name=pre+"_"+it.name))
+  def prefix(pre: String) = FieldMap.prefix[A](pre+"_", this)
 }
 
 trait PrimitiveFieldMap {
-  implicit def primitiveFieldMap[K <: Symbol, V](implicit
-      k: Witness.Aux[K],
-      typeTag: TypeTag[V]
-  ) = new FieldMap[FieldType[K, V]] {
-    override val fields =
-      prefix("p", Seq( FieldMap.Item(k.value.name, typeTag.tpe, false) ))
-  }
+  implicit def primitiveFieldMap[V](implicit  typeTag: TypeTag[V]) =
+    new FieldMap[V] {
+      override val fields = Seq( FieldMap.Item("", typeTag.tpe, false) )
+
+      override def prefix(pre: String) = FieldMap.prefix[V](pre, this)
+    }
 }
 
+
+trait keylessFieldMap extends PrimitiveFieldMap {
+  implicit def keylessHconsFieldMap[H, T<:HList](implicit
+    hmap: FieldMap[H],
+    tmap: FieldMap[T]
+  ) = new FieldMap[H :: T] {
+    override val fields = hmap.fields ++ tmap.fields
+  }
+
+}
 
 object FieldMap extends PrimitiveFieldMap {
 
@@ -47,13 +55,13 @@ object FieldMap extends PrimitiveFieldMap {
     generic: LabelledGeneric.Aux[A,ARepr],
     fieldMap: FieldMap[ARepr]
   ) = new FieldMap[A] {
-    override val fields = prefix("gen", fieldMap.fields)
+    override val fields = fieldMap.fields
   }
 
   implicit def hnilFieldMap = new FieldMap[HNil] {
     override val fields = Seq()
   }
-
+/*
   implicit def recursiveFieldMap[K<:Symbol,H,HRepr<:HList](implicit
     k: Witness.Aux[K],
     generic: LabelledGeneric.Aux[H,HRepr],
@@ -61,23 +69,25 @@ object FieldMap extends PrimitiveFieldMap {
   ) = new FieldMap[FieldType[K,H]] {
     override val fields = prefix("recurse", hmap.value.fields)
   }
-
+ */
   implicit def hconsFieldMap[K<:Symbol, H, T<:HList](implicit
     k: Witness.Aux[K],
-    hmap: FieldMap[FieldType[K,H]],
+    hmap: FieldMap[H],
     tmap: FieldMap[T]
   ) = new FieldMap[FieldType[K,H] :: T] {
-    override val fields = prefix("hcons", hmap.fields ++ tmap.fields)
+    override val fields = hmap.prefix(k.value.name).fields ++ tmap.fields
   }
 
   implicit def optionalFieldMap[K<:Symbol, V](implicit
     from: FieldMap[FieldType[K, V]]
   ) =  new FieldMap[FieldType[K,Option[V]]] {
-    override val fields = prefix("opt", from.fields.map(_.copy(optional=true)))
+    override val fields = from.fields.map(_.copy(optional=true))
   }
 
-  private[scarm] def prefix(pre: String, from: Seq[Item]) =
-    from.map(it => it.copy(name=pre+it.name))
+  private[scarm] def prefix[A](pre: String, from: FieldMap[A]): FieldMap[A] =
+    new FieldMap[A] {
+      override val fields = from.fields.map(it => it.copy(name=pre+it.name))
+    }
 
   private[scarm] def concat[A,B<:HList](l: FieldMap[A], r: FieldMap[B]) =
     new FieldMap[A :: B] {
