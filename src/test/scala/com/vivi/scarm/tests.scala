@@ -55,12 +55,12 @@ class DSLTest(driver: String,
     }
 
   override def beforeAll() {
-//    createAll()
+    createAll()
   }
 
   override def afterAll() {
     cleanup(xa)
-//    if (cleanup(xa))  dropAll(xa) else ()
+    if (cleanup(xa))  dropAll(xa) else ()
   }
 
   test("fieldLists") {
@@ -72,7 +72,6 @@ class DSLTest(driver: String,
     println(FieldMap[(SectionId)].names)
     println(FieldMap[(SectionId, Int)].names)
     println(FieldMap[(Int,SectionId)].names)
-    println(FieldMap[Foo].names)
 //    println(FieldMap[Foo2].names)
   }
 /*

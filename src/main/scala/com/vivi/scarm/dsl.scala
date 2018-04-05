@@ -6,7 +6,7 @@ import fs2.Stream
 import cats.effect.IO
 
 import scala.util.{Failure,Success,Try}
-import scala.reflect.runtime.universe.{Type,typeOf}
+import scala.reflect.runtime.universe.{Type,typeOf,Symbol=>rSymbol}
 import scala.language.higherKinds
 
 import doobie._
@@ -217,8 +217,8 @@ object Table {
     Table(name, fmap, keyNames)
 
   private def typeName(tpe: Type, nullable: Boolean, overrides: Map[Type,String]): String = 
-    overrides.getOrElse(tpe, sqlTypeMap.get(tpe)) match {
-      case None => throw new RuntimeException(s"Could not find sql type for type ${tpe}")
+    overrides.getOrElse(tpe, sqlTypeMap.get(tpe.typeSymbol)) match {
+      case None => throw new RuntimeException(s"Could not find sql type for type ${tpe.companion}")
       case Some(typeString) => typeString + (if (nullable) "" else " not null")
     }
 
@@ -242,24 +242,24 @@ object Table {
     s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
   }
 
-  private[scarm] val sqlTypeMap: Map[Type, String] = Map(
-    typeOf[Char] -> "CHAR(1)",
-    typeOf[String] -> "VARCHAR(255)",
-    typeOf[Boolean] -> "BOOLEAN",
-    typeOf[Short] -> "SMALLINIT",
-    typeOf[Int] -> "INT",
-    typeOf[Float] -> "FLOAT",
-    typeOf[Double] -> "DOUBLE PRECISION",
-    typeOf[java.util.Date] -> "TIMESTAMP",
-    typeOf[java.sql.Date] -> "TIMESTAMP",
-    typeOf[java.time.Instant] -> "TIMESTAMP",
-    typeOf[java.time.LocalDate] -> "DATE",
-    typeOf[java.time.LocalDateTime] -> "TIMESTAMP",
-    typeOf[java.time.LocalTime] -> "TIME",
-    typeOf[java.time.MonthDay] -> "DATE",
-    typeOf[java.time.MonthDay] -> "DATE",
-    typeOf[java.time.Year] -> "DATE",
-    typeOf[java.time.YearMonth] -> "DATE"
+  private[scarm] val sqlTypeMap: Map[rSymbol, String] = Map(
+    typeOf[Char].typeSymbol -> "CHAR(1)",
+    typeOf[String].typeSymbol -> "VARCHAR(255)",
+    typeOf[Boolean].typeSymbol -> "BOOLEAN",
+    typeOf[Short].typeSymbol -> "SMALLINIT",
+    typeOf[Int].typeSymbol -> "INT",
+    typeOf[Float].typeSymbol -> "FLOAT",
+    typeOf[Double].typeSymbol -> "DOUBLE PRECISION",
+    typeOf[java.util.Date].typeSymbol -> "TIMESTAMP",
+    typeOf[java.sql.Date].typeSymbol -> "TIMESTAMP",
+    typeOf[java.time.Instant].typeSymbol -> "TIMESTAMP",
+    typeOf[java.time.LocalDate].typeSymbol -> "DATE",
+    typeOf[java.time.LocalDateTime].typeSymbol -> "TIMESTAMP",
+    typeOf[java.time.LocalTime].typeSymbol -> "TIME",
+    typeOf[java.time.MonthDay].typeSymbol -> "DATE",
+    typeOf[java.time.MonthDay].typeSymbol -> "DATE",
+    typeOf[java.time.Year].typeSymbol -> "DATE",
+    typeOf[java.time.YearMonth].typeSymbol -> "DATE"
   )
 }
 

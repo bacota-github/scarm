@@ -44,20 +44,20 @@ trait keylessFieldMap extends PrimitiveFieldMap {
 }
 
 
-object FieldMap extends PrimitiveFieldMap {
+object FieldMap {
 
   case class Item(name: String, tpe: Type, optional: Boolean) {
     def entry = (name, (tpe, optional))
   }
 
-  def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = new FieldMap[A]{
+  implicit def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = new FieldMap[A]{
     override val fields = fieldsFromType("", ttag.tpe, false)
   }
 
   private def isCaseClass(tpe: Type): Boolean =
     tpe.members.exists {
       case m: MethodSymbol => m.isCaseAccessor
-      case _ => false
+       case _ => false
     }
 
   private def fieldsFromType(pre: String, tpe: Type, opt: Boolean): Seq[Item] =   {
@@ -73,7 +73,21 @@ object FieldMap extends PrimitiveFieldMap {
         }
       }
       members.flatten
+  }
+
+  private[scarm] def prefix[A](pre: String, from: FieldMap[A]): FieldMap[A] =
+    new FieldMap[A] {
+      override val fields = from.fields.map(it => it.copy(name=pre+it.name))
     }
+
+  private[scarm] def concat[A,B<:HList](l: FieldMap[A], r: FieldMap[B]) =
+    new FieldMap[A :: B] {
+      override val fields = l.fields ++ r.fields
+    }
+}
+
+
+object ShapelessFieldMap extends PrimitiveFieldMap {
 
 
   implicit def genericFieldMap[A,ARepr<:HList](implicit
@@ -108,16 +122,7 @@ object FieldMap extends PrimitiveFieldMap {
   ) =  new FieldMap[FieldType[K,Option[V]]] {
     override val fields = from.fields.map(_.copy(optional=true))
   }
-
-  private[scarm] def prefix[A](pre: String, from: FieldMap[A]): FieldMap[A] =
-    new FieldMap[A] {
-      override val fields = from.fields.map(it => it.copy(name=pre+it.name))
-    }
-
-  private[scarm] def concat[A,B<:HList](l: FieldMap[A], r: FieldMap[B]) =
-    new FieldMap[A :: B] {
-      override val fields = l.fields ++ r.fields
-    }
-
 }
+
+
 
