@@ -2,7 +2,7 @@ package com.vivi.scarm
 
 import scala.language.implicitConversions
 
-import scala.reflect.runtime.universe.{Type,TypeTag}
+import scala.reflect.runtime.universe.{MethodSymbol,Type,TypeTag, typeOf}
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy, Witness }
 import shapeless.labelled.FieldType
@@ -21,6 +21,7 @@ trait FieldMap[A] {
 
   def prefix(pre: String) = FieldMap.prefix[A](pre+"_", this)
 }
+
 
 trait PrimitiveFieldMap {
   implicit def primitiveFieldMap[V](implicit  typeTag: TypeTag[V]) =
@@ -42,13 +43,37 @@ trait keylessFieldMap extends PrimitiveFieldMap {
 
 }
 
+
 object FieldMap extends PrimitiveFieldMap {
 
   case class Item(name: String, tpe: Type, optional: Boolean) {
     def entry = (name, (tpe, optional))
   }
 
-  def apply[A](implicit fmap: FieldMap[A]): FieldMap[A] = fmap
+  def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = new FieldMap[A]{
+    override val fields = fieldsFromType("", ttag.tpe, false)
+  }
+
+  private def isCaseClass(tpe: Type): Boolean =
+    tpe.members.exists {
+      case m: MethodSymbol => m.isCaseAccessor
+      case _ => false
+    }
+
+  private def fieldsFromType(pre: String, tpe: Type, opt: Boolean): Seq[Item] =   {
+      val members = tpe.members.sorted.collect {
+        case m: MethodSymbol if m.isCaseAccessor => {
+          val prefix = if (pre == "") "" else pre+"_"
+          val name = prefix + m.name
+          if (isCaseClass(m.returnType))
+            fieldsFromType(name, m.returnType, opt)
+          else if (m.returnType <:< typeOf[Option[Any]]) 
+            fieldsFromType(name, m.returnType.typeArgs.head, true)
+          else Seq(Item(name, m.returnType, opt))
+        }
+      }
+      members.flatten
+    }
 
 
   implicit def genericFieldMap[A,ARepr<:HList](implicit
