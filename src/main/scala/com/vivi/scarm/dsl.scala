@@ -11,10 +11,9 @@ import scala.language.higherKinds
 
 import doobie._
 import doobie.implicits._
-import shapeless.LabelledGeneric
+import shapeless.{ Generic, HList, LabelledGeneric, Lazy, Lens, MkFieldLens, Witness, lens }
 import shapeless.ops.hlist
 import shapeless.ops.hlist.Prepend
-import shapeless.{ Generic, HList }
 
 import FieldMap._
 
@@ -33,7 +32,7 @@ trait Entity[K] {
 }
 
 
-/** An database object such as a table or index, created in the RDBMS. */
+/** A database object such as a table or index, created in the RDBMS. */
 sealed trait DatabaseObject {
   def name: String
   def fieldNames: Seq[String]
@@ -58,8 +57,10 @@ sealed trait Queryable[K, F[_], E, RT] {
   private[scarm] def selectList(ct: Int): String
   private[scarm] def tableList(ct: Int): Seq[String]
   private[scarm] def tablect: Int
+
   private[scarm] def whereClause: String = keyNames.map(k =>
     s"${tname(1)}.${k}=?").mkString(" AND ")
+
   private[scarm] def whereClauseNoAlias: String = keyNames.map(k =>
     s"${k}=?").mkString(" AND ")
 
@@ -97,13 +98,14 @@ sealed trait Queryable[K, F[_], E, RT] {
 }
 
 
-case class Table[K, E<:Entity[K]](
-  override val name: String,
-  fieldMap: FieldMap[E],
-  override val keyNames: Seq[String]
-) extends DatabaseObject with Queryable[K,Option,E,E] {
+trait Table[K, E<:Entity[K]]
+    extends DatabaseObject with Queryable[K,Option,E,E] {
+
+  val fieldMap: FieldMap[E]
 
   lazy val fieldNames: Seq[String] = fieldMap.names
+
+  def id(entity: E): K = entity.id
 
   lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this,
     (e:E) => Some(e.id), keyNames)
@@ -186,7 +188,6 @@ case class Table[K, E<:Entity[K]](
     )
   }
 
-
   private def updateOne[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList]
     (entity: E,
       kGeneric: LabelledGeneric.Aux[K,KList],
@@ -208,13 +209,32 @@ case class Table[K, E<:Entity[K]](
 
 object Table {
 
-  def apply[K,E<:Entity[K]](name: String) 
-    (implicit kmap: FieldMap[K], fmap: FieldMap[E]): Table[K,E] =
-    Table(name, fmap, kmap.names)
+  def apply[K,E<:Entity[K]](tname: String) 
+    (implicit kmap: FieldMap[K], fmap: FieldMap[E]) = new Table[K,E] {
+    override val name = tname
+    override val fieldMap = fmap
+    override val keyNames = kmap.names
+  }
 
-  def apply[K,E<:Entity[K]](name: String, keyNames: Seq[String])
-    (implicit fmap: FieldMap[E]): Table[K,E] = 
-    Table(name, fmap, keyNames)
+  def apply[K,E<:Entity[K]](tname: String, kNames: Seq[String])
+    (implicit fmap: FieldMap[E]) = new Table[K,E] {
+    override val name = tname
+    override val fieldMap = fmap
+    override val keyNames = kNames
+  }
+
+  def apply[K,E<:Entity[K]](tname: String, key: Witness.Aux[K])
+    (implicit kmap: FieldMap[K],
+      fmap: FieldMap[E],
+      mkFieldLens: MkFieldLens.Aux[E,K,K]
+    ) = new Table[K,E] {
+    override val name = tname
+    override val fieldMap = fmap
+    override val keyNames = kmap.names
+
+    val keyLens: Lens[E,K] = lens[E] >> key
+    override def id(entity: E): K = keyLens.get(entity)
+  }
 
   private def typeName(tpe: Type, nullable: Boolean, overrides: Map[Type,String]): String = 
     overrides.getOrElse(tpe, sqlTypeMap.get(tpe.typeSymbol)) match {

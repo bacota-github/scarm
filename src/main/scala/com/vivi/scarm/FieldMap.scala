@@ -3,6 +3,7 @@ package com.vivi.scarm
 import scala.language.implicitConversions
 
 import scala.reflect.runtime.universe.{MethodSymbol,Type,TypeTag, typeOf}
+import scala.reflect.runtime.universe.{Symbol => ReflectionSymbol}
 
 import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy, Witness }
 import shapeless.labelled.FieldType
@@ -54,25 +55,32 @@ object FieldMap {
     override val fields = fieldsFromType("", ttag.tpe, false)
   }
 
+  private def isCaseMethod(s: ReflectionSymbol): Boolean = 
+    s.isMethod && s.asMethod.isCaseAccessor
+
   private def isCaseClass(tpe: Type): Boolean =
-    tpe.members.exists {
-      case m: MethodSymbol => m.isCaseAccessor
-       case _ => false
-    }
+    tpe.members.exists(isCaseMethod(_))
+
 
   private def fieldsFromType(pre: String, tpe: Type, opt: Boolean): Seq[Item] =   {
-      val members = tpe.members.sorted.collect {
-        case m: MethodSymbol if m.isCaseAccessor => {
-          val prefix = if (pre == "") "" else pre+"_"
-          val name = prefix + m.name
-          if (isCaseClass(m.returnType))
+    val members = tpe.members.sorted.collect {
+      case s if isCaseMethod(s) => {
+        val m = s.asMethod
+        val prefix = if (pre == "") "" else pre+"_"
+        val name = prefix + m.name
+        if (isCaseClass(m.returnType)) {
+          if (m.returnType <:< typeOf[Option[AnyVal]])
+            fieldsFromType("", m.returnType, true)
+          else if (m.returnType <:< typeOf[AnyVal])
+            fieldsFromType("", m.returnType, opt)
+          else
             fieldsFromType(name, m.returnType, opt)
-          else if (m.returnType <:< typeOf[Option[Any]]) 
-            fieldsFromType(name, m.returnType.typeArgs.head, true)
-          else Seq(Item(name, m.returnType, opt))
-        }
+        } else if (m.returnType <:< typeOf[Option[Any]])
+          fieldsFromType(name, m.returnType.typeArgs.head, true)
+        else Seq(Item(name, m.returnType, opt))
       }
-      members.flatten
+    }
+    members.flatten
   }
 
   private[scarm] def prefix[A](pre: String, from: FieldMap[A]): FieldMap[A] =

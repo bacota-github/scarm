@@ -14,9 +14,9 @@ import TestObjects._
 
 object DSLSuite {
   val hsqldbCleanup = (xa:Transactor[IO]) => {
-    val op = for { 
-      _ <- sql"""DROP SCHEMA PUBLIC CASCADE""".update.run
-      _ <- sql"""SHUTDOWN IMMEDIATELY""".update.run
+    val op = for {
+      _ <- sql"DROP SCHEMA PUBLIC CASCADE".update.run
+      s <- sql"SHUTDOWN IMMEDIATELY".update.run
     } yield false
     op.transact(xa).unsafeRunSync()
   }
@@ -50,7 +50,7 @@ class DSLTest(driver: String,
       try {
         t.dropCascade.transact(xa).unsafeRunSync()
       } catch { case e: Exception =>
-          info(s"failed dropping ${t.name} ${e.getMessage()}")
+          println(s"failed dropping ${t.name} ${e.getMessage()}")
       }
     }
 
@@ -89,6 +89,8 @@ class DSLTest(driver: String,
     }
     run(op)
   }
+
+ test("fetching an entity by primary key results in an entity with correct primary key") (pending)
 
   test("Multiple entities can be inserted in one operation") {
     val newTeachers = Set(Teacher(TeacherId(10),"Fred"),
@@ -261,11 +263,17 @@ class DSLTest(driver: String,
 
   test("Query by Index with no results") (pending)
 
-  test("Query by Unique Index") (pending)
+ test("Query by index returns only entities with correct key") (pending)
+
+ test("Query by Unique Index") (pending)
+
+ test("Query by Unique index returns only entities with correct key") (pending)
 
   test("Query by Unique Index with no results") (pending)
 
   test("Query by Foreign Key") (pending)
+
+ test("Query by Foreign Key returns only entities with correct key") (pending)
 
   test("Query a View") (pending)
 
