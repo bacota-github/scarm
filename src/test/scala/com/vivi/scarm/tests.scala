@@ -63,7 +63,7 @@ class DSLTest(driver: String,
     if (cleanup(xa))  dropAll(xa) else ()
   }
 
-  test("fieldLists") {
+/*  test("fieldLists") {
     case class Foo(sectionId: SectionId, x: Int)
     case class NestedId(sectionId: SectionId)
     case class Foo2(nestedId: NestedId, x: Int)
@@ -73,8 +73,7 @@ class DSLTest(driver: String,
     println(FieldMap[(SectionId, Int)].names)
     println(FieldMap[(Int,SectionId)].names)
 //    println(FieldMap[Foo2].names)
-  }
-/*
+  }*/
   test("after inserting an entity, it can be selected by primary key") {
     val t1 = Teacher(TeacherId(1),  "entity1")
     val t2 = Teacher(TeacherId(2),  "entity2")
@@ -90,6 +89,7 @@ class DSLTest(driver: String,
     run(op)
   }
 
+/*
  test("fetching an entity by primary key results in an entity with correct primary key") (pending)
 
   test("Multiple entities can be inserted in one operation") {

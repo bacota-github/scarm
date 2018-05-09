@@ -66,17 +66,13 @@ object FieldMap {
     val members = tpe.members.sorted.collect {
       case s if isCaseMethod(s) => {
         val m = s.asMethod
-        val prefix = if (pre == "") "" else pre+"_"
-        val name = prefix + m.name
-        if (isCaseClass(m.returnType)) {
-          if (m.returnType <:< typeOf[Option[AnyVal]])
-            fieldsFromType("", m.returnType, true)
-          else if (m.returnType <:< typeOf[AnyVal])
-            fieldsFromType("", m.returnType, opt)
-          else
-            fieldsFromType(name, m.returnType, opt)
-        } else if (m.returnType <:< typeOf[Option[Any]])
+        val name = (if (pre == "") "" else pre+"_") + m.name
+        if (m.returnType <:< typeOf[Option[Any]])
           fieldsFromType(name, m.returnType.typeArgs.head, true)
+        else  if (isCaseClass(m.returnType)) {
+          val prefix = if (tpe <:< typeOf[Entity[Any]] && m.name.toString == "id") pre else name
+          fieldsFromType(prefix, m.returnType, opt)
+        }
         else Seq(Item(name, m.returnType, opt))
       }
     }

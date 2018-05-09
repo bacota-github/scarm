@@ -42,7 +42,7 @@ object TestObjects {
   val enrollments = Table[EnrollmentId, Enrollment]("enrollments")
   val assignments = Table[AssignmentId, Assignment]("assignments")
 
-  val allTables = Seq(teachers)//,courses, sections, students,enrollments,assignments)
+  val allTables = Seq(teachers,courses, sections, students,enrollments,assignments)
 
   val sectionsBySemester = Index("sectionsBySemester", sections,
     (s: Section) => Some(s.id.semester), Seq("semester")

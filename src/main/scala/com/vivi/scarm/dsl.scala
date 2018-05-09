@@ -27,7 +27,7 @@ import dslUtil._
 /** An object stored in a table.  Id is the primary key value. The
   * entity can be described as a tuple (id,data) */
 
-trait Entity[K] {
+trait Entity[+K] {
   def id: K
 }
 
@@ -247,8 +247,6 @@ object Table {
     fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
   ): String = {
-    println(s"fieldNames for ${table.name} is ${table.fieldNames}")
-    println(s"fieldMap for ${table.name} is ${table.fieldMap.mapping}")
     val columns = table.fieldNames.map(f => 
       fieldOverrides.get(f) match {
         case Some(typeString) => f+ " " + typeString
