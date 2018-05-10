@@ -5,10 +5,13 @@ import doobie._
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import java.sql.{ SQLException }
+import java.time._
+
 import org.scalatest._
 
 import com.vivi.scarm._
 import com.vivi.scarm.FieldMap._
+
 
 import TestObjects._
 
@@ -22,6 +25,8 @@ object DSLSuite {
   }
 }
 
+case class IntRow(id: Int, name: String) extends Entity[Int]
+
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver", "jdbc:hsqldb:file:testdb",
     "SA", "", DSLSuite.hsqldbCleanup),
@@ -29,12 +34,17 @@ class DSLSuite extends Suites(
   new DSLTest("com.mysql.cj.jdbc.Driver", "jdbc:mysql://localhost:3306/scarm?serverTimezone=UTC&useSSL=false", "scarm", "scarm")
 )
 
+
 class DSLTest(driver: String,
   url: String,
   username: String,
   pass: String,
   cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
 ) extends FunSuite with BeforeAndAfterAll {
+
+  var idCounter = new java.util.concurrent.atomic.AtomicInteger (1)
+
+  def nextId: Int = idCounter.getAndAdd(1)
 
   implicit val xa = Transactor.fromDriverManager[IO](driver, url, username, pass)
 
@@ -64,8 +74,8 @@ class DSLTest(driver: String,
   }
 
   test("after inserting an entity, it can be selected by primary key") {
-    val t1 = Teacher(TeacherId(1),  "entity1")
-    val t2 = Teacher(TeacherId(2),  "entity2")
+    val t1 = Teacher(TeacherId(nextId),  "entity1")
+    val t2 = Teacher(TeacherId(nextId),  "entity2")
     val op = for {
       n <- teachers.insert(t1, t2)
       t2Result <- teachers(t2.id)
@@ -78,26 +88,24 @@ class DSLTest(driver: String,
     run(op)
   }
 
-/*
- test("fetching an entity by primary key results in an entity with correct primary key") (pending)
 
   test("Multiple entities can be inserted in one operation") {
-    val newTeachers = Set(Teacher(TeacherId(10),"Fred"),
-      Teacher(TeacherId(11),"Barney"),
-      Teacher(TeacherId(12), "Wilma")
+    val newTeachers = Set(Teacher(TeacherId(nextId),"Fred"),
+      Teacher(TeacherId(nextId),"Barney"),
+      Teacher(TeacherId(nextId), "Wilma")
     )
     assert(newTeachers.size == run(teachers.insert(newTeachers.toSeq: _*)))
   }
 
+
   test("A table scan returns all the entities in the table") {
-    case class Row(id: Int, name: String) extends Entity[Int]
-    val table = Table[Int,Row]("scan_test", Seq("id"))
-    val entities = Set(Row(1,"One"), Row(2,"Two"), Row(3, "three"))
+    val table = Table[Int,IntRow]("scan_test", Seq("id"))
+    val entities = Set(IntRow(1,"One"), IntRow(2,"Two"), IntRow(3, "three"))
     val op = for {
       _ <- table.create()
       _ <- table.insert(entities.toSeq: _*)
       results <- table.scan(Unit)
-     _ <-table.drop
+      _ <-table.drop
     } yield {
       assert(results == entities)
     }
@@ -105,7 +113,7 @@ class DSLTest(driver: String,
   }
 
   test("after deleting an entity, the entity cannot be found by primary key") {
-    val t = Teacher(TeacherId(3), "A Teacher")
+    val t = Teacher(TeacherId(nextId), "A Teacher")
     val op = for {
       _ <- teachers.insert(t)
       _ <- teachers.delete(t.id)
@@ -117,8 +125,8 @@ class DSLTest(driver: String,
   }
 
   test("only the specified entity is affected by a delete") {
-    val t1 = Teacher(TeacherId(14), "Teacher 14")
-    val t2 = Teacher(TeacherId(15), "Teacher 15")
+    val t1 = Teacher(TeacherId(nextId), "Teacher 14")
+    val t2 = Teacher(TeacherId(nextId), "Teacher 15")
     val op = for {
       _ <- teachers.insert(t1,t2)
       _ <- teachers.delete(t1.id)
@@ -136,8 +144,8 @@ class DSLTest(driver: String,
   }
 
   test("multiple entities can be deleted in one operation")  {
-    val t1 = Teacher(TeacherId(16),  "entity1")
-    val t2 = Teacher(TeacherId(17),  "entity2")
+    val t1 = Teacher(TeacherId(nextId),  "entity1")
+    val t2 = Teacher(TeacherId(nextId),  "entity2")
     val op = for {
       _ <- teachers.insert(t1,t2)
       n <- teachers.delete(t1.id,t2.id, TeacherId(-1))
@@ -152,7 +160,7 @@ class DSLTest(driver: String,
   }
 
   test("after updating an entity, selecting the entity by primary key returns the new entity") {
-    val t = Teacher(TeacherId(4), "A Teacher")
+    val t = Teacher(TeacherId(nextId), "A Teacher")
     val newT = t.copy(name="Updated")
     val op = for {
       _ <- teachers.insert(t)
@@ -166,8 +174,8 @@ class DSLTest(driver: String,
   }
 
   test("only the specified entity is affected by an update") {
-    val t1 = Teacher(TeacherId(18), "A Teacher")
-    val t2 = Teacher(TeacherId(19), "A Teacher")
+    val t1 = Teacher(TeacherId(nextId), "A Teacher")
+    val t2 = Teacher(TeacherId(nextId), "A Teacher")
     val newT = t1.copy(name="Updated")
     val op = for {
       _ <- teachers.insert(t1,t2)
@@ -186,8 +194,8 @@ class DSLTest(driver: String,
   }
 
   test("Multiple entities can be updated in one operation") {
-    val t1 = Teacher(TeacherId(21), "A Teacher")
-    val t2 = Teacher(TeacherId(22), "A Teacher")
+    val t1 = Teacher(TeacherId(nextId), "A Teacher")
+    val t2 = Teacher(TeacherId(nextId), "A Teacher")
     val newT1 = t1.copy(name="Updated")
     val newT2 = t2.copy(name="Updated")
     val op = for {
@@ -201,24 +209,33 @@ class DSLTest(driver: String,
     assert(Some(newT2) == run(teachers(t2.id)))
   }
 
+
   test("Update doesn't compile if primary key isn't a prefix") {
-    case class Row(name: String, id: Int) extends Entity[Int]
-    val table = Table[Int,Row]("update_test", Seq("id"))
-    val row = Row("One",1)
+    val table = Table[Int,IntRow]("update_test", Seq("id"))
+    val row = IntRow(1,"One")
     assertTypeError("table.update(row)")
   }
 
   test("a dropped table cannot be used") { 
-    case class Row(name: String, id: Int) extends Entity[Int]
-    val table = Table[Int,Row]("drop_test", Seq("id"))
+    val table = Table[Int,IntRow]("drop_test", Seq("id"))
     run(table.create())
     run(table.drop)
     assertThrows[SQLException] {
-      run(table.insert(Row("foo", 1)))
+      run(table.insert(IntRow(1,"foo")))
     }
   }
+/*
+  test("Insert/Select on table with date fields") {
+    val courseId = CourseId(1)
+    val course = Course(courseId, "food", None)
+    val teacherId = TeacherId(5)
+    val now = LocalDate.now()
+    val section1 = Section(SectionId(courseId, 1, 1), "Room 1",
+      LocalTime.NOON, now.minusMonths(2), now.minusMonths(1))
+    val section2 = Section(SectionId(courseId, 1, 2), "Room 2",
+      LocalTime.NOON, LocalDate.now().plusMonths(1))
 
-  test("SQL on a table with date fields") (pending)
+  }*/
 
   test("SQL on a table with a primitive primary key") (pending)
 
@@ -305,5 +322,5 @@ class DSLTest(driver: String,
   test("field name overrides work") (pending)
 
   test("sql type overrides work") (pending)
- */
+
 }

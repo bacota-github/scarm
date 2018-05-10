@@ -4,6 +4,7 @@ import doobie.ConnectionIO
 import fs2.Stream
 import org.scalatest.FunSuite
 import com.vivi.scarm._
+import java.time._
 
 
 object TestObjects {
@@ -21,8 +22,8 @@ object TestObjects {
     prerequisite: Option[CourseId]) extends Entity[CourseId]
 
   case class Section(id: SectionId, instructor: TeacherId,
-    room: String, meetingTime: java.time.LocalTime,
-    startDate: java.time.LocalDate, endDate: java.time.LocalDate)
+    room: String, meetingTime: LocalTime,
+    startDate: LocalDate, endDate: java.time.LocalDate)
       extends Entity[SectionId]
 
   case class Student(id: StudentId, name: String, level: Int)
