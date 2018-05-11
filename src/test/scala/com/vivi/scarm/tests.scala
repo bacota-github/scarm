@@ -40,6 +40,7 @@ case class Level2(x: Int, y: String)
 case class Level1(x: Int, y: Int, level2: Level2)
 case class DeeplyNested(id: Int, x: Int, nested: Level1) extends Entity[Int]
 
+case class NullableString(id: Int, name: Option[String]) extends Entity[Int]
 
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver",
@@ -349,7 +350,21 @@ class DSLTest(driver: String,
     }
   }
 
-  test("SQL on a table with nullable String fields") (pending)
+
+  test("SQL with null String field") {
+    val table = Table[Int,NullableString]("nullable_string_test", Seq("id"))
+    try {
+      val e1 = NullableString(nextId, Some("foo"))
+      val e2 = NullableString(nextId, None)
+      run(table.create())
+      run(table.insert(e1,e2))
+      assert(run(table(e1.id)) == Some(e1))
+      assert(run(table(e2.id)) == Some(e2))
+    } finally {
+      runQuietly(table.drop)
+    }
+  }
+
 
   test("SQL on a table with nullable AnyVal fields") (pending)
 

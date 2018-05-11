@@ -21,6 +21,8 @@ trait FieldMap[A] {
   def ++[B<:HList](other: FieldMap[B]):FieldMap[A::B] = FieldMap.concat(this,other)
 
   def prefix(pre: String) = FieldMap.prefix[A](pre+"_", this)
+
+  override def toString = fields.toString
 }
 
 
@@ -76,7 +78,10 @@ object FieldMap {
         else Seq(Item(name, m.returnType, opt))
       }
     }
-    members.flatten
+    if (!members.isEmpty)
+      members.flatten
+    else
+      Seq(Item(pre, tpe, opt))
   }
 
   private[scarm] def prefix[A](pre: String, from: FieldMap[A]): FieldMap[A] =
