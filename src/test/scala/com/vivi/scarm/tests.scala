@@ -36,6 +36,11 @@ case class DateRow(id: Int,
   localTimex: LocalTime = LocalTime.now
 ) extends Entity[Int]
 
+case class Level2(x: Int, y: String)
+case class Level1(x: Int, y: Int, level2: Level2)
+case class DeeplyNested(id: Int, x: Int, nested: Level1) extends Entity[Int]
+
+
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver",
     "jdbc:hsqldb:file:testdb",
@@ -332,9 +337,17 @@ class DSLTest(driver: String,
     }
   }
 
-  test("SQL on a table with nested objects") (pending)
-
-  test("SQL on a table with a primary key containing nested object") (pending)
+  test("SQL on a table with nested objects") {
+    val table = Table[Int,DeeplyNested]("deeply_nested_test", Seq("id"))
+    try {
+      val e = DeeplyNested(nextId, 1, Level1(2, 3, Level2(4, "5")))
+      run(table.create())
+      run(table.insert(e))
+      assert(run(table(e.id)) == Some(e))
+    } finally {
+      runQuietly(table.drop)
+    }
+  }
 
   test("SQL on a table with nullable String fields") (pending)
 
