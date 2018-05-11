@@ -42,6 +42,8 @@ case class DeeplyNested(id: Int, x: Int, nested: Level1) extends Entity[Int]
 
 case class NullableString(id: Int, name: Option[String]) extends Entity[Int]
 
+case class NullableInt(id: Int, x: Option[Int]) extends Entity[Int]
+
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver",
     "jdbc:hsqldb:file:testdb",
@@ -366,7 +368,20 @@ class DSLTest(driver: String,
   }
 
 
-  test("SQL on a table with nullable AnyVal fields") (pending)
+  test("SQL on a table with nullable AnyVal fields") {
+    val table = Table[Int,NullableInt]("nullable_int_test", Seq("id"))
+    try {
+      val e1 = NullableInt(nextId, Some(1))
+      val e2 = NullableInt(nextId, None)
+      run(table.create())
+      run(table.insert(e1,e2))
+      assert(run(table(e1.id)) == Some(e1))
+      assert(run(table(e2.id)) == Some(e2))
+    } finally {
+      runQuietly(table.drop)
+    }
+  }
+
 
   test("SQL on a table with nullable nested object field") (pending)
 
