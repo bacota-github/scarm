@@ -14,6 +14,7 @@ import com.vivi.scarm.FieldMap._
 
 
 import TestObjects._
+import MySQLHacks.JavaTimeLocalDateMeta
 
 object DSLSuite {
   val hsqldbCleanup = (xa:Transactor[IO]) => {
@@ -28,10 +29,22 @@ object DSLSuite {
 case class IntRow(id: Int, name: String) extends Entity[Int]
 
 class DSLSuite extends Suites(
-  new DSLTest("org.hsqldb.jdbc.JDBCDriver", "jdbc:hsqldb:file:testdb",
-    "SA", "", DSLSuite.hsqldbCleanup),
-  new DSLTest("org.postgresql.Driver", "jdbc:postgresql:scarm", "scarm", "scarm"),
-  new DSLTest("com.mysql.cj.jdbc.Driver", "jdbc:mysql://localhost:3306/scarm?serverTimezone=UTC&useSSL=false", "scarm", "scarm")
+  new DSLTest("org.hsqldb.jdbc.JDBCDriver",
+    "jdbc:hsqldb:file:testdb",
+    "SA", "",
+    MySQLHacks.deactivate, 
+    DSLSuite.hsqldbCleanup),
+
+  new DSLTest("org.postgresql.Driver",
+    "jdbc:postgresql:scarm", "scarm", "scarm",
+    MySQLHacks.deactivate
+  ),
+
+  new DSLTest("com.mysql.cj.jdbc.Driver",
+    "jdbc:mysql://localhost:3306/scarm?serverTimezone=UTC&useSSL=false&sql_mode=",
+    "scarm", "scarm",
+    MySQLHacks.activate
+  )
 )
 
 
@@ -39,8 +52,11 @@ class DSLTest(driver: String,
   url: String,
   username: String,
   pass: String,
+  initialize: => Unit,
   cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
 ) extends FunSuite with BeforeAndAfterAll {
+
+  info(s"Testing with url ${url}")
 
   var idCounter = new java.util.concurrent.atomic.AtomicInteger (1)
 
@@ -65,6 +81,7 @@ class DSLTest(driver: String,
     }
 
   override def beforeAll() {
+    initialize
     createAll()
   }
 
@@ -84,6 +101,7 @@ class DSLTest(driver: String,
       assert(n == 2)
       assert(t1Result == Some(t1))
       assert(t2Result == Some(t2))
+
     }
     run(op)
   }
@@ -224,18 +242,28 @@ class DSLTest(driver: String,
       run(table.insert(IntRow(1,"foo")))
     }
   }
-/*
-  test("Insert/Select on table with date fields") {
-    val courseId = CourseId(1)
-    val course = Course(courseId, "food", None)
-    val teacherId = TeacherId(5)
-    val now = LocalDate.now()
-    val section1 = Section(SectionId(courseId, 1, 1), "Room 1",
-      LocalTime.NOON, now.minusMonths(2), now.minusMonths(1))
-    val section2 = Section(SectionId(courseId, 1, 2), "Room 2",
-      LocalTime.NOON, LocalDate.now().plusMonths(1))
 
-  }*/
+
+  test("Insert/Select on table with date fields") {
+    val courseId = CourseId(nextId)
+    val course = Course(courseId, "food", None)
+    val teacherId = TeacherId(nextId)
+    val teacher = Teacher(teacherId, "Teacher")
+    val now = LocalDate.now(ZoneId.of("UTC"))
+    val section1 = Section(SectionId(courseId, 1, 1), teacherId, "Room 1", 
+      LocalTime.NOON, now.minusMonths(2), now.minusMonths(1))
+    val section2 = Section(SectionId(courseId, 1, 2), teacherId, "Room 2",
+      LocalTime.NOON, now.plusMonths(1), now.plusMonths(2))
+    val c = Meta[java.time.LocalDate]
+    val op = for {
+      _ <- courses.insert(course)
+      _ <- teachers.insert(teacher)
+      _ <- sections.insert(section1, section2)
+    } yield ()
+    run(op)
+    assert(run(sections(section1.id)) == Some(section1))
+    assert(run(sections(section2.id)) == Some(section2))
+  }
 
   test("SQL on a table with a primitive primary key") (pending)
 

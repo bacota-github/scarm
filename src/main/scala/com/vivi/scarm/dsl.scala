@@ -1,5 +1,7 @@
 package com.vivi.scarm
 
+import com.vivi.scarm._
+
 import doobie.util.update.Update0
 import doobie.ConnectionIO
 import fs2.Stream
@@ -16,6 +18,21 @@ import shapeless.ops.hlist
 import shapeless.ops.hlist.Prepend
 
 import FieldMap._
+
+
+object MySQLHacks {
+  private var active = false
+
+  def activate = { active = true }
+
+  def deactivate = { active = false }
+
+  implicit lazy val JavaTimeLocalDateMeta: Meta[java.time.LocalDate] =
+    Meta[java.sql.Date].xmap(
+      d => { if (active) d.toLocalDate.plusDays(1) else d.toLocalDate },
+      java.sql.Date.valueOf
+    )
+}
 
 private[scarm] object dslUtil {
   def tname(ct: Int): String = "t" + ct
@@ -269,15 +286,11 @@ object Table {
     typeOf[Float].typeSymbol -> "FLOAT",
     typeOf[Double].typeSymbol -> "DOUBLE PRECISION",
     typeOf[java.util.Date].typeSymbol -> "TIMESTAMP",
-    typeOf[java.sql.Date].typeSymbol -> "TIMESTAMP",
+    typeOf[java.sql.Date].typeSymbol -> "DATE",
     typeOf[java.time.Instant].typeSymbol -> "TIMESTAMP",
-    typeOf[java.time.LocalDate].typeSymbol -> "DATE",
+    typeOf[java.time.LocalDate].typeSymbol -> "DATE", //Because MySQL Dates just don't work
     typeOf[java.time.LocalDateTime].typeSymbol -> "TIMESTAMP",
-    typeOf[java.time.LocalTime].typeSymbol -> "TIME",
-    typeOf[java.time.MonthDay].typeSymbol -> "DATE",
-    typeOf[java.time.MonthDay].typeSymbol -> "DATE",
-    typeOf[java.time.Year].typeSymbol -> "DATE",
-    typeOf[java.time.YearMonth].typeSymbol -> "DATE"
+    typeOf[java.time.LocalTime].typeSymbol -> "TIME"
   )
 }
 
