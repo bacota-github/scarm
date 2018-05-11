@@ -258,7 +258,7 @@ class DSLTest(driver: String,
     }
   }
 
-  test("Insert/Select on table with date fields") {
+  test("SQL on a table with a compound primary key") {
     val courseId = CourseId(nextId)
     val course = Course(courseId, "food", None)
     val teacherId = TeacherId(nextId)
@@ -331,9 +331,6 @@ class DSLTest(driver: String,
       runQuietly(table.drop)
     }
   }
-
-
-  test("SQL on a table with a compound primary key") (pending)
 
   test("SQL on a table with nested objects") (pending)
 
