@@ -285,10 +285,8 @@ object Table {
     typeOf[Int].typeSymbol -> "INT",
     typeOf[Float].typeSymbol -> "FLOAT",
     typeOf[Double].typeSymbol -> "DOUBLE PRECISION",
-    typeOf[java.util.Date].typeSymbol -> "TIMESTAMP",
-    typeOf[java.sql.Date].typeSymbol -> "DATE",
     typeOf[java.time.Instant].typeSymbol -> "TIMESTAMP",
-    typeOf[java.time.LocalDate].typeSymbol -> "DATE", //Because MySQL Dates just don't work
+    typeOf[java.time.LocalDate].typeSymbol -> "DATE", 
     typeOf[java.time.LocalDateTime].typeSymbol -> "TIMESTAMP",
     typeOf[java.time.LocalTime].typeSymbol -> "TIME"
   )

@@ -18,4 +18,4 @@ libraryDependencies ++= Seq(
   "mysql" % "mysql-connector-java" % "6.0.6" % "test"
 )
 
-testOptions in Test += Tests.Argument("-oDF")
+//testOptions in Test += Tests.Argument("-oDF")

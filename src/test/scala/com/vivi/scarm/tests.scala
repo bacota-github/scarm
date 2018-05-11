@@ -12,7 +12,6 @@ import org.scalatest._
 import com.vivi.scarm._
 import com.vivi.scarm.FieldMap._
 
-
 import TestObjects._
 import MySQLHacks.JavaTimeLocalDateMeta
 
@@ -27,6 +26,13 @@ object DSLSuite {
 }
 
 case class IntRow(id: Int, name: String) extends Entity[Int]
+
+case class DateRow(id: Int,
+  instant: Instant = Instant.now,
+  localDate: LocalDate = LocalDate.now,
+  localDateTime: LocalDateTime = LocalDateTime.now,
+  localTimex: LocalTime = LocalTime.now
+) extends Entity[Int]
 
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver",
@@ -65,6 +71,10 @@ class DSLTest(driver: String,
   implicit val xa = Transactor.fromDriverManager[IO](driver, url, username, pass)
 
   private def run[T](op: ConnectionIO[T]): T = op.transact(xa).unsafeRunSync()
+
+  private def runQuietly(op: ConnectionIO[_]) = try {
+    run(op)
+  } catch { case _:Exception => }
 
   private def createAll() = 
     for (t <- allTables) {
@@ -243,7 +253,6 @@ class DSLTest(driver: String,
     }
   }
 
-
   test("Insert/Select on table with date fields") {
     val courseId = CourseId(nextId)
     val course = Course(courseId, "food", None)
@@ -263,6 +272,43 @@ class DSLTest(driver: String,
     run(op)
     assert(run(sections(section1.id)) == Some(section1))
     assert(run(sections(section2.id)) == Some(section2))
+  }
+
+  test("Insert/Select on table with all possible date fields") {
+    val table = Table[Int,DateRow]("dates", Seq("id"))
+    val newDate = DateRow(nextId)
+    val c = Meta[LocalDateTime]
+    try {
+      run(table.create())
+      run(table.insert(newDate))
+      val readDate = run(table(newDate.id))
+      assert(!readDate.isEmpty)
+      val read = readDate.get
+
+      val originalEpoch = newDate.instant.getEpochSecond()
+      val readEpoch = read.instant.getEpochSecond()
+      assert(Math.abs(readEpoch - originalEpoch) <= 1)
+      assert(read.localDate == newDate.localDate)
+
+      val rdate = read.localDateTime
+      val ndate = newDate.localDateTime
+      assert(rdate.getYear() == ndate.getYear())
+      assert(rdate.getMonth() == ndate.getMonth())
+      assert(rdate.getDayOfMonth() == ndate.getDayOfMonth())
+      assert(rdate.getDayOfWeek() == ndate.getDayOfWeek())
+      assert(rdate.getDayOfYear() == ndate.getDayOfYear())
+      assert(rdate.getHour() == ndate.getHour())
+      assert(rdate.getMinute() == ndate.getMinute())
+      assert(Math.abs(rdate.getSecond() - ndate.getSecond()) <= 1)
+
+      val rtime = read.localTimex
+      val ntime = newDate.localTimex
+      assert(rtime.getHour() == ntime.getHour())
+      assert(rtime.getMinute() == ntime.getMinute())
+      assert(rtime.getSecond() == ntime.getSecond())
+    }  finally {
+      runQuietly(table.drop)
+    }
   }
 
   test("SQL on a table with a primitive primary key") (pending)
