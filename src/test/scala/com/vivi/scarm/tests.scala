@@ -13,7 +13,8 @@ import com.vivi.scarm._
 import com.vivi.scarm.FieldMap._
 
 import TestObjects._
-import MysqlHacks.JavaTimeLocalDateMeta
+//import MysqlHacks.JavaTimeLocalDateMeta
+import com.vivi.scarm.JavaTimeLocalDateMeta
 
 object DSLSuite {
   val hsqldbCleanup = (xa:Transactor[IO]) => {
@@ -72,6 +73,8 @@ class DSLTest(driver: String,
   cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
 ) extends FunSuite with BeforeAndAfterAll {
 
+  implicit val theDialect = dialect
+
   info(s"Testing with url ${url}")
 
   var idCounter = new java.util.concurrent.atomic.AtomicInteger (1)
@@ -102,7 +105,6 @@ class DSLTest(driver: String,
 
   override def beforeAll() {
     createAll()
-    if (dialect == Mysql) MysqlHacks.activate else MysqlHacks.deactivate
   }
 
   override def afterAll() {

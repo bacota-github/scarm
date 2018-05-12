@@ -19,21 +19,6 @@ import shapeless.ops.hlist.Prepend
 
 import FieldMap._
 
-
-object MysqlHacks {
-  private var active = false
-
-  def activate = { active = true }
-
-  def deactivate = { active = false }
-
-  implicit lazy val JavaTimeLocalDateMeta: Meta[java.time.LocalDate] =
-    Meta[java.sql.Date].xmap(
-      d => { if (active) d.toLocalDate.plusDays(1) else d.toLocalDate },
-      java.sql.Date.valueOf
-    )
-}
-
 private[scarm] object dslUtil {
   def tname(ct: Int): String = "t" + ct
   def alias(name: String, ct: Int): String = name + " AS " + tname(ct)
