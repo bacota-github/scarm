@@ -14,4 +14,9 @@ package object scarm {
 
   implicit lazy val JavaTimeLocalDateTimeMeta: Meta[java.time.LocalDateTime] =
     Meta[java.sql.Timestamp].xmap(_.toLocalDateTime, java.sql.Timestamp.valueOf)
+
+  trait SQLDialect
+  object Postgresql extends SQLDialect
+  object Mysql extends SQLDialect
+  object Hsqldb extends SQLDialect
 }

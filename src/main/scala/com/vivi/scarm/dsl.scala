@@ -20,7 +20,7 @@ import shapeless.ops.hlist.Prepend
 import FieldMap._
 
 
-object MySQLHacks {
+object MysqlHacks {
   private var active = false
 
   def activate = { active = true }
@@ -143,7 +143,7 @@ trait Table[K, E<:Entity[K]]
       )
   }
 
-  def create(fieldOverrides: Map[String, String] = Map(),
+  def create(dialect: SQLDialect, fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
   ): ConnectionIO[Int] = {
     val sql = Table.createSql(this,fieldOverrides,typeOverrides)
@@ -180,8 +180,6 @@ trait Table[K, E<:Entity[K]]
     val values = List.fill(comp.length)("?").mkString(",")
     s"INSERT INTO ${name} values (${values})"
   }
-
-  def insertReturning(e: E*): Try[K] = ???
 
   def save(enties: E*): Try[Unit] = ???
 
@@ -220,6 +218,15 @@ trait Table[K, E<:Entity[K]]
     val remainder: REMList = remList(eGeneric.to(entity))
     val reversed: REVList = revList(remainder, key)
     Fragment(sql, reversed)(revComposite).update.run
+  }
+}
+
+trait AutogenTable[K, E<:Entity[K]] extends Table[K,E] {
+
+  def insertReturning(entity: E)
+    (implicit compK: Composite[K], compE: Composite[E]): ConnectionIO[K] = {
+    val sql = insertSQL(compE)
+    Fragment(sql, entity)(compE).update.withUniqueGeneratedKeys[K](keyNames:_*)(compK)
   }
 }
 
@@ -291,6 +298,7 @@ object Table {
     typeOf[java.time.LocalTime].typeSymbol -> "TIME"
   )
 }
+
 
 
 case class TableScan[K,E<:Entity[K]](table: Table[K,E])
