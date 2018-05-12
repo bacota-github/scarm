@@ -112,29 +112,19 @@ class DSLTest(driver: String,
     if (cleanup(xa))  dropAll(xa) else ()
   }
 
-  test("after inserting an entity, it can be selected by primary key") {
+  test("after inserting entities, they can be selected by primary key") {
     val t1 = Teacher(TeacherId(nextId),  "entity1")
     val t2 = Teacher(TeacherId(nextId),  "entity2")
     val op = for {
-      n <- teachers.insert(t1, t2)
+      _ <- teachers.insert(t1, t2)
       t2Result <- teachers(t2.id)
       t1Result <- teachers(t1.id)
     } yield {
-      assert(n == 2)
       assert(t1Result == Some(t1))
       assert(t2Result == Some(t2))
 
     }
     run(op)
-  }
-
-
-  test("Multiple entities can be inserted in one operation") {
-    val newTeachers = Set(Teacher(TeacherId(nextId),"Fred"),
-      Teacher(TeacherId(nextId),"Barney"),
-      Teacher(TeacherId(nextId), "Wilma")
-    )
-    assert(newTeachers.size == run(teachers.insert(newTeachers.toSeq: _*)))
   }
 
 
