@@ -25,12 +25,12 @@ private[scarm] object dslUtil {
   def chainDdl(ddl: ConnectionIO[Int]*): ConnectionIO[Int] =
     ddl.tail.fold(ddl.head)( (l,r) => l.flatMap(i => r.map(_+i)))
 
-  def chainDml[T](seq: Seq[T], comp: Composite[T],
-    f: (T, Composite[T]) => ConnectionIO[Int]): ConnectionIO[Int] = {
-    val first = f(seq.head, comp)
+  def chainDml[T](seq: Seq[T],
+    f: T => ConnectionIO[Int]): ConnectionIO[Int] = {
+    val first = f(seq.head)
     if (seq.tail.size == 0) first
     else seq.tail.foldLeft(first)( (io,e) =>
-        io.flatMap(i => f(e, comp).map(_+i))
+        io.flatMap(i => f(e).map(_+i))
       )
   }
 
@@ -123,7 +123,9 @@ case class Table[K, E<:Entity[K]](
   id: E=>K,
   fieldMap: FieldMap[E],
   keyNames: Seq[String],
-  dialect: SqlDialect
+  dialect: SqlDialect,
+  keyComposite: Composite[K],
+  entityComposite: Composite[E]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
 
   lazy val fieldNames: Seq[String] = fieldMap.names
@@ -158,12 +160,12 @@ case class Table[K, E<:Entity[K]](
     }
   }
 
-  def delete(keys: K*)(implicit comp: Composite[K]): ConnectionIO[Int] = 
-    chainDml(keys, comp, deleteOne)
+  def delete(keys: K*): ConnectionIO[Int] = 
+    chainDml(keys, deleteOne)
 
-  private def deleteOne(key: K, comp: Composite[K]): ConnectionIO[Int] = {
+  private def deleteOne(key: K): ConnectionIO[Int] = {
     val sql =  s"DELETE FROM ${name} WHERE ${whereClauseNoAlias}"
-    Fragment(sql, key)(comp).update.run
+    Fragment(sql, key)(keyComposite).update.run
   }
 
   def drop: ConnectionIO[Int] = {
@@ -183,8 +185,8 @@ case class Table[K, E<:Entity[K]](
     Fragment(sql, ()).update.run
   }
 
-  def insert(entities: E*)(implicit comp: Composite[E]): ConnectionIO[Seq[K]] = {
-    def f(e: E) = insertOne(e,comp)
+  def insert(entities: E*): ConnectionIO[Seq[K]] = {
+    def f(e: E) = insertOne(e)
     val hd = entities.head
     val first = f(hd).map(_ => Seq(hd.id))
     if (entities.tail.size == 0) first
@@ -193,16 +195,26 @@ case class Table[K, E<:Entity[K]](
     )
   }
 
-  private def insertOne(entity: E, comp: Composite[E]): ConnectionIO[Int] = {
-    val sql = insertSQL(comp)
+  private def insertOne(entity: E): ConnectionIO[Int] = 
+    Fragment(insertSql, entity)(entityComposite).update.run
+
+
+  private[scarm] lazy val insertSql: String = {
+    val names = fieldNames.mkString(",")
+    val values = List.fill(entityComposite.length)("?").mkString(",")
+    s"INSERT INTO ${name} (${names}) values (${values})"
+  }
+/*
+  private def insertWithAutogen[EList<:HList,REMList<:HList,REM](entity: E)
+  (implicit eGeneric: LabelledGeneric.Aux[E,EList],
+    remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
+    remComposite: Composite[REMList],
+    remTupler: hlist.Tupler.Aux[REMList,REM]
+  ): ConnectionIO[Int] = {
+    val names = nonKeyFieldNames.mkString(",")
     Fragment(sql, entity)(comp).update.run
   }
-
-  private[scarm] def insertSQL(implicit comp: Composite[E]): String = {
-    val values = List.fill(comp.length)("?").mkString(",")
-    s"INSERT INTO ${name} values (${values})"
-  }
-
+ */
   def save(enties: E*): Try[Unit] = ???
 
   lazy val scan = TableScan(this)
@@ -236,7 +248,6 @@ case class Table[K, E<:Entity[K]](
   ): ConnectionIO[Int] = {
     val updatedCols = nonKeyFieldNames.map(f => s"${f}=?").mkString(",")
     val sql = s"UPDATE ${name} SET ${updatedCols} WHERE ${whereClauseNoAlias}"
-    println(sql)
     val key: KList = kGeneric.to(entity.id)
     val remainder: REMList = remList(eGeneric.to(entity))
     val reversed: REVList = revList(remainder, key)
@@ -248,21 +259,32 @@ case class Table[K, E<:Entity[K]](
 object Table {
 
   def apply[K,E<:Entity[K]](name: String)
-    (implicit dialect: SqlDialect, kmap: FieldMap[K], fmap: FieldMap[E]): Table[K,E] =
-    Table[K,E](name, (e:E) => e.id, fmap, kmap.names, dialect)
+    (implicit dialect: SqlDialect,
+      kmap: FieldMap[K],
+      fmap: FieldMap[E],
+      kcomp: Composite[K],
+      ecomp: Composite[E]
+    ): Table[K,E] =
+    Table[K,E](name, (e:E) => e.id, fmap, kmap.names, dialect, kcomp, ecomp)
 
   def apply[K,E<:Entity[K]](name: String, kNames: Seq[String])
-    (implicit dialect: SqlDialect, fmap: FieldMap[E]): Table[K,E] =
-    Table[K,E](name, (e:E) => e.id, fmap, kNames, dialect)
+    (implicit dialect: SqlDialect,
+      fmap: FieldMap[E],
+      kcomp: Composite[K],
+      ecomp: Composite[E]
+    ): Table[K,E] =
+    Table[K,E](name, (e:E) => e.id, fmap, kNames, dialect, kcomp, ecomp)
 
   def apply[K,E<:Entity[K]](name: String, key: Witness.Aux[K])
     (implicit dialect: SqlDialect,
       kmap: FieldMap[K],
       fmap: FieldMap[E],
-      mkFieldLens: MkFieldLens.Aux[E,K,K]
+      mkFieldLens: MkFieldLens.Aux[E,K,K],
+      kcomp: Composite[K],
+      ecomp: Composite[E]
     ): Table[K,E] = {
     val keyLens: Lens[E,K] = lens[E] >> key
-    Table(name, keyLens.get(_), fmap, kmap.names, dialect)
+    Table(name, keyLens.get(_), fmap, kmap.names, dialect, kcomp, ecomp)
   }
 
   private def sequenceName(tableName: String, fieldName: String) =
