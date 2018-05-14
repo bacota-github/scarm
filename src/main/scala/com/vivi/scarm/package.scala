@@ -15,14 +15,14 @@ package object scarm {
   implicit lazy val JavaTimeLocalDateTimeMeta: Meta[java.time.LocalDateTime] =
     Meta[java.sql.Timestamp].xmap(_.toLocalDateTime, java.sql.Timestamp.valueOf)
 
-  implicit def JavaTimeLocalDateMeta(implicit dialect: SQLDialect): Meta[java.time.LocalDate] =
+  implicit def JavaTimeLocalDateMeta(implicit dialect: SqlDialect): Meta[java.time.LocalDate] =
     Meta[java.sql.Date].xmap(
       d => { if (dialect == Mysql) d.toLocalDate.plusDays(1) else d.toLocalDate },
       java.sql.Date.valueOf
     )
 
-  trait SQLDialect
-  object Postgresql extends SQLDialect
-  object Mysql extends SQLDialect
-  object Hsqldb extends SQLDialect
+  trait SqlDialect
+  object Postgresql extends SqlDialect
+  object Mysql extends SqlDialect
+  object Hsqldb extends SqlDialect
 }

@@ -12,49 +12,26 @@ import shapeless.labelled.FieldType
 trait FieldMap[A] {
   val fields: Seq[FieldMap.Item]
 
-  lazy val mapping: Map[String,(Type,Boolean)] = fields.map(_.entry).toMap
-  def names = fields.map(_.name)
-  def typeOf(field: String): Option[Type] = mapping.get(field).map(_._1)
-  def isOptional(field: String): Boolean =
-    mapping.get(field).map(_._2).getOrElse(false)
-
+  lazy val mapping: Map[String,FieldMap.Item] =
+    fields.map(item=> (item.name, item) ).toMap
   def ++[B<:HList](other: FieldMap[B]):FieldMap[A::B] = FieldMap.concat(this,other)
-
+  lazy val autoGenFields: Seq[String] = fields.filter(_.autogen).map(_.name)
+  def isOptional(field: String): Boolean =
+    mapping.get(field).map(_.optional).getOrElse(false)
+  def names = fields.map(_.name)
   def prefix(pre: String) = FieldMap.prefix[A](pre+"_", this)
+  def typeOf(field: String): Option[Type] = mapping.get(field).map(_.tpe)
 
   override def toString = fields.toString
 }
 
 
-trait PrimitiveFieldMap {
-  implicit def primitiveFieldMap[V](implicit  typeTag: TypeTag[V]) =
-    new FieldMap[V] {
-      override val fields = Seq( FieldMap.Item("", typeTag.tpe, false) )
-
-      override def prefix(pre: String) = FieldMap.prefix[V](pre, this)
-    }
-}
-
-
-trait keylessFieldMap extends PrimitiveFieldMap {
-  implicit def keylessHconsFieldMap[H, T<:HList](implicit
-    hmap: FieldMap[H],
-    tmap: FieldMap[T]
-  ) = new FieldMap[H :: T] {
-    override val fields = hmap.fields ++ tmap.fields
-  }
-
-}
-
-
 object FieldMap {
 
-  case class Item(name: String, tpe: Type, optional: Boolean) {
-    def entry = (name, (tpe, optional))
-  }
+  case class Item(name: String, tpe: Type, optional: Boolean, autogen:Boolean)
 
   implicit def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = new FieldMap[A]{
-    override val fields = fieldsFromType("", ttag.tpe, false)
+    override val fields = fieldsFromType("", ttag.tpe, false, false)
   }
 
   private def isCaseMethod(s: ReflectionSymbol): Boolean = 
@@ -64,24 +41,26 @@ object FieldMap {
     tpe.members.exists(isCaseMethod(_))
 
 
-  private def fieldsFromType(pre: String, tpe: Type, opt: Boolean): Seq[Item] =   {
+  private def fieldsFromType(pre: String, tpe: Type, opt: Boolean, autogen: Boolean): Seq[Item] =   {
     val members = tpe.members.sorted.collect {
       case s if isCaseMethod(s) => {
         val m = s.asMethod
         val name = (if (pre == "") "" else pre+"_") + m.name
         if (m.returnType <:< typeOf[Option[Any]])
-          fieldsFromType(name, m.returnType.typeArgs.head, true)
-        else  if (isCaseClass(m.returnType)) {
+          fieldsFromType(name, m.returnType.typeArgs.head, true, false)
+        else if (m.returnType <:< typeOf[Autogen[Any]])
+          fieldsFromType(name, m.returnType.typeArgs.head, opt, true)
+        else if (isCaseClass(m.returnType)) {
           val prefix = if (tpe <:< typeOf[Entity[Any]] && m.name.toString == "id") pre else name
-          fieldsFromType(prefix, m.returnType, opt)
+          fieldsFromType(prefix, m.returnType, opt, false)
         }
-        else Seq(Item(name, m.returnType, opt))
+        else Seq(Item(name, m.returnType, opt, false))
       }
     }
     if (!members.isEmpty)
       members.flatten
     else
-      Seq(Item(pre, tpe, opt))
+      Seq(Item(pre, tpe, opt, false))
   }
 
   private[scarm] def prefix[A](pre: String, from: FieldMap[A]): FieldMap[A] =
@@ -94,44 +73,4 @@ object FieldMap {
       override val fields = l.fields ++ r.fields
     }
 }
-
-
-object ShapelessFieldMap extends PrimitiveFieldMap {
-
-
-  implicit def genericFieldMap[A,ARepr<:HList](implicit
-    generic: LabelledGeneric.Aux[A,ARepr],
-    fieldMap: FieldMap[ARepr]
-  ) = new FieldMap[A] {
-    override val fields = fieldMap.fields
-  }
-
-  implicit def hnilFieldMap = new FieldMap[HNil] {
-    override val fields = Seq()
-  }
-/*
-  implicit def recursiveFieldMap[K<:Symbol,H,HRepr<:HList](implicit
-    k: Witness.Aux[K],
-    generic: LabelledGeneric.Aux[H,HRepr],
-    hmap: Lazy[FieldMap[HRepr]]
-  ) = new FieldMap[FieldType[K,H]] {
-    override val fields = prefix("recurse", hmap.value.fields)
-  }
- */
-  implicit def hconsFieldMap[K<:Symbol, H, T<:HList](implicit
-    k: Witness.Aux[K],
-    hmap: FieldMap[H],
-    tmap: FieldMap[T]
-  ) = new FieldMap[FieldType[K,H] :: T] {
-    override val fields = hmap.prefix(k.value.name).fields ++ tmap.fields
-  }
-
-  implicit def optionalFieldMap[K<:Symbol, V](implicit
-    from: FieldMap[FieldType[K, V]]
-  ) =  new FieldMap[FieldType[K,Option[V]]] {
-    override val fields = from.fields.map(_.copy(optional=true))
-  }
-}
-
-
 

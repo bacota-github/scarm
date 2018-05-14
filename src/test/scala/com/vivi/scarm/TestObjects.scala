@@ -6,35 +6,36 @@ import org.scalatest.FunSuite
 import com.vivi.scarm._
 import java.time._
 
+case class TeacherId(id: Int) extends AnyVal
+case class CourseId(id: Int) extends AnyVal
+case class StudentId(id: Int) extends AnyVal
+case class SectionId(course: CourseId, semester: Int, number: Int)
+case class EnrollmentId(student: StudentId, section: SectionId)
+case class AssignmentId(id: Int) extends AnyVal
 
-object TestObjects {
+case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
 
-  case class TeacherId(id: Int) extends AnyVal
-  case class CourseId(id: Int) extends AnyVal
-  case class StudentId(id: Int) extends AnyVal
-  case class SectionId(course: CourseId, semester: Int, number: Int)
-  case class EnrollmentId(student: StudentId, section: SectionId)
-  case class AssignmentId(id: Int) extends AnyVal
+case class Course(id: CourseId, subject: String,
+  prerequisite: Option[CourseId]) extends Entity[CourseId]
 
-  case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
+case class Section(id: SectionId, instructor: TeacherId,
+  room: String, meetingTime: LocalTime,
+  startDate: LocalDate, endDate: java.time.LocalDate)
+    extends Entity[SectionId]
 
-  case class Course(id: CourseId, subject: String,
-    prerequisite: Option[CourseId]) extends Entity[CourseId]
+case class Student(id: StudentId, name: String, level: Int)
+    extends Entity[StudentId]
 
-  case class Section(id: SectionId, instructor: TeacherId,
-    room: String, meetingTime: LocalTime,
-    startDate: LocalDate, endDate: java.time.LocalDate)
-      extends Entity[SectionId]
+case class Enrollment(id: EnrollmentId, grade: Option[String])
+    extends Entity[EnrollmentId]
 
-  case class Student(id: StudentId, name: String, level: Int)
-      extends Entity[StudentId]
+case class Assignment(id: AssignmentId, name: String,
+  dueDate: java.time.LocalDate, section: SectionId
+) extends Entity[AssignmentId]
 
-  case class Enrollment(id: EnrollmentId, grade: Option[String])
-      extends Entity[EnrollmentId]
 
-  case class Assignment(id: AssignmentId, name: String,
-    dueDate: java.time.LocalDate, section: SectionId
-  ) extends Entity[AssignmentId]
+case class TestObjects(dialect: SqlDialect) {
+  implicit val theDialect = dialect
 
   val teachers = Table[TeacherId,Teacher]("teachers")
   val courses = Table[CourseId,Course]("courses")
