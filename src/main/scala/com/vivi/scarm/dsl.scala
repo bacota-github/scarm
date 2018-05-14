@@ -246,13 +246,17 @@ case class Table[K, E<:Entity[K]](
     revComposite: Composite[REVList],
     revTupler: hlist.Tupler.Aux[REVList, REV]
   ): ConnectionIO[Int] = {
-    val updatedCols = nonKeyFieldNames.map(f => s"${f}=?").mkString(",")
-    val sql = s"UPDATE ${name} SET ${updatedCols} WHERE ${whereClauseNoAlias}"
     val key: KList = kGeneric.to(entity.id)
     val remainder: REMList = remList(eGeneric.to(entity))
     val reversed: REVList = revList(remainder, key)
-    Fragment(sql, reversed)(revComposite).update.run
+    Fragment(updateSql, reversed)(revComposite).update.run
   }
+
+  private lazy val updateSql: String = {
+    val updatedCols = nonKeyFieldNames.map(f => s"${f}=?").mkString(",")
+    s"UPDATE ${name} SET ${updatedCols} WHERE ${whereClauseNoAlias}"
+  }
+
 }
 
 
