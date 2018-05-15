@@ -260,13 +260,13 @@ case class DSLTest(driver: String,
   var nextIdVal = 0
   def nextId = {
     nextIdVal += 1
-    nextIdVal
+    Id(nextIdVal)
   }
   
   test("After inserting an entity into a table with primitive primary key, the entity can be selected")  {
-    val e1 = PrimitiveEntity(Id(nextId), randomString)
-    val e2 = PrimitiveEntity(Id(nextId), randomString)
-    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    val e1 = PrimitiveEntity(nextId, randomString)
+    val e2 = PrimitiveEntity(nextId, randomString)
+    val e3 = PrimitiveEntity(nextId, randomString)
     run(for {
       i1 <- primitiveTable.insert(e1)
       i2 <- primitiveTable.insert(e2)
@@ -285,9 +285,9 @@ case class DSLTest(driver: String,
   }
 
   test("After inserting a batch of entities into a table with primitive primary key, every entity can be selected") {
-    val e1 = PrimitiveEntity(Id(nextId), randomString)
-    val e2 = PrimitiveEntity(Id(nextId), randomString)
-    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    val e1 = PrimitiveEntity(nextId, randomString)
+    val e2 = PrimitiveEntity(nextId, randomString)
+    val e3 = PrimitiveEntity(nextId, randomString)
     run(for {
       i <- primitiveTable.insertBatch(e1,e2,e3)
       e2New <- primitiveTable(e2.id)
@@ -302,7 +302,7 @@ case class DSLTest(driver: String,
   }
 
   test("insertReturningKey of an entity with primitive primary key returns the correct Key and the entity can be selected") {
-    val e = PrimitiveEntity(Id(nextId), randomString)
+    val e = PrimitiveEntity(nextId, randomString)
     run(for {
       k <- primitiveTable.insertReturningKey(e)
       eNew <- primitiveTable(k)
@@ -314,9 +314,9 @@ case class DSLTest(driver: String,
 
 
   test("insertBatchReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") {
-    val e1 = PrimitiveEntity(Id(nextId), randomString)
-    val e2 = PrimitiveEntity(Id(nextId), randomString)
-    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    val e1 = PrimitiveEntity(nextId, randomString)
+    val e2 = PrimitiveEntity(nextId, randomString)
+    val e3 = PrimitiveEntity(nextId, randomString)
     val entities = Seq(e1,e2,e3)
     val keys = run(primitiveTable.insertBatchReturningKeys(e1,e2,e3))
     assert(keys == entities.map(_.id))
@@ -326,7 +326,7 @@ case class DSLTest(driver: String,
   }
 
   test("insertReturning an entity with primitive primary key returns the entity and the entity can be selected") {
-    val e = PrimitiveEntity(Id(nextId), randomString)
+    val e = PrimitiveEntity(nextId, randomString)
     run(for {
       returned <- primitiveTable.insertReturning(e)
       selected <- primitiveTable(e.id)
@@ -337,9 +337,9 @@ case class DSLTest(driver: String,
   }
 
   test("insertBatchReturning entities with primitive primary key returns the entities and the entities can be selected") {
-    val e1 = PrimitiveEntity(Id(nextId), randomString)
-    val e2 = PrimitiveEntity(Id(nextId), randomString)
-    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    val e1 = PrimitiveEntity(nextId, randomString)
+    val e2 = PrimitiveEntity(nextId, randomString)
+    val e3 = PrimitiveEntity(nextId, randomString)
     val entities = Seq(e1,e2,e3)
     val returned = run(primitiveTable.insertBatchReturning(e1,e2,e3))
     assert(returned == entities)
@@ -349,9 +349,9 @@ case class DSLTest(driver: String,
   }
 
   test("after deleting by primitive primary key, selecting on those keys returns None") {
-    val e1 = PrimitiveEntity(Id(nextId), randomString)
-    val e2 = PrimitiveEntity(Id(nextId), randomString)
-    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    val e1 = PrimitiveEntity(nextId, randomString)
+    val e2 = PrimitiveEntity(nextId, randomString)
+    val e3 = PrimitiveEntity(nextId, randomString)
     assert(run(primitiveTable.insertBatch(e1,e2,e3)) == 3)
     assert(run(primitiveTable.delete(e1.id,e2.id)) == 2)
     assert(run(primitiveTable(e1.id)) == None)
@@ -361,9 +361,9 @@ case class DSLTest(driver: String,
   }
 
   test("updates of entities with primitive primary key are reflected in future selects") {
-    val e1 = PrimitiveEntity(Id(nextId), randomString)
-    val e2 = PrimitiveEntity(Id(nextId), randomString)
-    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    val e1 = PrimitiveEntity(nextId, randomString)
+    val e2 = PrimitiveEntity(nextId, randomString)
+    val e3 = PrimitiveEntity(nextId, randomString)
     assert(run(primitiveTable.insertBatch(e1,e2,e3)) == 3)
     val update1 = e1.copy(name=randomString)
     assert(e1 != update1)
@@ -571,40 +571,13 @@ case class DSLTest(driver: String,
   }
 
 
-  test("entities with nested objects can be inserted, selected, and updated")  (pending)
-
-  test("entities with nullable (Option) fields can inserted, selected, and updated")   (pending)
-
-  test("entities with nullable (Option) nested fields can inserted, selected, and updated")   (pending)
-
-  test("entities with any primitive field can inserted, selected, and updated")   (pending)
-
-  test("entities with java.time fields can be inserted, selected, and updated") (pending)
-
-
-
-/*
-  test("after inserting entities, they can be selected by primary key") {
-    val t1 = Teacher(TeacherId(0),  "entity" + System.currentTimeMillis())
-    val t2 = Teacher(TeacherId(0),  "entity2")
-    val op = for {
-      id1 <- teachers.insertReturningKey(t1)
-      id2 <- teachers.insertReturningKey(t2)
-      t2Result <- teachers(id1)
-      t1Result <- teachers(id2)
-    } yield {
-      assert(t1Result == Some(t1.copy(id=id1)))
-      assert(t2Result == Some(t2.copy(id=id2)))
-
-    }
-    run(op)
-  }
-
-
   test("A table scan returns all the entities in the table") {
-    val table = Table[Int,IntRow]("scan_test", Seq("id"))
+    val table = Table[Id,PrimitiveEntity]("scan_test")
     try {
-      val entities = Set(IntRow(1,"One"), IntRow(2,"Two"), IntRow(3, "three"))
+      val entities = Set(PrimitiveEntity(nextId,randomString),
+        PrimitiveEntity(nextId, randomString),
+        PrimitiveEntity(nextId, randomString)
+      )
       val op = for {
         _ <- table.create()
         _ <- table.insertBatch(entities.toSeq: _*)
@@ -618,152 +591,31 @@ case class DSLTest(driver: String,
     }
   }
 
-  test("after deleting an entity, the entity cannot be found by primary key") {
-    val t = Teacher(TeacherId(0), "A Teacher")
-    val op = for {
-      k <- teachers.insertReturningKey(t)
-      inserted <- teachers(id)
-      _ <- teachers.delete(id)
-      result <- teachers(id)
-    } yield {
-      assert(inserted == t.copy(id = k)
-      assert(result == None)
-    }
-    run(op)
-  }
-
-  test("only the specified entity is affected by a delete") {
-    val t1 = Teacher(TeacherId(0), "Teacher 14")
-    val t2 = Teacher(TeacherId(0), "Teacher 15")
-    val op = for {
-      id1 <- teachers.insertBatch(t1,t2)
-      id2 <- teachers.delete(t1.id)
-      r1 <- teachers(id1)
-      r2 <- teachers(id2)
-    } yield {
-      assert (r1 == None)
-      assert (r2 == Some(t2))
-    }
-  }
 
   test("deleting a nonexistent entity affects nothing") {
-    val n = teachers.delete(TeacherId(-1))
+    val n = primitiveTable.delete(Id(-1))
     assert (run(n) == 0)
   }
 
-  test("multiple entities can be deleted in one operation")  {
-    val t1 = Teacher(TeacherId(0),  "entity1")
-    val t2 = Teacher(TeacherId(0),  "entity2")
-    val t3 = Teacher(TeacherId(0),  "entity2")
-    val op = for {
-      ids <- teachers.insert(t1,t2,t3)
-      n <- teachers.delete(ids(0),ids(1),ids(2), TeacherId(-1))
-      t1Result <- teachers(ids(0))
-      t2Result <- teachers(ids(1))
-      t3Result <- teachers(ids(2))
-    } yield {
-      assert(t1Result == None)
-      assert(t2Result == None)
-      assert(t3Result == None)
-      assert(n == 2)
-    }
-    run(op)
-  }
-
-  test("after updating an entity, selecting the entity by primary key returns the new entity") {
-    val t = Teacher(TeacherId(0), "A Teacher")
-    val newName = "update"
-    val op = for {
-      inserted <- teachers.insertAndReturn(t)
-      newTeacher = inserted.copy(name=newName)
-      n <- teachers.update(newTeacher)
-      result <- teachers(inserted.id)
-    } yield {
-      assert(n == 1)
-      assert(result == Some(newTeacher))
-    }
-    run(op)
-  }
-
-  test("only the specified entity is affected by an update") {
-    val t1 = Teacher(TeacherId(nextId), "A Teacher")
-    val t2 = Teacher(TeacherId(nextId), "A Teacher")
-    val newT = t1.copy(name="Updated")
-    val op = for {
-      _ <- teachers.insert(t1,t2)
-      n <- teachers.update(newT)
-      result <- teachers(t2.id)
-    } yield {
-      assert(n == 1)
-      assert(result == Some(t2))
-    }
-    run(op)
-  }
-
   test("updating a nonexistent entity affects nothing") {
-    val t = Teacher(TeacherId(-1), "A Teacher")
-    assert(0 == run(teachers.update(t)))
+    val t = PrimitiveEntity(Id(-1), randomString)
+    assert(0 == run(primitiveTable.update(t)))
   }
 
-  test("Multiple entities can be updated in one operation") {
-    val t1 = Teacher(TeacherId(nextId), "A Teacher")
-    val t2 = Teacher(TeacherId(nextId), "A Teacher")
-    val newT1 = t1.copy(name="Updated")
-    val newT2 = t2.copy(name="Updated")
-    val op = for {
-      _ <- teachers.insert(t1,t2)
-      n <- teachers.update(newT1, newT2)
-    } yield {
-      assert(n == 2)
-    }
-    run(op)
-    assert(Some(newT1) == run(teachers(t1.id)))
-    assert(Some(newT2) == run(teachers(t2.id)))
-  }
-
-
-  test("Update doesn't compile if primary key isn't a prefix") {
-    val table = Table[Int,IntRow]("update_test", Seq("id"))
-    val row = IntRow(1,"One")
-    assertTypeError("table.update(row)")
-  }
 
   test("a dropped table cannot be used") { 
-    val table = Table[Int,IntRow]("drop_test", Seq("id"))
+    val table = Table[Id,PrimitiveEntity]("drop_test")
     run(table.create())
     runQuietly(table.drop)
     assertThrows[SQLException] {
-      run(table.insert(IntRow(1,"foo")))
+      run(table.insert(PrimitiveEntity(Id(1),"foo")))
     }
   }
 
-  test("SQL on a table with a compound primary key") {
-    val courseId = CourseId(nextId)
-    val course = Course(courseId, "food", None)
-    val teacherId = TeacherId(nextId)
-    val teacher = Teacher(teacherId, "Teacher")
-    val now = LocalDate.now(ZoneId.of("UTC"))
-    val section1 = Section(SectionId(courseId, 1, 1), teacherId, "Room 1", 
-      LocalTime.NOON, now.minusMonths(2), now.minusMonths(1))
-    val section2 = Section(SectionId(courseId, 1, 2), teacherId, "Room 2",
-      LocalTime.NOON, now.plusMonths(1), now.plusMonths(2))
-    val newSection2 = section2.copy(room="Room X")
-    val c = Meta[java.time.LocalDate]
-    val op = for {
-      _ <- courses.insert(course)
-      _ <- teachers.insert(teacher)
-      _ <- sections.insert(section1, section2)
-      _ <- sections.update(newSection2)
-    } yield ()
-    run(op)
-    assert(run(sections(section1.id)) == Some(section1))
-    assert(run(sections(section2.id)) == Some(newSection2))
-  }
 
   test("insert/select on table with all possible date fields") {
-    val table = Table[Int,DateRow]("dates", Seq("id"))
-    val newDate = DateRow(nextId)
-    val c = Meta[LocalDateTime]
+    val table = Table[Id,DateEntity]("dates")
+    val newDate = DateEntity(nextId)
     try {
       run(table.create())
       run(table.insert(newDate))
@@ -796,23 +648,7 @@ case class DSLTest(driver: String,
       runQuietly(table.drop)
     }
   }
-
-  test("SQL on a table with a primitive") {
-    val table = Table[String,StringRow]("string_test", Seq("id"))
-    try {
-      val e1 = StringRow("1", "One")
-      val e2 = StringRow("2", "Two")
-      val op = for {
-        _ <- table.create()
-        _ <- table.insert(e1,e2)
-      } yield ()
-      run(op)
-      assert(run(table(e1.id)) == Some(e1))
-    } finally {
-      runQuietly(table.drop)
-    }
-  }
-
+/*
   test("SQL on a table with nested objects") {
     val table = Table[Int,DeeplyNested]("deeply_nested_test", Seq("id"))
     try {
@@ -870,6 +706,18 @@ case class DSLTest(driver: String,
     }
   }
  */
+
+
+  test("entities with nested objects can be inserted, selected, and updated")  (pending)
+
+  test("entities with nullable (Option) fields can inserted, selected, and updated")   (pending)
+
+  test("entities with nullable (Option) nested fields can inserted, selected, and updated")   (pending)
+
+  test("entities with any primitive field can inserted, selected, and updated")   (pending)
+
+  test("entities with java.time fields can be inserted, selected, and updated") (pending)
+
   test("SQL on a table with autogenerated primary key") (pending)
 
   test("Insert ignores values for autogenerated columns") (pending)
