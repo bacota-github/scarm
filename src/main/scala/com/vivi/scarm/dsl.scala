@@ -334,12 +334,6 @@ case class Table[K, E<:Entity[K]](
 
 object Table {
 
-  private def keyNames[K](kmap: FieldMap[K]): Seq[String] = {
-    val names = kmap.names
-    if (names != Seq("")) names else Seq("id")
-  }
-
-
   def apply[K,E<:Entity[K]](name: String)
     (implicit dialect: SqlDialect,
       kmap: FieldMap[K],
@@ -347,7 +341,7 @@ object Table {
       kcomp: Composite[K],
       ecomp: Composite[E]
     ): Table[K,E] =
-    Table[K,E](name, (e:E) => e.id, fmap, keyNames(kmap), false, dialect, kcomp, ecomp)
+    Table[K,E](name, (e:E) => e.id, fmap, kmap.names, false, dialect, kcomp, ecomp)
 
   def apply[K,E<:Entity[K]](name: String, kNames: Seq[String])
     (implicit dialect: SqlDialect,
@@ -366,7 +360,7 @@ object Table {
       ecomp: Composite[E]
     ): Table[K,E] = {
     val keyLens: Lens[E,K] = lens[E] >> key
-    Table(name, keyLens.get(_), fmap, keyNames(kmap), false, dialect, kcomp, ecomp)
+    Table(name, keyLens.get(_), fmap, kmap.names, false, dialect, kcomp, ecomp)
   }
 
   private def sequenceName(tableName: String, fieldName: String) =

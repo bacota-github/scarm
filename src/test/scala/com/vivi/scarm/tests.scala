@@ -25,39 +25,39 @@ object DSLSuite {
   }
 }
 
-case class AnyRefKeyEntity(id: String, name: String) extends Entity[String]
+case class StringId(id: String) extends AnyVal
 
-case class PrimitiveKeyEntity(id: Long, name: String) extends Entity[Long]
+case class StringKeyEntity(id: StringId, name: String) extends Entity[StringId]
 
-//just verifying that the boolean type can be created
-case class EntityWithBoolean(id: Long, name: String, maybe: Boolean)
-    extends Entity[Long]
-
-case class Wrapped(id: Int) extends AnyVal
-case class WrappedKeyEntity(id: Wrapped, name: String) extends Entity[Wrapped]
+case class Id(id: Int) extends AnyVal
+case class PrimitiveEntity(id: Id, name: String) extends Entity[Id]
 
 case class InnerKey(x: Short, y: Short)
 case class CompositeKey(first: Long, inner: InnerKey, last: String)
 case class CompositeKeyEntity(id: CompositeKey, name: String)
     extends Entity[CompositeKey]
 
-case class DateEntity(id: Int,
+case class EntityWithAllPrimitiveTypes(id: Id, char: Char, string: String,
+  boolean:Boolean,short: Short, int: Int, long: Long, float: Float,
+  double: Double)  extends Entity[Id]
+
+case class DateEntity(id: Id,
   instant: Instant = Instant.now,
   localDate: LocalDate = LocalDate.now,
   localDateTime: LocalDateTime = LocalDateTime.now,
   localTimex: LocalTime = LocalTime.now
-) extends Entity[Int]
+) extends Entity[Id]
 
-case class Level2(x: Wrapped, y: String)
+case class Level2(x: Id, y: String)
 case class Level1(x: Int, y: Int, level2: Level2)
-case class DeeplyNestedEntity(id: Wrapped, x: Int, nested: Level1)
-    extends Entity[Wrapped]
+case class DeeplyNestedEntity(id: Id, x: Int, nested: Level1)
+    extends Entity[Id]
 
-case class NullableEntity(id: Wrapped, name: Option[String])
-    extends Entity[Wrapped]
+case class NullableEntity(id: Id, name: Option[String])
+    extends Entity[Id]
 
-case class NullableNestedEntity(id: Wrapped, nested: Option[Level1])
-    extends Entity[Wrapped]
+case class NullableNestedEntity(id: Id, nested: Option[Level1])
+    extends Entity[Id]
 
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver",
@@ -96,18 +96,18 @@ case class DSLTest(driver: String,
     run(op)
   } catch { case _:Exception => }
 
-  val primitiveTable = Table[Long,PrimitiveKeyEntity]("primitive")
-  val booleanTable = Table[Long,EntityWithBoolean]("boolean")
-  val anyRefTable = Table[String,AnyRefKeyEntity]("string")
-  val wrappedTable = Table[Wrapped,WrappedKeyEntity]("wrapped")
-  val compositeTable = Table[CompositeKey,CompositeKeyEntity]("composite")
-  val dateTable = Table[Int,DateEntity]("date")
-  val nestedTable = Table[Wrapped,DeeplyNestedEntity]("nested")
-  val nullableTable = Table[Wrapped,NullableEntity]("nullable")
-  val nullableNestedTable = Table[Wrapped,NullableNestedEntity]("nullable_nested")
 
-  val allTables = Seq(primitiveTable, booleanTable, anyRefTable, wrappedTable,
-    compositeTable, dateTable, nestedTable, nullableTable, nullableNestedTable)
+  val stringTable = Table[StringId,StringKeyEntity]("string")
+  val primitiveTable = Table[Id,PrimitiveEntity]("primitive")
+  val compositeTable = Table[CompositeKey,CompositeKeyEntity]("composite")
+  val nestedTable = Table[Id,DeeplyNestedEntity]("nested")
+  val nullableTable = Table[Id,NullableEntity]("nullable")
+  val nullableNestedTable = Table[Id,NullableNestedEntity]("nullable_nested")
+  val dateTable = Table[Id,DateEntity]("date")
+  //  val primitivesTable = Table[Id,EntityWithAllPrimitiveTypes]("primtive")
+
+  val allTables = Seq(stringTable,primitiveTable,compositeTable, nestedTable,
+    nullableTable,nullableNestedTable, dateTable)
 
   private def createAll() = 
     for (t <- allTables) {
@@ -134,17 +134,17 @@ case class DSLTest(driver: String,
 
   private def randomString: String = java.util.UUID.randomUUID().toString
 
-  test("After inserting an entity into a table with AnyRef primary key, the entity can be selected")  {
-    val e1 = AnyRefKeyEntity(randomString, randomString)
-    val e2 = AnyRefKeyEntity(randomString, randomString)
-    val e3 = AnyRefKeyEntity(randomString, randomString)
+  test("After inserting an entity into a table with String primary key, the entity can be selected")  {
+    val e1 = StringKeyEntity(StringId(randomString), randomString)
+    val e2 = StringKeyEntity(StringId(randomString), randomString)
+    val e3 = StringKeyEntity(StringId(randomString), randomString)
     run(for {
-      i1 <- anyRefTable.insert(e1)
-      i2 <- anyRefTable.insert(e2)
-      i3 <- anyRefTable.insert(e3)
-      e2New <- anyRefTable(e2.id)
-      e1New <- anyRefTable(e1.id)
-      e3New <- anyRefTable(e3.id)
+      i1 <- stringTable.insert(e1)
+      i2 <- stringTable.insert(e2)
+      i3 <- stringTable.insert(e3)
+      e2New <- stringTable(e2.id)
+      e1New <- stringTable(e1.id)
+      e3New <- stringTable(e3.id)
     } yield {
       assert (i1 == 1)
       assert (i2 == 1)
@@ -155,15 +155,15 @@ case class DSLTest(driver: String,
     })
   }
 
-  test("After inserting a batch of entities into a table with AnyRef primary key, every entity can be selected") {
-    val e1 = AnyRefKeyEntity(randomString, randomString)
-    val e2 = AnyRefKeyEntity(randomString, randomString)
-    val e3 = AnyRefKeyEntity(randomString, randomString)
+  test("After inserting a batch of entities into a table with String primary key, every entity can be selected") {
+    val e1 = StringKeyEntity(StringId(randomString), randomString)
+    val e2 = StringKeyEntity(StringId(randomString), randomString)
+    val e3 = StringKeyEntity(StringId(randomString), randomString)
     run(for {
-      i <- anyRefTable.insertBatch(e1,e2,e3)
-      e2New <- anyRefTable(e2.id)
-      e1New <- anyRefTable(e1.id)
-      e3New <- anyRefTable(e3.id)
+      i <- stringTable.insertBatch(e1,e2,e3)
+      e2New <- stringTable(e2.id)
+      e1New <- stringTable(e1.id)
+      e3New <- stringTable(e3.id)
     } yield {
       assert (i == 3)
       assert(e1New == Some(e1))
@@ -172,11 +172,11 @@ case class DSLTest(driver: String,
     })
   }
 
-  test("insertReturningKey of an entity with AnyRef primary key returns the correct Key and the entity can be selected") {
-    val e = AnyRefKeyEntity(randomString, randomString)
+  test("insertReturningKey of an entity with String primary key returns the correct Key and the entity can be selected") {
+    val e = StringKeyEntity(StringId(randomString), randomString)
     run(for {
-      k <- anyRefTable.insertReturningKey(e)
-      eNew <- anyRefTable(k)
+      k <- stringTable.insertReturningKey(e)
+      eNew <- stringTable(k)
     } yield {
       assert (k == e.id)
       assert(eNew == Some(e))
@@ -184,71 +184,199 @@ case class DSLTest(driver: String,
   }
 
 
-  test("insertBatchReturningKey on entities with AnyRef primary key returns the correct Keys and the entities can be selected") {
-    val e1 = AnyRefKeyEntity(randomString, randomString)
-    val e2 = AnyRefKeyEntity(randomString, randomString)
-    val e3 = AnyRefKeyEntity(randomString, randomString)
+  test("insertBatchReturningKey on entities with String primary key returns the correct Keys and the entities can be selected") {
+    val e1 = StringKeyEntity(StringId(randomString), randomString)
+    val e2 = StringKeyEntity(StringId(randomString), randomString)
+    val e3 = StringKeyEntity(StringId(randomString), randomString)
     val entities = Seq(e1,e2,e3)
-    val keys = run(anyRefTable.insertBatchReturningKeys(e1,e2,e3))
+    val keys = run(stringTable.insertBatchReturningKeys(e1,e2,e3))
     assert(keys == entities.map(_.id))
     for (e <- entities) {
-      assert(run(anyRefTable(e.id)) == Some(e))
+      assert(run(stringTable(e.id)) == Some(e))
     }
   }
 
-  test("insertReturning an entity with AnyRef primary key returns the entity and the entity can be selected") {
-    val e = AnyRefKeyEntity(randomString, randomString)
+  test("insertReturning an entity with String primary key returns the entity and the entity can be selected") {
+    val e = StringKeyEntity(StringId(randomString), randomString)
     run(for {
-      returned <- anyRefTable.insertReturning(e)
-      selected <- anyRefTable(e.id)
+      returned <- stringTable.insertReturning(e)
+      selected <- stringTable(e.id)
     } yield {
       assert(returned == e)
       assert(selected == Some(e))
     })
   }
 
-  test("insertBatchReturning entities with AnyRef primary key returns the entities and the entities can be selected") (pending)
-  test("after deleting by AnyRef primary, selecting on those keys returns None") (pending)
-  test("entities with AnyRef primary are not accidentally deleted") (pending)
-  test("updates of entities with AnyRef primary key are reflected in future selects") (pending)
-  test("entities with AnyRef primary key are not accidentally updated") (pending)
-  test("AnyRef primary key enforces uniqueness") (pending)
+  test("insertBatchReturning entities with String primary key returns the entities and the entities can be selected") {
+    val e1 = StringKeyEntity(StringId(randomString), randomString)
+    val e2 = StringKeyEntity(StringId(randomString), randomString)
+    val e3 = StringKeyEntity(StringId(randomString), randomString)
+    val entities = Seq(e1,e2,e3)
+    val returned = run(stringTable.insertBatchReturning(e1,e2,e3))
+    assert(returned == entities)
+    for (e <- entities) {
+      assert(run(stringTable(e.id)) == Some(e))
+    }
+  }
 
-  test("After inserting an entity into a table with primitive primary key, the entity can be selected") (pending)
-  test("After inserting a batch of entities into a table with primitive primary key, every entity can be selected") (pending)
-  test("insertReturningKey of an entity with primitive primary key returns the correct Key and the entity can be selected") (pending)
-  test("insertBatchReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") (pending)
-  test("insertReturning an entity with primitive primary key returns the entity and the entity can be selected") (pending)
-  test("insertBatchReturning entities with primitive primary key returns the entities and the entities can be selected") (pending)
-  test("after deleting by primitive primary, selecting on those keys returns None") (pending)
-  test("entities with primitive primary are not accidentally deleted") (pending)
-  test("updates of entities with primitive primary key are reflected in future selects") (pending)
-  test("entities with primitive primary key are not accidentally updated") (pending)
-  test("primitive primary key enforces uniqueness") (pending)
+  test("after deleting by String primary, selecting on those keys returns None") {
+    val e1 = StringKeyEntity(StringId(randomString), randomString)
+    val e2 = StringKeyEntity(StringId(randomString), randomString)
+    val e3 = StringKeyEntity(StringId(randomString), randomString)
+    assert(run(stringTable.insertBatch(e1,e2,e3)) == 3)
+    assert(run(stringTable.delete(e1.id,e2.id)) == 2)
+    assert(run(stringTable(e1.id)) == None)
+    assert(run(stringTable(e2.id)) == None)
+    //sneak in a test for accidental deletion
+    assert(run(stringTable(e3.id)) == Some(e3))
+  }
 
-  test("After inserting an entity into a table with user defined AnyVal primary key, the entity can be selected") (pending)
-  test("After inserting a batch of entities into a table with user defined AnyVal primary key, every entity can be selected") (pending)
-  test("insertReturningKey of an entity with user defined AnyVal primary key returns the correct Key and the entity can be selected") (pending)
-  test("insertBatchReturningKey on entities with user defined AnyVal primary key returns the correct Keys and the entities can be selected") (pending)
-  test("insertReturning an entity with user defined AnyVal primary key returns the entity and the entity can be selected") (pending)
-  test("insertBatchReturning entities with user defined AnyVal primary key returns the entities and the entities can be selected") (pending)
-  test("after deleting by user defined AnyVal primary, selecting on those keys returns None") (pending)
-  test("entities with user defined AnyVal primary are not accidentally deleted") (pending)
-  test("updates of entities with user defined AnyVal primary key are reflected in future selects") (pending)
-  test("entities with user defined AnyVal primary key are not accidentally updated") (pending)
-  test("user defined AnyVal primary key enforces uniqueness") (pending)
 
-  test("After inserting an entity into a table with composite primary key, the entity can be selected") (pending)
+  test("updates of entities with String primary key are reflected in future selects") {
+    val e1 = StringKeyEntity(StringId(randomString), randomString)
+    val e2 = StringKeyEntity(StringId(randomString), randomString)
+    val e3 = StringKeyEntity(StringId(randomString), randomString)
+    assert(run(stringTable.insertBatch(e1,e2,e3)) == 3)
+    val update1 = e1.copy(name=randomString)
+    assert(e1 != update1)
+    val update2 = e2.copy(name=randomString)
+    assert(e2 != update2)
+    assert(run(stringTable.update(update1, update2)) == 2)
+    assert(run(stringTable(e1.id)) == Some(update1))
+    assert(run(stringTable(e2.id)) == Some(update2))
+    //sneak in a test for accidental update
+    assert(run(stringTable(e3.id)) == Some(e3))
+  }
+
+
+  var nextIdVal = 0
+  def nextId = {
+    nextIdVal += 1
+    nextIdVal
+  }
+  
+  test("After inserting an entity into a table with primitive, the entity can be selected")  {
+    val e1 = PrimitiveEntity(Id(nextId), randomString)
+    val e2 = PrimitiveEntity(Id(nextId), randomString)
+    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    run(for {
+      i1 <- primitiveTable.insert(e1)
+      i2 <- primitiveTable.insert(e2)
+      i3 <- primitiveTable.insert(e3)
+      e2New <- primitiveTable(e2.id)
+      e1New <- primitiveTable(e1.id)
+      e3New <- primitiveTable(e3.id)
+    } yield {
+      assert (i1 == 1)
+      assert (i2 == 1)
+      assert (i3 == 1)
+      assert(e1New == Some(e1))
+      assert(e2New == Some(e2))
+      assert(e3New == Some(e3))
+    })
+  }
+
+  test("After inserting a batch of entities into a table with primitive, every entity can be selected") {
+    val e1 = PrimitiveEntity(Id(nextId), randomString)
+    val e2 = PrimitiveEntity(Id(nextId), randomString)
+    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    run(for {
+      i <- primitiveTable.insertBatch(e1,e2,e3)
+      e2New <- primitiveTable(e2.id)
+      e1New <- primitiveTable(e1.id)
+      e3New <- primitiveTable(e3.id)
+    } yield {
+      assert (i == 3)
+      assert(e1New == Some(e1))
+      assert(e2New == Some(e2))
+      assert(e3New == Some(e3))
+    })
+  }
+
+  test("insertReturningKey of an entity with primitive returns the correct Key and the entity can be selected") {
+    val e = PrimitiveEntity(Id(nextId), randomString)
+    run(for {
+      k <- primitiveTable.insertReturningKey(e)
+      eNew <- primitiveTable(k)
+    } yield {
+      assert (k == e.id)
+      assert(eNew == Some(e))
+    })
+  }
+
+
+  test("insertBatchReturningKey on entities with primitive returns the correct Keys and the entities can be selected") {
+    val e1 = PrimitiveEntity(Id(nextId), randomString)
+    val e2 = PrimitiveEntity(Id(nextId), randomString)
+    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    val entities = Seq(e1,e2,e3)
+    val keys = run(primitiveTable.insertBatchReturningKeys(e1,e2,e3))
+    assert(keys == entities.map(_.id))
+    for (e <- entities) {
+      assert(run(primitiveTable(e.id)) == Some(e))
+    }
+  }
+
+  test("insertReturning an entity with primitive returns the entity and the entity can be selected") {
+    val e = PrimitiveEntity(Id(nextId), randomString)
+    run(for {
+      returned <- primitiveTable.insertReturning(e)
+      selected <- primitiveTable(e.id)
+    } yield {
+      assert(returned == e)
+      assert(selected == Some(e))
+    })
+  }
+
+  test("insertBatchReturning entities with primitive returns the entities and the entities can be selected") {
+    val e1 = PrimitiveEntity(Id(nextId), randomString)
+    val e2 = PrimitiveEntity(Id(nextId), randomString)
+    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    val entities = Seq(e1,e2,e3)
+    val returned = run(primitiveTable.insertBatchReturning(e1,e2,e3))
+    assert(returned == entities)
+    for (e <- entities) {
+      assert(run(primitiveTable(e.id)) == Some(e))
+    }
+  }
+
+  test("after deleting by primitive primary key, selecting on those keys returns None") {
+    val e1 = PrimitiveEntity(Id(nextId), randomString)
+    val e2 = PrimitiveEntity(Id(nextId), randomString)
+    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    assert(run(primitiveTable.insertBatch(e1,e2,e3)) == 3)
+    assert(run(primitiveTable.delete(e1.id,e2.id)) == 2)
+    assert(run(primitiveTable(e1.id)) == None)
+    assert(run(primitiveTable(e2.id)) == None)
+    //sneak in a test for accidental deletion
+    assert(run(primitiveTable(e3.id)) == Some(e3))
+  }
+
+
+  test("updates of entities with primitive are reflected in future selects") {
+    val e1 = PrimitiveEntity(Id(nextId), randomString)
+    val e2 = PrimitiveEntity(Id(nextId), randomString)
+    val e3 = PrimitiveEntity(Id(nextId), randomString)
+    assert(run(primitiveTable.insertBatch(e1,e2,e3)) == 3)
+    val update1 = e1.copy(name=randomString)
+    assert(e1 != update1)
+    val update2 = e2.copy(name=randomString)
+    assert(e2 != update2)
+    assert(run(primitiveTable.update(update1, update2)) == 2)
+    assert(run(primitiveTable(e1.id)) == Some(update1))
+    assert(run(primitiveTable(e2.id)) == Some(update2))
+    //sneak in a test for accidental update
+    assert(run(primitiveTable(e3.id)) == Some(e3))
+  }
+
+test("After inserting an entity into a table with composite primary key, the entity can be selected") (pending)
   test("After inserting a batch of entities into a table with composite primary key, every entity can be selected") (pending)
   test("insertReturningKey of an entity with composite primary key returns the correct Key and the entity can be selected") (pending)
   test("insertBatchReturningKey on entities with composite primary key returns the correct Keys and the entities can be selected") (pending)
   test("insertReturning an entity with composite primary key returns the entity and the entity can be selected") (pending)
   test("insertBatchReturning entities with composite primary key returns the entities and the entities can be selected") (pending)
   test("after deleting by composite primary, selecting on those keys returns None") (pending)
-  test("entities with composite primary are not accidentally deleted") (pending)
   test("updates of entities with composite primary key are reflected in future selects") (pending)
-  test("entities with composite primary key are not accidentally updated") (pending)
-  test("composite primary key enforces uniqueness") (pending)
 
 
   test("insertReturningKey of an entity with autogen primary key returns the correct Key and the entity can be selected") (pending)
@@ -260,22 +388,16 @@ case class DSLTest(driver: String,
   test("updates of entities with autogen primary key are reflected in future selects") (pending)
   test("entities with autogen primary key are not accidentally updated") (pending)
 
-  test("insertReturningKey of an entity with wrapped autogen primary key returns the correct Key and the entity can be selected") (pending)
-  test("insertBatchReturningKey on entities with wrapped autogen primary key returns the correct Keys and the entities can be selected") (pending)
-  test("insertReturning an entity with wrapped autogen primary key returns the entity and the entity can be selected") (pending)
-  test("insertBatchReturning entities with wrapped autogen primary key returns the entities and the entities can be selected") (pending)
-  test("after deleting by wrapped autogen primary, selecting on those keys returns None") (pending)
-  test("entities with wrapped autogen primary are not accidentally deleted") (pending)
-  test("updates of entities with wrapped autogen primary key are reflected in future selects") (pending)
-  test("entities with wrapped autogen primary key are not accidentally updated") (pending)
-
-  test("entities with java.time fields can be inserted, selected, and updated") (pending)
-
   test("entities with nested objects can be inserted, selected, and updated")  (pending)
 
   test("entities with nullable (Option) fields can inserted, selected, and updated")   (pending)
 
   test("entities with nullable (Option) nested fields can inserted, selected, and updated")   (pending)
+
+  test("entities with any primitive field can inserted, selected, and updated")   (pending)
+
+  test("entities with java.time fields can be inserted, selected, and updated") (pending)
+
 
 
 /*
@@ -492,7 +614,7 @@ case class DSLTest(driver: String,
     }
   }
 
-  test("SQL on a table with a String primary key") {
+  test("SQL on a table with a primitive") {
     val table = Table[String,StringRow]("string_test", Seq("id"))
     try {
       val e1 = StringRow("1", "One")
