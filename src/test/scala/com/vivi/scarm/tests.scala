@@ -48,7 +48,7 @@ case class DateEntity(id: Id,
   localTimex: LocalTime = LocalTime.now
 ) extends Entity[Id]
 
-case class Level2(x: Id, y: String)
+case class Level2(x: Int, y: String)
 case class Level1(x: Int, y: Int, level2: Level2)
 case class DeeplyNestedEntity(id: Id, x: Int, nested: Level1)
     extends Entity[Id]
@@ -591,7 +591,6 @@ case class DSLTest(driver: String,
     }
   }
 
-
   test("deleting a nonexistent entity affects nothing") {
     val n = primitiveTable.delete(Id(-1))
     assert (run(n) == 0)
@@ -602,7 +601,6 @@ case class DSLTest(driver: String,
     assert(0 == run(primitiveTable.update(t)))
   }
 
-
   test("a dropped table cannot be used") { 
     val table = Table[Id,PrimitiveEntity]("drop_test")
     run(table.create())
@@ -611,7 +609,6 @@ case class DSLTest(driver: String,
       run(table.insert(PrimitiveEntity(Id(1),"foo")))
     }
   }
-
 
   test("java.time fields are supported") {
     val newDate = DateEntity(nextId)
@@ -644,8 +641,11 @@ case class DSLTest(driver: String,
     assert(rtime.getSecond() == ntime.getSecond())
   }
 
-
-  test("entities with nested objects supported")  (pending)
+  test("entities with nested objects supported") {
+    val entity = DeeplyNestedEntity(nextId, 1, Level1(2,3, Level2(4, "hi")))
+    assert(run(nestedTable.insert(entity)) == 1)
+    assert(run(nestedTable(entity.id)) == Some(entity))
+  }
 
   test("various primitive fields supported")   (pending)
 
@@ -653,7 +653,7 @@ case class DSLTest(driver: String,
 
   test("entities with nullable (Option) nested fields can be inserted, selected, and updated")   (pending)
 
-  test("SQL on a table with explicit key names") (pending)
+  test("key name can be overridden") (pending)
 
   test("Query by Index") (pending)
 
@@ -712,4 +712,12 @@ case class DSLTest(driver: String,
   test("field name overrides work") (pending)
 
   test("sql type overrides work") (pending)
+
+  test("select by in clause (new feature)") (pending)
+
+  //Is the Entity type really required?
+  //Can primary key type be inferred or required to be the first column?
+  //createing an Autogen with a non-integral primary key shouldn't compile
+  //Primitive primary key is called "id"
+  //Name of primitive primary key can be overridden
 }
