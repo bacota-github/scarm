@@ -408,7 +408,6 @@ object Table {
   }
 
   private[scarm] val sqlTypeMap: Map[RSymbol, String] = Map(
-    typeOf[Char].typeSymbol -> "CHAR(1)",
     typeOf[String].typeSymbol -> "VARCHAR(255)",
     typeOf[Boolean].typeSymbol -> "BOOLEAN",
     typeOf[Short].typeSymbol -> "SMALLINT",

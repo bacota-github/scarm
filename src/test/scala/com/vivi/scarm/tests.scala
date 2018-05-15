@@ -37,9 +37,15 @@ case class CompositeKey(first: Long, inner: InnerKey, last: String)
 case class CompositeKeyEntity(id: CompositeKey, name: String)
     extends Entity[CompositeKey]
 
-case class EntityWithAllPrimitiveTypes(id: Id, char: Char, string: String,
-  boolean:Boolean,short: Short, int: Int, long: Long, float: Float,
-  double: Double)  extends Entity[Id]
+case class EntityWithAllPrimitiveTypes(id: Id,
+  stringCol: String,
+  booleanCol: Boolean,
+  shortCol: Short,
+  intCol: Int,
+  longCol: Long,
+  floatCol: Float,
+  doubleCol: Double)
+    extends Entity[Id]
 
 case class DateEntity(id: Id,
   instant: Instant = Instant.now,
@@ -98,17 +104,17 @@ case class DSLTest(driver: String,
 
 
   val stringTable = Table[StringId,StringKeyEntity]("string")
-  val intTable = Table[Id,IntEntity]("primitive")
+  val intTable = Table[Id,IntEntity]("int_table")
   val compositeTable = Table[CompositeKey,CompositeKeyEntity]("composite")
   val autogenTable = Autogen[Id,IntEntity]("autogen")
   val nestedTable = Table[Id,DeeplyNestedEntity]("nested")
   val nullableTable = Table[Id,NullableEntity]("nullable")
   val nullableNestedTable = Table[Id,NullableNestedEntity]("nullable_nested")
   val dateTable = Table[Id,DateEntity]("date")
-  //val primitivesTable = Table[Id,EntityWithAllPrimitiveTypes]("primtive")
+  val primitivesTable = Table[Id,EntityWithAllPrimitiveTypes]("primitives")
 
   val allTables = Seq(stringTable,intTable,compositeTable, autogenTable,
-    nestedTable, nullableTable,nullableNestedTable, dateTable)
+    nestedTable, nullableTable,nullableNestedTable, dateTable, primitivesTable)
 
   private def createAll() = 
     for (t <- allTables) {
@@ -648,6 +654,10 @@ case class DSLTest(driver: String,
   }
 
   test("various primitive fields supported") {
+    val entity = EntityWithAllPrimitiveTypes(nextId,randomString,
+      true, 1, 2, 3, 1.0f, 2.0)
+    assert(run(primitivesTable.insert(entity)) == 1)
+    assert(run(primitivesTable(entity.id)) == Some(entity))
   }
 
   test("entities with nullable (Option) fields can be inserted, selected, and updated")   (pending)
