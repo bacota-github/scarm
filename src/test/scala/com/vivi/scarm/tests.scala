@@ -673,7 +673,18 @@ case class DSLTest(driver: String,
     assert(run(nullableTable(e2.id)) == Some(updated2))
   }
 
-  test("entities with nullable (Option) nested fields can be inserted, selected, and updated")   (pending)
+  test("entities with nullable (Option) nested fields can be inserted, selected, and updated") {
+    val e1 = NullableNestedEntity(nextId, Some(Level1(1,2,Level2(3,"4"))))
+    val e2 = NullableNestedEntity(nextId, None)
+    assert(run(nullableNestedTable.insertBatch(e1,e2)) == 2)
+    assert(run(nullableNestedTable(e1.id)) == Some(e1))
+    assert(run(nullableNestedTable(e2.id)) == Some(e2))
+    val updated1 = NullableNestedEntity(e1.id, None)
+    val updated2 = NullableNestedEntity(e2.id, Some(Level1(2,3,Level2(4,"5"))))
+    assert(run(nullableNestedTable.update(updated1, updated2)) == 2)
+    assert(run(nullableNestedTable(e1.id)) == Some(updated1))
+    assert(run(nullableNestedTable(e2.id)) == Some(updated2))
+  }
 
   test("key name can be overridden") (pending)
 
