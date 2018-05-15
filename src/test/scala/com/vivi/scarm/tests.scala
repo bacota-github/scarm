@@ -138,7 +138,7 @@ case class DSLTest(driver: String,
     val e1 = AnyRefKeyEntity(randomString, randomString)
     val e2 = AnyRefKeyEntity(randomString, randomString)
     val e3 = AnyRefKeyEntity(randomString, randomString)
-    for {
+    run(for {
       i1 <- anyRefTable.insert(e1)
       i2 <- anyRefTable.insert(e2)
       i3 <- anyRefTable.insert(e3)
@@ -149,13 +149,29 @@ case class DSLTest(driver: String,
       assert (i1 == 1)
       assert (i2 == 1)
       assert (i3 == 1)
-      assert(e1New == e1)
-      assert(e2New == e2)
-      assert(e3New == e3)
-    }
+      assert(e1New == Some(e1))
+      assert(e2New == Some(e2))
+      assert(e3New == Some(e3))
+    })
   }
 
-  test("After inserting a batch of entities into a table with AnyRef primary key, every entity can be selected") (pending)
+  test("After inserting a batch of entities into a table with AnyRef primary key, every entity can be selected") {
+    val e1 = AnyRefKeyEntity(randomString, randomString)
+    val e2 = AnyRefKeyEntity(randomString, randomString)
+    val e3 = AnyRefKeyEntity(randomString, randomString)
+    run(for {
+      i <- anyRefTable.insertBatch(e1,e2,e3)
+      e2New <- anyRefTable(e2.id)
+      e1New <- anyRefTable(e1.id)
+      e3New <- anyRefTable(e3.id)
+    } yield {
+      assert (i == 3)
+      assert(e1New == Some(e1))
+      assert(e2New == Some(e2))
+      assert(e3New == Some(e3))
+    })
+  }
+
   test("insertReturningKey of an entity with AnyRef primary key returns the correct Key and the entity can be selected") (pending)
   test("insertBatchReturningKey on entities with AnyRef primary key returns the correct Keys and the entities can be selected") (pending)
   test("insertReturning an entity with AnyRef primary key returns the entity and the entity can be selected") (pending)
