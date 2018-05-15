@@ -614,39 +614,34 @@ case class DSLTest(driver: String,
 
 
   test("insert/select on table with all possible date fields") {
-    val table = Table[Id,DateEntity]("dates")
     val newDate = DateEntity(nextId)
-    try {
-      run(table.create())
-      run(table.insert(newDate))
-      val readDate = run(table(newDate.id))
-      assert(!readDate.isEmpty)
-      val read = readDate.get
+    val table = dateTable
+    run(table.insert(newDate))
+    val readDate = run(table(newDate.id))
+    assert(!readDate.isEmpty)
+    val read = readDate.get
 
-      val originalEpoch = newDate.instant.getEpochSecond()
-      val readEpoch = read.instant.getEpochSecond()
-      assert(Math.abs(readEpoch - originalEpoch) <= 1)
-      assert(read.localDate == newDate.localDate)
+    val originalEpoch = newDate.instant.getEpochSecond()
+    val readEpoch = read.instant.getEpochSecond()
+    assert(Math.abs(readEpoch - originalEpoch) <= 1)
+    assert(read.localDate == newDate.localDate)
 
-      val rdate = read.localDateTime
-      val ndate = newDate.localDateTime
-      assert(rdate.getYear() == ndate.getYear())
-      assert(rdate.getMonth() == ndate.getMonth())
-      assert(rdate.getDayOfMonth() == ndate.getDayOfMonth())
-      assert(rdate.getDayOfWeek() == ndate.getDayOfWeek())
-      assert(rdate.getDayOfYear() == ndate.getDayOfYear())
-      assert(rdate.getHour() == ndate.getHour())
-      assert(rdate.getMinute() == ndate.getMinute())
-      assert(Math.abs(rdate.getSecond() - ndate.getSecond()) <= 1)
+    val rdate = read.localDateTime
+    val ndate = newDate.localDateTime
+    assert(rdate.getYear() == ndate.getYear())
+    assert(rdate.getMonth() == ndate.getMonth())
+    assert(rdate.getDayOfMonth() == ndate.getDayOfMonth())
+    assert(rdate.getDayOfWeek() == ndate.getDayOfWeek())
+    assert(rdate.getDayOfYear() == ndate.getDayOfYear())
+    assert(rdate.getHour() == ndate.getHour())
+    assert(rdate.getMinute() == ndate.getMinute())
+    assert(Math.abs(rdate.getSecond() - ndate.getSecond()) <= 1)
 
-      val rtime = read.localTimex
-      val ntime = newDate.localTimex
-      assert(rtime.getHour() == ntime.getHour())
-      assert(rtime.getMinute() == ntime.getMinute())
-      assert(rtime.getSecond() == ntime.getSecond())
-    }  finally {
-      runQuietly(table.drop)
-    }
+    val rtime = read.localTimex
+    val ntime = newDate.localTimex
+    assert(rtime.getHour() == ntime.getHour())
+    assert(rtime.getMinute() == ntime.getMinute())
+    assert(rtime.getSecond() == ntime.getSecond())
   }
 /*
   test("SQL on a table with nested objects") {
