@@ -172,9 +172,41 @@ case class DSLTest(driver: String,
     })
   }
 
-  test("insertReturningKey of an entity with AnyRef primary key returns the correct Key and the entity can be selected") (pending)
-  test("insertBatchReturningKey on entities with AnyRef primary key returns the correct Keys and the entities can be selected") (pending)
-  test("insertReturning an entity with AnyRef primary key returns the entity and the entity can be selected") (pending)
+  test("insertReturningKey of an entity with AnyRef primary key returns the correct Key and the entity can be selected") {
+    val e = AnyRefKeyEntity(randomString, randomString)
+    run(for {
+      k <- anyRefTable.insertReturningKey(e)
+      eNew <- anyRefTable(k)
+    } yield {
+      assert (k == e.id)
+      assert(eNew == Some(e))
+    })
+  }
+
+
+  test("insertBatchReturningKey on entities with AnyRef primary key returns the correct Keys and the entities can be selected") {
+    val e1 = AnyRefKeyEntity(randomString, randomString)
+    val e2 = AnyRefKeyEntity(randomString, randomString)
+    val e3 = AnyRefKeyEntity(randomString, randomString)
+    val entities = Seq(e1,e2,e3)
+    val keys = run(anyRefTable.insertBatchReturningKeys(e1,e2,e3))
+    assert(keys == entities.map(_.id))
+    for (e <- entities) {
+      assert(run(anyRefTable(e.id)) == Some(e))
+    }
+  }
+
+  test("insertReturning an entity with AnyRef primary key returns the entity and the entity can be selected") {
+    val e = AnyRefKeyEntity(randomString, randomString)
+    run(for {
+      returned <- anyRefTable.insertReturning(e)
+      selected <- anyRefTable(e.id)
+    } yield {
+      assert(returned == e)
+      assert(selected == Some(e))
+    })
+  }
+
   test("insertBatchReturning entities with AnyRef primary key returns the entities and the entities can be selected") (pending)
   test("after deleting by AnyRef primary, selecting on those keys returns None") (pending)
   test("entities with AnyRef primary are not accidentally deleted") (pending)

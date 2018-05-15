@@ -208,7 +208,7 @@ case class Table[K, E<:Entity[K]](
   }
 
 
-  def insertBatchReturningKey[EList<:HList,REMList<:HList,REM](entities: E*)
+  def insertBatchReturningKeys[EList<:HList,REMList<:HList,REM](entities: E*)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
     remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
     remComposite: Composite[REMList],
@@ -233,10 +233,12 @@ case class Table[K, E<:Entity[K]](
     dialect match {
       case Postgresql =>
         dml.withUniqueGeneratedKeys[E](fieldNames:_*)(entityComposite)
-      case Hsqldb => {
+      case Hsqldb|Mysql if !autogen => 
+        dml.run.flatMap(_ => fetchEntity(entity.id))
+      case Hsqldb if autogen =>
         dml.withUniqueGeneratedKeys[K](keyNames.head)(keyComposite).
           flatMap(k => fetchEntity(k))
-      } case Mysql => {
+      case Mysql if autogen => {
         val fetchId = sql"SELECT LAST_INSERT_ID()".query[K](keyComposite).unique
         for {
           _ <- dml.run
