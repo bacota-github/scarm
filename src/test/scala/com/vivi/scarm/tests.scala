@@ -100,14 +100,15 @@ case class DSLTest(driver: String,
   val stringTable = Table[StringId,StringKeyEntity]("string")
   val primitiveTable = Table[Id,PrimitiveEntity]("primitive")
   val compositeTable = Table[CompositeKey,CompositeKeyEntity]("composite")
+  val autogenTable = Autogen[Id,PrimitiveEntity]("autogen")
   val nestedTable = Table[Id,DeeplyNestedEntity]("nested")
   val nullableTable = Table[Id,NullableEntity]("nullable")
   val nullableNestedTable = Table[Id,NullableNestedEntity]("nullable_nested")
   val dateTable = Table[Id,DateEntity]("date")
   //  val primitivesTable = Table[Id,EntityWithAllPrimitiveTypes]("primtive")
 
-  val allTables = Seq(stringTable,primitiveTable,compositeTable, nestedTable,
-    nullableTable,nullableNestedTable, dateTable)
+  val allTables = Seq(stringTable,primitiveTable,compositeTable, autogenTable,
+    nestedTable, nullableTable,nullableNestedTable, dateTable)
 
   private def createAll() = 
     for (t <- allTables) {
@@ -262,7 +263,7 @@ case class DSLTest(driver: String,
     nextIdVal
   }
   
-  test("After inserting an entity into a table with primitive, the entity can be selected")  {
+  test("After inserting an entity into a table with primitive primary key, the entity can be selected")  {
     val e1 = PrimitiveEntity(Id(nextId), randomString)
     val e2 = PrimitiveEntity(Id(nextId), randomString)
     val e3 = PrimitiveEntity(Id(nextId), randomString)
@@ -283,7 +284,7 @@ case class DSLTest(driver: String,
     })
   }
 
-  test("After inserting a batch of entities into a table with primitive, every entity can be selected") {
+  test("After inserting a batch of entities into a table with primitive primary key, every entity can be selected") {
     val e1 = PrimitiveEntity(Id(nextId), randomString)
     val e2 = PrimitiveEntity(Id(nextId), randomString)
     val e3 = PrimitiveEntity(Id(nextId), randomString)
@@ -300,7 +301,7 @@ case class DSLTest(driver: String,
     })
   }
 
-  test("insertReturningKey of an entity with primitive returns the correct Key and the entity can be selected") {
+  test("insertReturningKey of an entity with primitive primary key returns the correct Key and the entity can be selected") {
     val e = PrimitiveEntity(Id(nextId), randomString)
     run(for {
       k <- primitiveTable.insertReturningKey(e)
@@ -312,7 +313,7 @@ case class DSLTest(driver: String,
   }
 
 
-  test("insertBatchReturningKey on entities with primitive returns the correct Keys and the entities can be selected") {
+  test("insertBatchReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") {
     val e1 = PrimitiveEntity(Id(nextId), randomString)
     val e2 = PrimitiveEntity(Id(nextId), randomString)
     val e3 = PrimitiveEntity(Id(nextId), randomString)
@@ -324,7 +325,7 @@ case class DSLTest(driver: String,
     }
   }
 
-  test("insertReturning an entity with primitive returns the entity and the entity can be selected") {
+  test("insertReturning an entity with primitive primary key returns the entity and the entity can be selected") {
     val e = PrimitiveEntity(Id(nextId), randomString)
     run(for {
       returned <- primitiveTable.insertReturning(e)
@@ -335,7 +336,7 @@ case class DSLTest(driver: String,
     })
   }
 
-  test("insertBatchReturning entities with primitive returns the entities and the entities can be selected") {
+  test("insertBatchReturning entities with primitive primary key returns the entities and the entities can be selected") {
     val e1 = PrimitiveEntity(Id(nextId), randomString)
     val e2 = PrimitiveEntity(Id(nextId), randomString)
     val e3 = PrimitiveEntity(Id(nextId), randomString)
@@ -359,7 +360,7 @@ case class DSLTest(driver: String,
     assert(run(primitiveTable(e3.id)) == Some(e3))
   }
 
-  test("updates of entities with primitive are reflected in future selects") {
+  test("updates of entities with primitive primary key are reflected in future selects") {
     val e1 = PrimitiveEntity(Id(nextId), randomString)
     val e2 = PrimitiveEntity(Id(nextId), randomString)
     val e3 = PrimitiveEntity(Id(nextId), randomString)
@@ -491,14 +492,84 @@ case class DSLTest(driver: String,
   }
 
 
-  test("insertReturningKey of an entity with autogen primary key returns the correct Key and the entity can be selected") (pending)
-  test("insertBatchReturningKey on entities with autogen primary key returns the correct Keys and the entities can be selected") (pending)
-  test("insertReturning an entity with autogen primary key returns the entity and the entity can be selected") (pending)
-  test("insertBatchReturning entities with autogen primary key returns the entities and the entities can be selected") (pending)
-  test("after deleting by autogen primary, selecting on those keys returns None") (pending)
-  test("entities with autogen primary are not accidentally deleted") (pending)
-  test("updates of entities with autogen primary key are reflected in future selects") (pending)
-  test("entities with autogen primary key are not accidentally updated") (pending)
+  test("insertReturningKey of an entity with autogen primary key returns the correct Key and the entity can be selected") {
+    val e = PrimitiveEntity(Id(0), randomString)
+    run(for {
+      k <- autogenTable.insertReturningKey(e)
+      eNew <- autogenTable(k)
+    } yield {
+      assert(eNew == Some(e.copy(id=k)))
+    })
+  }
+
+
+  test("insertBatchReturningKey on entities with autogen primary key returns the correct Keys and the entities can be selected") {
+    val e1 = PrimitiveEntity(Id(0), randomString)
+    val e2 = PrimitiveEntity(Id(0), randomString)
+    val e3 = PrimitiveEntity(Id(0), randomString)
+    val entities = Seq(e1,e2,e3)
+    val keys = run(autogenTable.insertBatchReturningKeys(e1,e2,e3))
+    val zipped = keys zip entities
+    for ((k,e) <- zipped) {
+      val readName = run(autogenTable(k)).get.name
+      assert(e.name == readName)
+    }
+  }
+
+  test("insertReturning an entity with autogen primary key returns the entity and the entity can be selected") {
+    val e = PrimitiveEntity(Id(0), randomString)
+    run(for {
+      returned <- autogenTable.insertReturning(e)
+      selected <- autogenTable(returned.id)
+    } yield {
+      assert(returned.name == e.name)
+      assert(selected.get.name == e.name)
+    })
+  }
+
+  test("insertBatchReturning entities with autogen primary key returns the entities and the entities can be selected") {
+    val e1 = PrimitiveEntity(Id(0), randomString)
+    val e2 = PrimitiveEntity(Id(0), randomString)
+    val e3 = PrimitiveEntity(Id(0), randomString)
+    val entities = Seq(e1,e2,e3)
+    val returned = run(autogenTable.insertBatchReturning(e1,e2,e3))
+    val zipped = returned zip entities
+    for ((ret, e) <- zipped) {
+      assert(ret.name == e.name)
+      assert(run(autogenTable(ret.id)).get.name == e.name)
+    }
+  }
+
+  test("after deleting by autogen primary key, selecting on those keys returns None") {
+    val e1 = PrimitiveEntity(Id(0), randomString)
+    val e2 = PrimitiveEntity(Id(0), randomString)
+    val e3 = PrimitiveEntity(Id(0), randomString)
+    val keys = run(autogenTable.insertBatchReturningKeys(e1,e2,e3))
+    assert(run(autogenTable.delete(keys(0), keys(1))) == 2)
+    assert(run(autogenTable(keys(0))) == None)
+    assert(run(autogenTable(keys(1))) == None)
+    //sneak in a test for accidental deletion
+    assert(run(autogenTable(keys(2))).get.name == e3.name)
+  }
+
+  test("updates of entities with autogen primary key are reflected in future selects") {
+    val entities = Seq(
+      PrimitiveEntity(Id(0), randomString),
+      PrimitiveEntity(Id(0), randomString),
+      PrimitiveEntity(Id(0), randomString)
+    )
+    val Seq(e1,e2,e3) = run(autogenTable.insertBatchReturning(entities:_*))
+    val update1 = e1.copy(name=randomString)
+    assert(e1 != update1)
+    val update2 = e2.copy(name=randomString)
+    assert(e2 != update2)
+    assert(run(autogenTable.update(update1, update2)) == 2)
+    assert(run(autogenTable(e1.id)) == Some(update1))
+    assert(run(autogenTable(e2.id)) == Some(update2))
+    //sneak in a test for accidental update
+    assert(run(autogenTable(e3.id)) == Some(e3))
+  }
+
 
   test("entities with nested objects can be inserted, selected, and updated")  (pending)
 

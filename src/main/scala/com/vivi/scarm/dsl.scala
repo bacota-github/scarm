@@ -424,7 +424,7 @@ object Table {
 }
 
 
-object AutogenTable {
+object Autogen {
 
   def apply[K,E<:Entity[K]](name: String)
     (implicit dialect: SqlDialect,

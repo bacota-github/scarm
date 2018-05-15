@@ -39,7 +39,7 @@ case class TestObjects(dialect: SqlDialect) {
 
   implicit val theDialect = dialect
 
-  val teachers = AutogenTable[TeacherId,Teacher]("teachers")
+  val teachers = Autogen[TeacherId,Teacher]("teachers")
   val courses = Table[CourseId,Course]("courses")
   val sections = Table[SectionId,Section]("sections")
   val students = Table[StudentId,Student]("students")
