@@ -660,7 +660,18 @@ case class DSLTest(driver: String,
     assert(run(primitivesTable(entity.id)) == Some(entity))
   }
 
-  test("entities with nullable (Option) fields can be inserted, selected, and updated")   (pending)
+  test("entities with nullable (Option) fields can be inserted, selected, and updated")  {
+    val e1 = NullableEntity(nextId, Some(randomString))
+    val e2 = NullableEntity(nextId, None)
+    assert(run(nullableTable.insertBatch(e1,e2)) == 2)
+    assert(run(nullableTable(e1.id)) == Some(e1))
+    assert(run(nullableTable(e2.id)) == Some(e2))
+    val updated1 = NullableEntity(e1.id, None)
+    val updated2 = NullableEntity(e2.id, Some(randomString))
+    assert(run(nullableTable.update(updated1, updated2)) == 2)
+    assert(run(nullableTable(e1.id)) == Some(updated1))
+    assert(run(nullableTable(e2.id)) == Some(updated2))
+  }
 
   test("entities with nullable (Option) nested fields can be inserted, selected, and updated")   (pending)
 
