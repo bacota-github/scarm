@@ -15,7 +15,6 @@ trait FieldMap[A] {
   lazy val mapping: Map[String,FieldMap.Item] =
     fields.map(item=> (item.name, item) ).toMap
   def ++[B<:HList](other: FieldMap[B]):FieldMap[A::B] = FieldMap.concat(this,other)
-  lazy val autoGenFields: Seq[String] = fields.filter(_.autogen).map(_.name)
   def isOptional(field: String): Boolean =
     mapping.get(field).map(_.optional).getOrElse(false)
   def names = fields.map(_.name)
@@ -28,10 +27,10 @@ trait FieldMap[A] {
 
 object FieldMap {
 
-  case class Item(name: String, tpe: Type, optional: Boolean, autogen:Boolean)
+  case class Item(name: String, tpe: Type, optional: Boolean)
 
   implicit def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = new FieldMap[A]{
-    override val fields = fieldsFromType("", ttag.tpe, false, false)
+    override val fields = fieldsFromType("", ttag.tpe, false)
   }
 
   private def isCaseMethod(s: ReflectionSymbol): Boolean = 
@@ -40,27 +39,23 @@ object FieldMap {
   private def isCaseClass(tpe: Type): Boolean =
     tpe.members.exists(isCaseMethod(_))
 
-
-  private def fieldsFromType(pre: String, tpe: Type, opt: Boolean, autogen: Boolean): Seq[Item] =   {
+  private def fieldsFromType(pre: String, tpe: Type, opt: Boolean): Seq[Item] =   {
     val members = tpe.members.sorted.collect {
       case s if isCaseMethod(s) => {
         val m = s.asMethod
-        val name = (if (pre == "") "" else pre+"_") + m.name
+        lazy val name = (if (pre == "") "" else pre+"_") + m.name
         if (m.returnType <:< typeOf[Option[Any]])
-          fieldsFromType(name, m.returnType.typeArgs.head, true, false)
-        else if (m.returnType <:< typeOf[Autogen[Any]])
-          fieldsFromType(name, m.returnType.typeArgs.head, opt, true)
+          fieldsFromType(name, m.returnType.typeArgs.head, true)
         else if (isCaseClass(m.returnType)) {
           val prefix = if (tpe <:< typeOf[Entity[Any]] && m.name.toString == "id") pre else name
-          fieldsFromType(prefix, m.returnType, opt, false)
-        }
-        else Seq(Item(name, m.returnType, opt, false))
+          fieldsFromType(prefix, m.returnType, opt)
+        } else Seq(Item(name, m.returnType, opt))
       }
     }
     if (!members.isEmpty)
       members.flatten
     else
-      Seq(Item(pre, tpe, opt, false))
+      Seq(Item(pre, tpe, opt))
   }
 
   private[scarm] def prefix[A](pre: String, from: FieldMap[A]): FieldMap[A] =

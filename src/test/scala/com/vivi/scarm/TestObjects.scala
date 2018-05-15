@@ -13,7 +13,8 @@ case class SectionId(course: CourseId, semester: Int, number: Int)
 case class EnrollmentId(student: StudentId, section: SectionId)
 case class AssignmentId(id: Int) extends AnyVal
 
-case class Teacher(id: TeacherId, name: String) extends Entity[TeacherId]
+case class Teacher(id: TeacherId, name: String)
+    extends Entity[TeacherId]
 
 case class Course(id: CourseId, subject: String,
   prerequisite: Option[CourseId]) extends Entity[CourseId]
@@ -35,9 +36,10 @@ case class Assignment(id: AssignmentId, name: String,
 
 
 case class TestObjects(dialect: SqlDialect) {
+
   implicit val theDialect = dialect
 
-  val teachers = Table[TeacherId,Teacher]("teachers")
+  val teachers = AutogenTable[TeacherId,Teacher]("teachers")
   val courses = Table[CourseId,Course]("courses")
   val sections = Table[SectionId,Section]("sections")
   val students = Table[StudentId,Student]("students")

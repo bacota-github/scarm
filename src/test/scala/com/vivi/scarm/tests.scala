@@ -13,7 +13,6 @@ import com.vivi.scarm._
 import com.vivi.scarm.FieldMap._
 
 import TestObjects._
-//import MysqlHacks.JavaTimeLocalDateMeta
 import com.vivi.scarm.JavaTimeLocalDateMeta
 
 object DSLSuite {
@@ -26,27 +25,39 @@ object DSLSuite {
   }
 }
 
-case class IntRow(id: Int, name: String) extends Entity[Int]
+case class AnyRefKeyEntity(id: String, name: String) extends Entity[String]
 
-case class StringRow(id: String, name: String) extends Entity[String]
+case class PrimitiveKeyEntity(id: Long, name: String) extends Entity[Long]
 
-case class DateRow(id: Int,
+//just verifying that the boolean type can be created
+case class EntityWithBoolean(id: Long, name: String, maybe: Boolean)
+    extends Entity[Long]
+
+case class Wrapped(id: Int) extends AnyVal
+case class WrappedKeyEntity(id: Wrapped, name: String) extends Entity[Wrapped]
+
+case class InnerKey(x: Short, y: Short)
+case class CompositeKey(first: Long, inner: InnerKey, last: String)
+case class CompositeKeyEntity(id: CompositeKey, name: String)
+    extends Entity[CompositeKey]
+
+case class DateEntity(id: Int,
   instant: Instant = Instant.now,
   localDate: LocalDate = LocalDate.now,
   localDateTime: LocalDateTime = LocalDateTime.now,
   localTimex: LocalTime = LocalTime.now
 ) extends Entity[Int]
 
-case class Level2(x: Int, y: String)
+case class Level2(x: Wrapped, y: String)
 case class Level1(x: Int, y: Int, level2: Level2)
-case class DeeplyNested(id: Int, x: Int, nested: Level1) extends Entity[Int]
+case class DeeplyNestedEntity(id: Wrapped, x: Int, nested: Level1)
+    extends Entity[Wrapped]
 
-case class NullableString(id: Int, name: Option[String]) extends Entity[Int]
+case class NullableEntity(id: Wrapped, name: Option[String])
+    extends Entity[Wrapped]
 
-case class NullableInt(id: Int, x: Option[Int]) extends Entity[Int]
-
-case class Nestable(x: Int, nm: String)
-case class NullableNested(id: Int, nested: Option[Nestable]) extends Entity[Int]
+case class NullableNestedEntity(id: Wrapped, nested: Option[Level1])
+    extends Entity[Wrapped]
 
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver",
@@ -73,16 +84,9 @@ case class DSLTest(driver: String,
   cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
 ) extends FunSuite with BeforeAndAfterAll {
 
-  val testObjects = TestObjects(dialect)
-  import testObjects._
-
-//  implicit val theDialect: SqlDialect = dialect
+  implicit val theDialect: SqlDialect = dialect
 
   info(s"Testing with url ${url}")
-
-  var idCounter = new java.util.concurrent.atomic.AtomicInteger (1)
-
-  def nextId: Int = idCounter.getAndAdd(1)
 
   implicit val xa = Transactor.fromDriverManager[IO](driver, url, username, pass)
 
@@ -91,6 +95,19 @@ case class DSLTest(driver: String,
   private def runQuietly(op: ConnectionIO[_]) = try {
     run(op)
   } catch { case _:Exception => }
+
+  val primitiveTable = Table[Long,PrimitiveKeyEntity]("primitive")
+  val booleanTable = Table[Long,EntityWithBoolean]("boolean")
+  val anyRefTable = Table[String,AnyRefKeyEntity]("string")
+  val wrappedTable = Table[Wrapped,WrappedKeyEntity]("wrapped")
+  val compositeTable = Table[CompositeKey,CompositeKeyEntity]("composite")
+  val dateTable = Table[Int,DateEntity]("date")
+  val nestedTable = Table[Wrapped,DeeplyNestedEntity]("nested")
+  val nullableTable = Table[Wrapped,NullableEntity]("nullable")
+  val nullableNestedTable = Table[Wrapped,NullableNestedEntity]("nullable_nested")
+
+  val allTables = Seq(primitiveTable, booleanTable, anyRefTable, wrappedTable,
+    compositeTable, dateTable, nestedTable, nullableTable, nullableNestedTable)
 
   private def createAll() = 
     for (t <- allTables) {
@@ -115,16 +132,116 @@ case class DSLTest(driver: String,
     if (cleanup(xa))  dropAll(xa) else ()
   }
 
-  test("after inserting entities, they can be selected by primary key") {
-    val t1 = Teacher(TeacherId(nextId),  "entity1")
-    val t2 = Teacher(TeacherId(nextId),  "entity2")
-    val op = for {
-      _ <- teachers.insert(t1, t2)
-      t2Result <- teachers(t2.id)
-      t1Result <- teachers(t1.id)
+  private def randomString: String = java.util.UUID.randomUUID().toString
+
+  test("After inserting an entity into a table with AnyRef primary key, the entity can be selected")  {
+    val e1 = AnyRefKeyEntity(randomString, randomString)
+    val e2 = AnyRefKeyEntity(randomString, randomString)
+    val e3 = AnyRefKeyEntity(randomString, randomString)
+    for {
+      i1 <- anyRefTable.insert(e1)
+      i2 <- anyRefTable.insert(e2)
+      i3 <- anyRefTable.insert(e3)
+      e2New <- anyRefTable(e2.id)
+      e1New <- anyRefTable(e1.id)
+      e3New <- anyRefTable(e3.id)
     } yield {
-      assert(t1Result == Some(t1))
-      assert(t2Result == Some(t2))
+      assert (i1 == 1)
+      assert (i2 == 1)
+      assert (i3 == 1)
+      assert(e1New == e1)
+      assert(e2New == e2)
+      assert(e3New == e3)
+    }
+  }
+
+  test("After inserting a batch of entities into a table with AnyRef primary key, every entity can be selected") (pending)
+  test("insertReturningKey of an entity with AnyRef primary key returns the correct Key and the entity can be selected") (pending)
+  test("insertBatchReturningKey on entities with AnyRef primary key returns the correct Keys and the entities can be selected") (pending)
+  test("insertReturning an entity with AnyRef primary key returns the entity and the entity can be selected") (pending)
+  test("insertBatchReturning entities with AnyRef primary key returns the entities and the entities can be selected") (pending)
+  test("after deleting by AnyRef primary, selecting on those keys returns None") (pending)
+  test("entities with AnyRef primary are not accidentally deleted") (pending)
+  test("updates of entities with AnyRef primary key are reflected in future selects") (pending)
+  test("entities with AnyRef primary key are not accidentally updated") (pending)
+  test("AnyRef primary key enforces uniqueness") (pending)
+
+  test("After inserting an entity into a table with primitive primary key, the entity can be selected") (pending)
+  test("After inserting a batch of entities into a table with primitive primary key, every entity can be selected") (pending)
+  test("insertReturningKey of an entity with primitive primary key returns the correct Key and the entity can be selected") (pending)
+  test("insertBatchReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") (pending)
+  test("insertReturning an entity with primitive primary key returns the entity and the entity can be selected") (pending)
+  test("insertBatchReturning entities with primitive primary key returns the entities and the entities can be selected") (pending)
+  test("after deleting by primitive primary, selecting on those keys returns None") (pending)
+  test("entities with primitive primary are not accidentally deleted") (pending)
+  test("updates of entities with primitive primary key are reflected in future selects") (pending)
+  test("entities with primitive primary key are not accidentally updated") (pending)
+  test("primitive primary key enforces uniqueness") (pending)
+
+  test("After inserting an entity into a table with user defined AnyVal primary key, the entity can be selected") (pending)
+  test("After inserting a batch of entities into a table with user defined AnyVal primary key, every entity can be selected") (pending)
+  test("insertReturningKey of an entity with user defined AnyVal primary key returns the correct Key and the entity can be selected") (pending)
+  test("insertBatchReturningKey on entities with user defined AnyVal primary key returns the correct Keys and the entities can be selected") (pending)
+  test("insertReturning an entity with user defined AnyVal primary key returns the entity and the entity can be selected") (pending)
+  test("insertBatchReturning entities with user defined AnyVal primary key returns the entities and the entities can be selected") (pending)
+  test("after deleting by user defined AnyVal primary, selecting on those keys returns None") (pending)
+  test("entities with user defined AnyVal primary are not accidentally deleted") (pending)
+  test("updates of entities with user defined AnyVal primary key are reflected in future selects") (pending)
+  test("entities with user defined AnyVal primary key are not accidentally updated") (pending)
+  test("user defined AnyVal primary key enforces uniqueness") (pending)
+
+  test("After inserting an entity into a table with composite primary key, the entity can be selected") (pending)
+  test("After inserting a batch of entities into a table with composite primary key, every entity can be selected") (pending)
+  test("insertReturningKey of an entity with composite primary key returns the correct Key and the entity can be selected") (pending)
+  test("insertBatchReturningKey on entities with composite primary key returns the correct Keys and the entities can be selected") (pending)
+  test("insertReturning an entity with composite primary key returns the entity and the entity can be selected") (pending)
+  test("insertBatchReturning entities with composite primary key returns the entities and the entities can be selected") (pending)
+  test("after deleting by composite primary, selecting on those keys returns None") (pending)
+  test("entities with composite primary are not accidentally deleted") (pending)
+  test("updates of entities with composite primary key are reflected in future selects") (pending)
+  test("entities with composite primary key are not accidentally updated") (pending)
+  test("composite primary key enforces uniqueness") (pending)
+
+
+  test("insertReturningKey of an entity with autogen primary key returns the correct Key and the entity can be selected") (pending)
+  test("insertBatchReturningKey on entities with autogen primary key returns the correct Keys and the entities can be selected") (pending)
+  test("insertReturning an entity with autogen primary key returns the entity and the entity can be selected") (pending)
+  test("insertBatchReturning entities with autogen primary key returns the entities and the entities can be selected") (pending)
+  test("after deleting by autogen primary, selecting on those keys returns None") (pending)
+  test("entities with autogen primary are not accidentally deleted") (pending)
+  test("updates of entities with autogen primary key are reflected in future selects") (pending)
+  test("entities with autogen primary key are not accidentally updated") (pending)
+
+  test("insertReturningKey of an entity with wrapped autogen primary key returns the correct Key and the entity can be selected") (pending)
+  test("insertBatchReturningKey on entities with wrapped autogen primary key returns the correct Keys and the entities can be selected") (pending)
+  test("insertReturning an entity with wrapped autogen primary key returns the entity and the entity can be selected") (pending)
+  test("insertBatchReturning entities with wrapped autogen primary key returns the entities and the entities can be selected") (pending)
+  test("after deleting by wrapped autogen primary, selecting on those keys returns None") (pending)
+  test("entities with wrapped autogen primary are not accidentally deleted") (pending)
+  test("updates of entities with wrapped autogen primary key are reflected in future selects") (pending)
+  test("entities with wrapped autogen primary key are not accidentally updated") (pending)
+
+  test("entities with java.time fields can be inserted, selected, and updated") (pending)
+
+  test("entities with nested objects can be inserted, selected, and updated")  (pending)
+
+  test("entities with nullable (Option) fields can inserted, selected, and updated")   (pending)
+
+  test("entities with nullable (Option) nested fields can inserted, selected, and updated")   (pending)
+
+
+/*
+  test("after inserting entities, they can be selected by primary key") {
+    val t1 = Teacher(TeacherId(0),  "entity" + System.currentTimeMillis())
+    val t2 = Teacher(TeacherId(0),  "entity2")
+    val op = for {
+      id1 <- teachers.insertReturningKey(t1)
+      id2 <- teachers.insertReturningKey(t2)
+      t2Result <- teachers(id1)
+      t1Result <- teachers(id2)
+    } yield {
+      assert(t1Result == Some(t1.copy(id=id1)))
+      assert(t2Result == Some(t2.copy(id=id2)))
 
     }
     run(op)
@@ -137,7 +254,7 @@ case class DSLTest(driver: String,
       val entities = Set(IntRow(1,"One"), IntRow(2,"Two"), IntRow(3, "three"))
       val op = for {
         _ <- table.create()
-        _ <- table.insert(entities.toSeq: _*)
+        _ <- table.insertBatch(entities.toSeq: _*)
         results <- table.scan(Unit)
       } yield {
         assert(results == entities)
@@ -149,25 +266,27 @@ case class DSLTest(driver: String,
   }
 
   test("after deleting an entity, the entity cannot be found by primary key") {
-    val t = Teacher(TeacherId(nextId), "A Teacher")
+    val t = Teacher(TeacherId(0), "A Teacher")
     val op = for {
-      _ <- teachers.insert(t)
-      _ <- teachers.delete(t.id)
-      result <- teachers(t.id)
+      k <- teachers.insertReturningKey(t)
+      inserted <- teachers(id)
+      _ <- teachers.delete(id)
+      result <- teachers(id)
     } yield {
+      assert(inserted == t.copy(id = k)
       assert(result == None)
     }
     run(op)
   }
 
   test("only the specified entity is affected by a delete") {
-    val t1 = Teacher(TeacherId(nextId), "Teacher 14")
-    val t2 = Teacher(TeacherId(nextId), "Teacher 15")
+    val t1 = Teacher(TeacherId(0), "Teacher 14")
+    val t2 = Teacher(TeacherId(0), "Teacher 15")
     val op = for {
-      _ <- teachers.insert(t1,t2)
-      _ <- teachers.delete(t1.id)
-      r1 <- teachers(t1.id)
-      r2 <- teachers(t2.id)
+      id1 <- teachers.insertBatch(t1,t2)
+      id2 <- teachers.delete(t1.id)
+      r1 <- teachers(id1)
+      r2 <- teachers(id2)
     } yield {
       assert (r1 == None)
       assert (r2 == Some(t2))
@@ -180,31 +299,35 @@ case class DSLTest(driver: String,
   }
 
   test("multiple entities can be deleted in one operation")  {
-    val t1 = Teacher(TeacherId(nextId),  "entity1")
-    val t2 = Teacher(TeacherId(nextId),  "entity2")
+    val t1 = Teacher(TeacherId(0),  "entity1")
+    val t2 = Teacher(TeacherId(0),  "entity2")
+    val t3 = Teacher(TeacherId(0),  "entity2")
     val op = for {
-      _ <- teachers.insert(t1,t2)
-      n <- teachers.delete(t1.id,t2.id, TeacherId(-1))
-      t1Result <- teachers(t1.id)
-      t2Result <- teachers(t2.id)
+      ids <- teachers.insert(t1,t2,t3)
+      n <- teachers.delete(ids(0),ids(1),ids(2), TeacherId(-1))
+      t1Result <- teachers(ids(0))
+      t2Result <- teachers(ids(1))
+      t3Result <- teachers(ids(2))
     } yield {
-      assert(n == 2)
       assert(t1Result == None)
       assert(t2Result == None)
+      assert(t3Result == None)
+      assert(n == 2)
     }
     run(op)
   }
 
   test("after updating an entity, selecting the entity by primary key returns the new entity") {
-    val t = Teacher(TeacherId(nextId), "A Teacher")
-    val newT = t.copy(name="Updated")
+    val t = Teacher(TeacherId(0), "A Teacher")
+    val newName = "update"
     val op = for {
-      _ <- teachers.insert(t)
-      n <- teachers.update(newT)
-      result <- teachers(t.id)
+      inserted <- teachers.insertAndReturn(t)
+      newTeacher = inserted.copy(name=newName)
+      n <- teachers.update(newTeacher)
+      result <- teachers(inserted.id)
     } yield {
       assert(n == 1)
-      assert(result == Some(newT))
+      assert(result == Some(newTeacher))
     }
     run(op)
   }
@@ -393,8 +516,7 @@ case class DSLTest(driver: String,
       runQuietly(table.drop)
     }
   }
-
-
+ */
   test("SQL on a table with autogenerated primary key") (pending)
 
   test("Insert ignores values for autogenerated columns") (pending)
