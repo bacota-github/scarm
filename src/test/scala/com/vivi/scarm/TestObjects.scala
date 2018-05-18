@@ -48,9 +48,8 @@ case class TestObjects(dialect: SqlDialect) {
 
   val allTables = Seq(teachers,courses, sections, students,enrollments,assignments)
 
-  val sectionsBySemester = Index("sectionsBySemester", sections,
-    (s: Section) => Some(s.id.semester), Seq("semester")
-  )
+  val sectionsBySemester =
+    Index[String,SectionId,Section]("sectionsBySemester", sections, Seq("semester"))
 
   val instructor = MandatoryForeignKey(sections,
     (s: Section) => s.instructor, teachers)

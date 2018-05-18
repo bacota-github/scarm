@@ -1,4 +1,5 @@
 scalaVersion := "2.12.6"
+ensimeScalaVersion in ThisBuild := "2.12.6"
 
 scalacOptions ++= Seq("-Ypartial-unification", "-deprecation", "-feature")
 
@@ -13,6 +14,7 @@ libraryDependencies ++= Seq(
   "org.tpolecat" %% "doobie-scalatest" % doobieVersion,  // ScalaTest support for typechecking statements.
 
   //"org.scalatest" %% "scalatest" % "3.0.5" % "test",
+  "ai.x" %% "typeless" % "0.5.0",
   "org.hsqldb" % "hsqldb" % "2.4.0" % "test",
   "org.tpolecat" %% "doobie-postgres"  % doobieVersion % "test",
   "mysql" % "mysql-connector-java" % "6.0.6" % "test"

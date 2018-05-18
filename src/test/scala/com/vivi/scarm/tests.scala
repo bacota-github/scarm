@@ -59,11 +59,15 @@ case class Level1(x: Int, y: Int, level2: Level2)
 case class DeeplyNestedEntity(id: Id, x: Int, nested: Level1)
     extends Entity[Id]
 
-case class NullableEntity(id: Id, name: Option[String])
-    extends Entity[Id]
+case class NullableEntity(id: Id, name: Option[String]) extends Entity[Id]
 
 case class NullableNestedEntity(id: Id, nested: Option[Level1])
     extends Entity[Id]
+
+case class MultiEntity(id: Id, name: String, x: Int) extends Entity[Id]
+case class MultiIndexKey( x: Int, name: String) 
+case class MultiIndexKeyNotQuiteRight(x: Int, nme: String)
+
 
 class DSLSuite extends Suites(
   new DSLTest("org.hsqldb.jdbc.JDBCDriver",
@@ -112,9 +116,12 @@ case class DSLTest(driver: String,
   val nullableNestedTable = Table[Id,NullableNestedEntity]("nullable_nested")
   val dateTable = Table[Id,DateEntity]("date")
   val primitivesTable = Table[Id,EntityWithAllPrimitiveTypes]("primitives")
+  val multiTable = Table[Id,MultiEntity]("multi")
 
   val allTables = Seq(stringTable,intTable,compositeTable, autogenTable,
-    nestedTable, nullableTable,nullableNestedTable, dateTable, primitivesTable)
+    nestedTable, nullableTable,nullableNestedTable, dateTable, primitivesTable,
+    multiTable
+  )
 
   private def createAll() = 
     for (t <- allTables) {
@@ -686,23 +693,44 @@ case class DSLTest(driver: String,
     assert(run(nullableNestedTable(e2.id)) == Some(updated2))
   }
 
-  test("key name can be overridden") (pending)
 
-  test("Query by Index") (pending)
+  test("Query by multi-column Index") {
+    val index = Index(multiTable, (t:MultiEntity) => MultiIndexKey(t.x, t.name))
+    val name = randomString
+    val e1 = MultiEntity(nextId, name, 1)
+    val e2 = MultiEntity(nextId, randomString, 2)
+    val e3 = MultiEntity(nextId, name, 1)
+    run(for {
+      _ <- index.create
+      _ <- multiTable.insertBatch(e1,e2,e3)
+      results <- index(MultiIndexKey(1, name))
+    } yield {
+      assert(results == Set(e1,e3))
+    })
+  }
 
-  test("Query by Index with no results") (pending)
+  test("An index doesn't compile unless the fields are subset of the table") {
+    assertDoesNotCompile(
+      "Index(multiTable, (t:MultiEntity) => MultiIndexKeyNotQuiteRight(t.x, t.name))"
+    )
+  }
 
- test("Query by index returns only entities with correct key") (pending)
 
- test("Query by Unique Index") (pending)
+  test("Query by Index with no results returns an empty set") (pending)
 
- test("Query by Unique index returns only entities with correct key") (pending)
+  test("Query by index returns only entities with correct key") (pending)
 
-  test("Query by Unique Index with no results") (pending)
+  test("Query by Unique Index") (pending)
+
+  test("Query by Unique index returns only entities with correct key") (pending)
+
+  test("Query by Unique Index with no results returns an empty set") (pending)
+
+  test("A unique index doesn't compile unless the fields are subset of the table") (pending)
 
   test("Query by Foreign Key") (pending)
 
- test("Query by Foreign Key returns only entities with correct key") (pending)
+  test("Query by Foreign Key returns only entities with correct key") (pending)
 
   test("Query a View") (pending)
 
@@ -748,9 +776,11 @@ case class DSLTest(driver: String,
 
   test("select by in clause (new feature)") (pending)
 
-  //Is the Entity type really required?
   //Can primary key type be inferred or required to be the first column?
+  //Is the Entity type really required?
   //createing an Autogen with a non-integral primary key shouldn't compile
   //Primitive primary key is called "id"
   //Name of primitive primary key can be overridden
+  //do we need the function in the middle of the index
+  //uuid primary key
 }

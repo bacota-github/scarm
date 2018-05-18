@@ -1,7 +1,5 @@
 package com.vivi.scarm
 
-import scala.language.implicitConversions
-
 import com.vivi.scarm._
 
 import doobie.util.update.Update0
@@ -10,7 +8,7 @@ import fs2.Stream
 import cats.effect.IO
 
 import scala.util.{Failure,Success,Try}
-import scala.reflect.runtime.universe.{Type,typeOf,Symbol=>RSymbol}
+import scala.reflect.runtime.universe.{Type,TypeTag,typeOf,Symbol=>RSymbol}
 import scala.language.higherKinds
 
 import doobie._
@@ -18,6 +16,8 @@ import doobie.implicits._
 import shapeless.{ Generic, HList, LabelledGeneric, Lazy, Lens,MkFieldLens, Nat, Witness, lens }
 import shapeless.ops.hlist
 import shapeless.ops.hlist.{Length, Prepend}
+
+//import ai.x.typeless.hlist.Subset
 
 import FieldMap._
 
@@ -122,9 +122,7 @@ case class Table[K, E<:Entity[K]](
   lazy val autogenField = fieldMap.fields.head.name
   lazy val fieldNames: Seq[String] = fieldMap.names
   lazy val nonKeyFieldNames = fieldNames.filter(!keyNames.contains(_))
-
-  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this,
-    (e:E) => Some(e.id), keyNames)
+  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, keyNames)
 
   override private[scarm] def selectList(ct: Int): String =
     fieldNames.map(f => s"${tname(ct)}.${f}").mkString(",")
@@ -490,47 +488,98 @@ object View {
     View(name, definition, fieldList.names, keyList.names)
 }
 
+
+trait IndexBase[K,PK,E<:Entity[PK]] {
+  def name: String
+  def table: Table[PK,E]
+  def keyNames: Seq[String]
+  def unique: Boolean
+
+  def create: ConnectionIO[Int] = {
+    val keys = keyNames.mkString(",")
+    val uniqueness = if (unique) "UNIQUE" else ""
+    val sql = s"CREATE ${uniqueness} INDEX ${name} on ${table.name} (${keys})"
+    Fragment(sql, ()).update.run
+  }
+}
+
 case class Index[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
-  key: E => Option[K],
   override val keyNames: Seq[String]
-) extends DatabaseObject with Queryable[K,Set,E,E] {
+) extends DatabaseObject with Queryable[K,Set,E,E] with IndexBase[K,PK,E]{
   override val fieldNames = table.fieldNames
   override private[scarm] def selectList(ct: Int): String = table.selectList(ct)
   override private[scarm] def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Set[T] = reduced.toSet
+  override def unique: Boolean = false
 }
 
 
 object Index {
-  def apply[K,PK,E<:Entity[PK]](name: String, table: Table[PK,E], key: E=>Option[K])
-    (implicit keyList: FieldList[K]): Index[K,PK,E] = 
-    Index(name, table, key, keyList.names)
+
+  private[scarm] def indexName(table: Table[_,_], ttag: TypeTag[_]) =
+    table.name + "_" + ttag.tpe.typeSymbol.name + "_idx"
+
+  def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
+    table: Table[PK,E],
+    key: E => K
+  )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
+    kGeneric: LabelledGeneric.Aux[K,KList],
+    subset: Subset[KList,EList],
+    kmap: FieldMap[K],
+    ktag: TypeTag[K]
+  ): Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
+
+  def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
+    name: String,
+    table: Table[PK,E],
+    key: E => K
+  )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
+    kGeneric: LabelledGeneric.Aux[K,KList],
+    subset: Subset[KList,EList],
+    kmap: FieldMap[K]
+  ): Index[K,PK,E] = Index(name, table, kmap.names)
 }
-
-
 
 case class UniqueIndex[K,PK,E<:Entity[PK]](
   override val name: String,
   table: Table[PK,E],
-  key: E => Option[K],
   override val keyNames: Seq[String]
-) extends DatabaseObject with Queryable[K,Option,E,E] {
+) extends DatabaseObject with Queryable[K,Option,E,E] with IndexBase[K,PK,E] {
   override val fieldNames = table.fieldNames
   override private[scarm] def selectList(ct: Int): String = table.selectList(ct)
   override private[scarm] def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
+
+  override def unique: Boolean = false
 }
 
 
 object UniqueIndex {
-  def apply[K,PK,E<:Entity[PK]](name: String, table: Table[PK,E], key: E=>Option[K])
-    (implicit keyList: FieldList[K]): UniqueIndex[K,PK,E] = 
-    UniqueIndex(name, table, key, keyList.names)
+
+  def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
+    table: Table[PK,E],
+    key: E => PK
+  )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
+    kGeneric: LabelledGeneric.Aux[K,KList],
+    subset: Subset[KList,EList],
+    kmap: FieldMap[K],
+    ktag: TypeTag[K]
+  ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
+
+  def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
+    name: String,
+    table: Table[PK,E]
+  )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
+    kGeneric: LabelledGeneric.Aux[K,KList],
+    subset: Subset[KList,EList],
+    kmap: FieldMap[K]
+  ): UniqueIndex[K,PK,E] = UniqueIndex(name, table, kmap.names)
+
 }
 
 
@@ -548,11 +597,10 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
   override lazy val name: String = s"${from.name}_${to.name}_fk"
   override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
   override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
-
   lazy val oneToMany = ReverseForeignKey(this)
   lazy val reverse = oneToMany
 
-  lazy val index: Index[TPK,FPK,FROM] = Index(name+"_ix", from, fromKey, keyNames)
+  lazy val index: Index[TPK,FPK,FROM] = Index(name+"_ix", from, keyNames)
 }
 
 
