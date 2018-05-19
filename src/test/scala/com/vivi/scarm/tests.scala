@@ -818,18 +818,20 @@ case class TestIndex(
 
 case class UniqueIndexEntity(id: Id, name: String) extends Entity[Id]
 case class UniqueKey(name: String)
+case class WrongUniqueKey(nme: String)
 
 case class TestUniqueIndex(
   override val xa: Transactor[IO],
   override val dialect: SqlDialect,
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
 ) extends FunSuite with DSLTestBase  {
+
   val uniqueTable = Table[Id,UniqueIndexEntity]("uniqueTable")
   override val allTables = Seq(uniqueTable)
-
+  val index = UniqueIndex(uniqueTable, (t:UniqueIndexEntity) => UniqueKey(t.name)
+  )
 
   test("A unique index enforces uniqueness") {
-    val index = UniqueIndex(uniqueTable, (t: UniqueIndexEntity) => UniqueKey(t.name))
     run(index.create)
     val name = randomString
     run(uniqueTable.insert(UniqueIndexEntity(nextId, name)))
@@ -844,6 +846,23 @@ case class TestUniqueIndex(
     }
   }
 
+  test("Query by unique Index") {
+    val e1 = UniqueIndexEntity(nextId, randomString)
+    val e2 = UniqueIndexEntity(nextId, randomString)
+    run(uniqueTable.insertBatch(e1,e2))
+    assert(run(index(UniqueKey(e2.name))) == Some(e2))
+    assert(run(index(UniqueKey(e1.name))) == Some(e1))
+  }
+
+  test("A unique index doesn't compile unless the fields are subset of the table") {
+    assertDoesNotCompile(
+      "UniqueIndex(uniqueTable, (t:UniqueIndexEntity) => WrongUniqueKey(t.name))"
+    )
+  }
+
+  test("Query by unique Index with no results returns None") {
+    assert(run(index(UniqueKey(randomString))) == None)
+  }
 }
 
 
@@ -905,4 +924,5 @@ class PendingTests extends FunSuite {
   //uuid primary key
   //Select by sets of key values
   //Naming conversions
+  //tuples to Case Classes for index queries
 }
