@@ -25,69 +25,28 @@ object DSLSuite {
   }
 }
 
-case class StringId(id: String) extends AnyVal
-
-case class StringKeyEntity(id: StringId, name: String) extends Entity[StringId]
-
-case class Id(id: Int) extends AnyVal
-case class IntEntity(id: Id, name: String) extends Entity[Id]
-
-case class InnerKey(x: Short, y: Short)
-case class CompositeKey(first: Long, inner: InnerKey, last: String)
-case class CompositeKeyEntity(id: CompositeKey, name: String)
-    extends Entity[CompositeKey]
-
-case class EntityWithAllPrimitiveTypes(id: Id,
-  stringCol: String,
-  booleanCol: Boolean,
-  shortCol: Short,
-  intCol: Int,
-  longCol: Long,
-  floatCol: Float,
-  doubleCol: Double)
-    extends Entity[Id]
-
-case class DateEntity(id: Id,
-  instant: Instant = Instant.now,
-  localDate: LocalDate = LocalDate.now,
-  localDateTime: LocalDateTime = LocalDateTime.now,
-  localTimex: LocalTime = LocalTime.now
-) extends Entity[Id]
-
-case class Level2(x: Int, y: String)
-case class Level1(x: Int, y: Int, level2: Level2)
-case class DeeplyNestedEntity(id: Id, x: Int, nested: Level1)
-    extends Entity[Id]
-
-case class NullableEntity(id: Id, name: Option[String]) extends Entity[Id]
-
-case class NullableNestedEntity(id: Id, nested: Option[Level1])
-    extends Entity[Id]
-
-case class MultiEntity(id: Id, name: String, x: Int) extends Entity[Id]
-case class MultiIndexKey(x: Int, name: String) 
-case class MultiIndexKeyNotQuiteRight(x: Int, nme: String)
-
-case class UniqueIndexEntity(id: Id, name: String) extends Entity[Id]
-case class UniqueKey(name: String)
 
 
 class DSLSuite extends Suites(
-  new DSLTest("org.hsqldb.jdbc.JDBCDriver",
+  DSLTest("org.hsqldb.jdbc.JDBCDriver",
     "jdbc:hsqldb:file:testdb",
     "SA", "", Hsqldb,
     DSLSuite.hsqldbCleanup),
 
-  new DSLTest("org.postgresql.Driver",
+  DSLTest("org.postgresql.Driver",
     "jdbc:postgresql:scarm", "scarm", "scarm", Postgresql,
   ),
 
-  new DSLTest("com.mysql.cj.jdbc.Driver",
+  DSLTest("com.mysql.cj.jdbc.Driver",
     "jdbc:mysql://localhost:3306/scarm?serverTimezone=UTC&useSSL=false&sql_mode=",
     "scarm", "scarm", Mysql
   )
 )
 
+object DSLTest {
+  def xa(driver: String, url: String, username: String, pass: String)
+  = Transactor.fromDriverManager[IO](driver, url, username, pass)
+}
 
 case class DSLTest(driver: String,
   url: String,
@@ -95,44 +54,43 @@ case class DSLTest(driver: String,
   pass: String,
   dialect: SqlDialect,
   cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
-) extends FunSuite with BeforeAndAfterAll {
+) extends Suites(
+  TestWithStringPrimaryKey(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestWithPrimitivePrimaryKey(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestWithCompositePrimaryKey(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestAutogen(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestMiscellaneous(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestJavaTime(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestNestedObjectTable(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestAllPrimitivesTable(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestNullableFields(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestIndex(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestUniqueIndex(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
+)
 
-  implicit val theDialect: SqlDialect = dialect
 
-  info(s"Testing with url ${url}")
+trait DSLTestBase extends Suite with BeforeAndAfterAll {
+  def dialect: SqlDialect
+  implicit def implicitDialect = dialect
 
-  implicit val xa = Transactor.fromDriverManager[IO](driver, url, username, pass)
+  def xa: Transactor[IO]
+  implicit def implicitXA = xa
 
-  private def run[T](op: ConnectionIO[T]): T = op.transact(xa).unsafeRunSync()
+  def allTables: Seq[Table[_,_]]
+  def cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
 
-  private def runQuietly(op: ConnectionIO[_]) = try {
+  def run[T](op: ConnectionIO[T]): T = op.transact(xa).unsafeRunSync()
+
+  def runQuietly(op: ConnectionIO[_]) = try {
     run(op)
   } catch { case _:Exception => }
 
-
-  val stringTable = Table[StringId,StringKeyEntity]("string")
-  val intTable = Table[Id,IntEntity]("int_table")
-  val compositeTable = Table[CompositeKey,CompositeKeyEntity]("composite")
-  val autogenTable = Autogen[Id,IntEntity]("autogen")
-  val nestedTable = Table[Id,DeeplyNestedEntity]("nested")
-  val nullableTable = Table[Id,NullableEntity]("nullable")
-  val nullableNestedTable = Table[Id,NullableNestedEntity]("nullable_nested")
-  val dateTable = Table[Id,DateEntity]("date")
-  val primitivesTable = Table[Id,EntityWithAllPrimitiveTypes]("primitives")
-  val multiTable = Table[Id,MultiEntity]("multi")
-  val uniqueTable = Table[Id,UniqueIndexEntity]("uniqueTable")
-
-  val allTables = Seq(stringTable,intTable,compositeTable, autogenTable,
-    nestedTable, nullableTable,nullableNestedTable, dateTable, primitivesTable,
-    multiTable, uniqueTable
-  )
-
-  private def createAll() = 
+  def createAll: Unit =  
     for (t <- allTables) {
       t.create().transact(xa).unsafeRunSync()
     }
 
-  private def dropAll(xa: Transactor[IO]): Unit = 
+  def dropAll: Unit = 
     for (t <-allTables) {
       try {
         t.dropCascade.transact(xa).unsafeRunSync()
@@ -141,23 +99,35 @@ case class DSLTest(driver: String,
       }
     }
 
-  override def beforeAll() {
-    createAll()
+   override def beforeAll() {
+    createAll
   }
 
-  override def afterAll() {
-    cleanup(xa)
-    if (cleanup(xa))  dropAll(xa) else ()
-  }
+   override def afterAll() {
+    if (cleanup(xa)) dropAll else ()
+   }
 
-  private val rand = new java.util.Random()
-  private def randomString: String = java.util.UUID.randomUUID().toString
-  private def randomCompositeKey = {
-    val first = rand.nextLong()
-    val last = randomString
-    val innerKey = InnerKey(rand.nextInt().toShort, rand.nextInt().toShort)
-    CompositeKey(first, innerKey, last)
+  val rand = new java.util.Random()
+  def randomString: String = java.util.UUID.randomUUID().toString
+
+  var nextIdVal = 0
+  def nextId = {
+    nextIdVal += 1
+    Id(nextIdVal)
   }
+}
+
+
+case class StringId(id: String) extends AnyVal
+case class StringKeyEntity(id: StringId, name: String) extends Entity[StringId]
+
+case class TestWithStringPrimaryKey(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
+) extends FunSuite with DSLTestBase  {
+  val stringTable = Table[StringId,StringKeyEntity]("string")
+  override val  allTables = Seq(stringTable)
 
   test("After inserting an entity into a table with String primary key, the entity can be selected")  {
     val e1 = StringKeyEntity(StringId(randomString), randomString)
@@ -208,7 +178,6 @@ case class DSLTest(driver: String,
     })
   }
 
-
   test("insertBatchReturningKey on entities with String primary key returns the correct Keys and the entities can be selected") {
     val e1 = StringKeyEntity(StringId(randomString), randomString)
     val e2 = StringKeyEntity(StringId(randomString), randomString)
@@ -256,7 +225,6 @@ case class DSLTest(driver: String,
     assert(run(stringTable(e3.id)) == Some(e3))
   }
 
-
   test("updates of entities with String primary key are reflected in future selects") {
     val e1 = StringKeyEntity(StringId(randomString), randomString)
     val e2 = StringKeyEntity(StringId(randomString), randomString)
@@ -272,14 +240,19 @@ case class DSLTest(driver: String,
     //sneak in a test for accidental update
     assert(run(stringTable(e3.id)) == Some(e3))
   }
+}
 
+case class Id(id: Int) extends AnyVal
+case class IntEntity(id: Id, name: String) extends Entity[Id]
 
-  var nextIdVal = 0
-  def nextId = {
-    nextIdVal += 1
-    Id(nextIdVal)
-  }
-  
+case class TestWithPrimitivePrimaryKey(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val intTable = Table[Id,IntEntity]("int_table")
+  override val  allTables = Seq(intTable)
+
   test("After inserting an entity into a table with primitive primary key, the entity can be selected")  {
     val e1 = IntEntity(nextId, randomString)
     val e2 = IntEntity(nextId, randomString)
@@ -392,7 +365,29 @@ case class DSLTest(driver: String,
     //sneak in a test for accidental update
     assert(run(intTable(e3.id)) == Some(e3))
   }
+}
 
+
+case class InnerKey(x: Short, y: Short)
+case class CompositeKey(first: Long, inner: InnerKey, last: String)
+case class CompositeKeyEntity(id: CompositeKey, name: String)
+    extends Entity[CompositeKey]
+
+
+case class TestWithCompositePrimaryKey(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val compositeTable = Table[CompositeKey,CompositeKeyEntity]("composite")
+  override val  allTables = Seq(compositeTable)
+
+  private def randomCompositeKey = {
+    val first = rand.nextLong()
+    val last = randomString
+    val innerKey = InnerKey(rand.nextInt().toShort, rand.nextInt().toShort)
+    CompositeKey(first, innerKey, last)
+  }
 
   test("After inserting an entity into a table with composite key, the entity can be selected")  {
     val e1 = CompositeKeyEntity(randomCompositeKey, randomString)
@@ -491,7 +486,6 @@ case class DSLTest(driver: String,
     assert(run(compositeTable(e3.id)) == Some(e3))
   }
 
-
   test("updates of entities with composite key are reflected in future selects") {
     val e1 = CompositeKeyEntity(randomCompositeKey, randomString)
     val e2 = CompositeKeyEntity(randomCompositeKey, randomString)
@@ -507,7 +501,16 @@ case class DSLTest(driver: String,
     //sneak in a test for accidental update
     assert(run(compositeTable(e3.id)) == Some(e3))
   }
+}
 
+
+case class TestAutogen(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val autogenTable = Autogen[Id,IntEntity]("autogen")
+  override val  allTables = Seq(autogenTable)
 
   test("insertReturningKey of an entity with autogen primary key returns the correct Key and the entity can be selected") {
     val e = IntEntity(Id(0), randomString)
@@ -586,7 +589,15 @@ case class DSLTest(driver: String,
     //sneak in a test for accidental update
     assert(run(autogenTable(e3.id)) == Some(e3))
   }
+}
 
+case class TestMiscellaneous(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val intTable = Table[Id,IntEntity]("misc_test")
+  override val  allTables = Seq(intTable)
 
   test("A table scan returns all the entities in the table") {
     val table = Table[Id,IntEntity]("scan_test")
@@ -626,6 +637,23 @@ case class DSLTest(driver: String,
       run(table.insert(IntEntity(Id(1),"foo")))
     }
   }
+}
+
+case class DateEntity(id: Id,
+  instant: Instant = Instant.now,
+  localDate: LocalDate = LocalDate.now,
+  localDateTime: LocalDateTime = LocalDateTime.now,
+  localTimex: LocalTime = LocalTime.now
+) extends Entity[Id]
+
+
+case class TestJavaTime(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val dateTable = Table[Id,DateEntity]("date")
+  override val  allTables = Seq(dateTable)
 
   test("java.time fields are supported") {
     val newDate = DateEntity(nextId)
@@ -657,12 +685,46 @@ case class DSLTest(driver: String,
     assert(rtime.getMinute() == ntime.getMinute())
     assert(rtime.getSecond() == ntime.getSecond())
   }
+}
+
+case class Level2(x: Int, y: String)
+case class Level1(x: Int, y: Int, level2: Level2)
+case class DeeplyNestedEntity(id: Id, x: Int, nested: Level1)
+    extends Entity[Id]
+
+case class TestNestedObjectTable(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val nestedTable = Table[Id,DeeplyNestedEntity]("nested")
+  override val  allTables = Seq(nestedTable)
 
   test("entities with nested objects supported") {
     val entity = DeeplyNestedEntity(nextId, 1, Level1(2,3, Level2(4, "hi")))
     assert(run(nestedTable.insert(entity)) == 1)
     assert(run(nestedTable(entity.id)) == Some(entity))
   }
+}
+
+
+case class EntityWithAllPrimitiveTypes(id: Id,
+  stringCol: String,
+  booleanCol: Boolean,
+  shortCol: Short,
+  intCol: Int,
+  longCol: Long,
+  floatCol: Float,
+  doubleCol: Double)
+    extends Entity[Id]
+
+case class TestAllPrimitivesTable(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val primitivesTable = Table[Id,EntityWithAllPrimitiveTypes]("allPrimitives")
+  override val allTables = Seq(primitivesTable)
 
   test("various primitive fields supported") {
     val entity = EntityWithAllPrimitiveTypes(nextId,randomString,
@@ -670,6 +732,23 @@ case class DSLTest(driver: String,
     assert(run(primitivesTable.insert(entity)) == 1)
     assert(run(primitivesTable(entity.id)) == Some(entity))
   }
+}
+
+
+case class NullableEntity(id: Id, name: Option[String]) extends Entity[Id]
+
+case class NullableNestedEntity(id: Id, nested: Option[Level1])
+    extends Entity[Id]
+
+case class TestNullableFields(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val nullableTable = Table[Id,NullableEntity]("nullable")
+  val nullableNestedTable = Table[Id,NullableNestedEntity]("nullable_nested")
+  override val allTables = Seq(nullableTable, nullableNestedTable)
+
 
   test("entities with nullable (Option) fields can be inserted, selected, and updated")  {
     val e1 = NullableEntity(nextId, Some(randomString))
@@ -696,7 +775,19 @@ case class DSLTest(driver: String,
     assert(run(nullableNestedTable(e1.id)) == Some(updated1))
     assert(run(nullableNestedTable(e2.id)) == Some(updated2))
   }
+}
 
+case class MultiEntity(id: Id, name: String, x: Int) extends Entity[Id]
+case class MultiIndexKey(x: Int, name: String) 
+case class MultiIndexKeyNotQuiteRight(x: Int, nme: String)
+
+case class TestIndex(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val multiTable = Table[Id,MultiEntity]("multi")
+  override val allTables = Seq(multiTable)
 
   test("Query by multi-column Index") {
     val index = Index(multiTable, (t:MultiEntity) => MultiIndexKey(t.x, t.name))
@@ -723,6 +814,19 @@ case class DSLTest(driver: String,
     val index = Index(multiTable, (t:MultiEntity) => MultiIndexKey(t.x, t.name))
     assert(run(index(MultiIndexKey(0, randomString))) == Set())
   }
+}
+
+case class UniqueIndexEntity(id: Id, name: String) extends Entity[Id]
+case class UniqueKey(name: String)
+
+case class TestUniqueIndex(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+  val uniqueTable = Table[Id,UniqueIndexEntity]("uniqueTable")
+  override val allTables = Seq(uniqueTable)
+
 
   test("A unique index enforces uniqueness") {
     val index = UniqueIndex(uniqueTable, (t: UniqueIndexEntity) => UniqueKey(t.name))
@@ -740,7 +844,11 @@ case class DSLTest(driver: String,
     }
   }
 
+}
 
+
+
+class PendingTests extends FunSuite {
   test("Query by Foreign Key") (pending)
 
   test("Query by Foreign Key returns only entities with correct key") (pending)
