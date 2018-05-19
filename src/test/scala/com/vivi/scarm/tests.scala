@@ -65,8 +65,11 @@ case class NullableNestedEntity(id: Id, nested: Option[Level1])
     extends Entity[Id]
 
 case class MultiEntity(id: Id, name: String, x: Int) extends Entity[Id]
-case class MultiIndexKey( x: Int, name: String) 
+case class MultiIndexKey(x: Int, name: String) 
 case class MultiIndexKeyNotQuiteRight(x: Int, nme: String)
+
+case class UniqueIndexEntity(id: Id, name: String) extends Entity[Id]
+case class UniqueKey(name: String)
 
 
 class DSLSuite extends Suites(
@@ -117,10 +120,11 @@ case class DSLTest(driver: String,
   val dateTable = Table[Id,DateEntity]("date")
   val primitivesTable = Table[Id,EntityWithAllPrimitiveTypes]("primitives")
   val multiTable = Table[Id,MultiEntity]("multi")
+  val uniqueTable = Table[Id,UniqueIndexEntity]("uniqueTable")
 
   val allTables = Seq(stringTable,intTable,compositeTable, autogenTable,
     nestedTable, nullableTable,nullableNestedTable, dateTable, primitivesTable,
-    multiTable
+    multiTable, uniqueTable
   )
 
   private def createAll() = 
@@ -715,18 +719,27 @@ case class DSLTest(driver: String,
     )
   }
 
+  test("Query by Index with no results returns an empty set") {
+    val index = Index(multiTable, (t:MultiEntity) => MultiIndexKey(t.x, t.name))
+    assert(run(index(MultiIndexKey(0, randomString))) == Set())
+  }
 
-  test("Query by Index with no results returns an empty set") (pending)
+  test("A unique index enforces uniqueness") {
+    val index = UniqueIndex(uniqueTable, (t: UniqueIndexEntity) => UniqueKey(t.name))
+    run(index.create)
+    val name = randomString
+    run(uniqueTable.insert(UniqueIndexEntity(nextId, name)))
+    if (dialect == Postgresql) {
+      assertThrows[Exception] { 
+        run(uniqueTable.insert(UniqueIndexEntity(nextId, name)))
+      }
+    } else {
+      assertThrows[java.sql.SQLIntegrityConstraintViolationException] {
+        run(uniqueTable.insert(UniqueIndexEntity(nextId, name)))
+      }
+    }
+  }
 
-  test("Query by index returns only entities with correct key") (pending)
-
-  test("Query by Unique Index") (pending)
-
-  test("Query by Unique index returns only entities with correct key") (pending)
-
-  test("Query by Unique Index with no results returns an empty set") (pending)
-
-  test("A unique index doesn't compile unless the fields are subset of the table") (pending)
 
   test("Query by Foreign Key") (pending)
 
@@ -778,9 +791,10 @@ case class DSLTest(driver: String,
 
   //Can primary key type be inferred or required to be the first column?
   //Is the Entity type really required?
-  //createing an Autogen with a non-integral primary key shouldn't compile
+  //creating an Autogen with a non-integral primary key shouldn't compile
   //Primitive primary key is called "id"
   //Name of primitive primary key can be overridden
-  //do we need the function in the middle of the index
   //uuid primary key
+  //Select by sets of key values
+  //Naming conversions
 }

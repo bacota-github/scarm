@@ -555,7 +555,7 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
 
-  override def unique: Boolean = false
+  override def unique: Boolean = true
 }
 
 
@@ -563,7 +563,7 @@ object UniqueIndex {
 
   def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
     table: Table[PK,E],
-    key: E => PK
+    key: E => K
   )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
     kGeneric: LabelledGeneric.Aux[K,KList],
     subset: Subset[KList,EList],
