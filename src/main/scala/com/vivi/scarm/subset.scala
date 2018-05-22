@@ -12,13 +12,12 @@ trait LowerPrioritySubset {
 }
 
 object Subset extends LowerPrioritySubset {
-  def apply[A,SET<:HList]
-    (implicit subset: Subset[A,SET]): Subset[A,SET] = subset
+  def apply[A,SET<:HList](implicit subset: Subset[A,SET]) = subset
 
   implicit def hnilIsSubset[SET<:HList] = new Subset[HNil,SET] {}
 
   implicit def headAndTail[A,TAIL<:HList,SET<:HList]
-  (implicit hd: Subset[A,SET], tl: Subset[TAIL,SET]) = new Subset[A::TAIL,SET] {}
+    (implicit hd: Subset[A,SET], tl: Subset[TAIL,SET]) = new Subset[A::TAIL,SET] {}
 
   implicit def containedInHead[A,TAIL<:HList] = new Subset[A,A::TAIL] {}
 }

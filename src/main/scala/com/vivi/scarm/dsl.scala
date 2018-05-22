@@ -17,8 +17,6 @@ import shapeless.{ Generic, HList, LabelledGeneric, Lazy, Lens,MkFieldLens, Nat,
 import shapeless.ops.hlist
 import shapeless.ops.hlist.{Length, Prepend}
 
-//import ai.x.typeless.hlist.Subset
-
 import FieldMap._
 
 private[scarm] object dslUtil {
@@ -116,20 +114,21 @@ case class Table[K, E<:Entity[K]](
   autogen: Boolean,
   dialect: SqlDialect,
   keyComposite: Composite[K],
-  entityComposite: Composite[E]
+  entityComposite: Composite[E],
+  primaryKey: PrimaryKey[K,E]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
 
   lazy val autogenField = fieldMap.fields.head.name
   lazy val fieldNames: Seq[String] = fieldMap.names
   lazy val nonKeyFieldNames = fieldNames.filter(!keyNames.contains(_))
-  lazy val primaryKey = UniqueIndex[K,K,E](name+"_pk", this, keyNames)
+  lazy val primaryKeyIndex = UniqueIndex[K,K,E](name+"_pk", this, keyNames)
 
   override private[scarm] def selectList(ct: Int): String =
     fieldNames.map(f => s"${tname(ct)}.${f}").mkString(",")
 
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
-    primaryKey.collectResults(reduced)
+    primaryKeyIndex.collectResults(reduced)
 
 
   def create(
@@ -337,17 +336,21 @@ object Table {
       kmap: FieldMap[K],
       fmap: FieldMap[E],
       kcomp: Composite[K],
-      ecomp: Composite[E]
+      ecomp: Composite[E],
+      primaryKey: PrimaryKey[K,E]
     ): Table[K,E] =
-    Table[K,E](name, (e:E) => e.id, fmap, kmap.names, false, dialect, kcomp, ecomp)
+    Table[K,E](name, (e:E) => e.id, fmap, kmap.names, false, dialect, kcomp,
+      ecomp, primaryKey)
 
   def apply[K,E<:Entity[K]](name: String, kNames: Seq[String])
     (implicit dialect: SqlDialect,
       fmap: FieldMap[E],
       kcomp: Composite[K],
-      ecomp: Composite[E]
+      ecomp: Composite[E],
+      primaryKey: PrimaryKey[K,E]
     ): Table[K,E] =
-    Table[K,E](name, (e:E) => e.id, fmap, kNames, false, dialect, kcomp, ecomp)
+    Table[K,E](name, (e:E) => e.id, fmap, kNames, false, dialect, kcomp,
+      ecomp, primaryKey)
 
   def apply[K,E<:Entity[K]](name: String, key: Witness.Aux[K])
     (implicit dialect: SqlDialect,
@@ -355,10 +358,12 @@ object Table {
       fmap: FieldMap[E],
       mkFieldLens: MkFieldLens.Aux[E,K,K],
       kcomp: Composite[K],
-      ecomp: Composite[E]
+      ecomp: Composite[E],
+      primaryKey: PrimaryKey[K,E]
     ): Table[K,E] = {
     val keyLens: Lens[E,K] = lens[E] >> key
-    Table(name, keyLens.get(_), fmap, kmap.names, false, dialect, kcomp, ecomp)
+    Table(name, keyLens.get(_), fmap, kmap.names, false, dialect, kcomp,
+      ecomp, primaryKey)
   }
 
   private def sequenceName(tableName: String, fieldName: String) =
@@ -428,14 +433,16 @@ object Autogen {
       kmap: FieldMap[K],
       fmap: FieldMap[E],
       kcomp: Composite[K],
-      ecomp: Composite[E]
+      ecomp: Composite[E],
+      primaryKey: PrimaryKey[K,E]
     ): Table[K,E] = Table[K,E](name).copy(autogen=true)
 
   def apply[K,E<:Entity[K]](name: String, kNames: Seq[String])
     (implicit dialect: SqlDialect,
       fmap: FieldMap[E],
       kcomp: Composite[K],
-      ecomp: Composite[E]
+      ecomp: Composite[E],
+      primaryKey: PrimaryKey[K,E]
     ): Table[K,E] = Table[K,E](name,kNames).copy(autogen=true)
 
   def apply[K,E<:Entity[K]](name: String, key: Witness.Aux[K])
@@ -444,7 +451,8 @@ object Autogen {
       fmap: FieldMap[E],
       mkFieldLens: MkFieldLens.Aux[E,K,K],
       kcomp: Composite[K],
-      ecomp: Composite[E]
+      ecomp: Composite[E],
+      primaryKey: PrimaryKey[K,E]
     ): Table[K,E] = Table[K,E](name,key).copy(autogen=true)
 }
 
