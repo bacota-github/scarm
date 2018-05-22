@@ -590,68 +590,36 @@ object UniqueIndex {
 }
 
 
-sealed trait ForeignKey[FPK, FROM, TPK, TO, F[_]]
-    extends DatabaseObject
-    with Queryable[FROM, F, TO, TO] {
-
-  def from: Table[FPK,FROM]
-  def fromKey: FROM => Option[TPK]
-  def to: Table[TPK,TO]
-
+case class ForeignKey[FPK, FROM, TPK, TO](
+  override val name: String,
+  from: Table[FPK,FROM],
+  to: Table[TPK,TO],
+  override val keyNames: Seq[String]
+) extends DatabaseObject with Queryable[FROM, Option, TO, TO] {
   override val fieldNames = to.fieldNames
-  override def keyNames: Seq[String]
   override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
-  override lazy val name: String = s"${from.name}_${to.name}_fk"
   override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
   override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
   lazy val oneToMany = ReverseForeignKey(this)
   lazy val reverse = oneToMany
-
   lazy val index: Index[TPK,FPK,FROM] = Index(name+"_ix", from, keyNames)
-}
 
-
-case class MandatoryForeignKey[FPK,FROM,TPK,TO](
-  override val from: Table[FPK,FROM],
-  val indexKey: FROM => TPK,
-  override val to: Table[TPK,TO],
-  override val  keyNames: Seq[String]
-) extends ForeignKey[FPK,FROM,TPK,TO,Option] {
-  override def fromKey = (f: FROM) => Some(indexKey(f))
   override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
-    to.collectResults(reduced)
-}
-
-
-object MandatoryForeignKey {
-  def apply[FPK,FROM,TPK,TO](
-    from: Table[FPK,FROM], indexKey: FROM=>TPK, to:Table[TPK,TO]
-  )(implicit keyList: FieldList[FROM]): MandatoryForeignKey[FPK,FROM,TPK,TO] =
-    MandatoryForeignKey(from, indexKey, to, keyList.names)
-}
-
-
-case class OptionalForeignKey[FPK,FROM,TPK,TO](
-  override val from: Table[FPK,FROM],
-  override val fromKey: FROM => Option[TPK],
-  override val to: Table[TPK,TO],
-  override val  keyNames: Seq[String]
-) extends ForeignKey[FPK,FROM,TPK,TO,Option] {
-  override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
-  override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] = 
     if (reduced.isEmpty) None else Some(reduced.head)
 }
 
-object OptionalForeignKey {
+
+object ForeignKey {
   def apply[FPK,FROM,TPK,TO](
-    from: Table[FPK,FROM], indexKey: FROM=>Option[TPK], to:Table[TPK,TO]
-  )(implicit keyList: FieldList[FROM]): OptionalForeignKey[FPK,FROM,TPK,TO] =
-    OptionalForeignKey(from, indexKey, to, keyList.names)
+    from: Table[FPK,FROM], indexKey: FROM=>TPK, to:Table[TPK,TO]
+  )(implicit  keyList: FieldList[FROM]): ForeignKey[FPK,FROM,TPK,TO] = 
+    ForeignKey(s"${from.name}_${to.name}_fk", from, to, keyList.names)
 }
 
-case class ReverseForeignKey[FPK,FROM,TPK,TO,F[_]](
-  val foreignKey: ForeignKey[TPK,TO,FPK,FROM,F]
+
+case class ReverseForeignKey[FPK,FROM,TPK,TO](
+  val foreignKey: ForeignKey[TPK,TO,FPK,FROM]
 ) extends Queryable[FROM, Set, TO, TO] {
 
   override val keyNames: Seq[String] = foreignKey.to.keyNames
