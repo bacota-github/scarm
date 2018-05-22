@@ -9,8 +9,7 @@ import shapeless.{ ::, HList, HNil, LabelledGeneric, Lazy, Witness }
 import shapeless.labelled.FieldType
 
 
-trait FieldMap[A] {
-  val fields: Seq[FieldMap.Item]
+case class FieldMap[A](firstFieldName: String, fields: Seq[FieldMap.Item]) {
 
   lazy val mapping: Map[String,FieldMap.Item] =
     fields.map(item=> (item.name, item) ).toMap
@@ -29,9 +28,16 @@ object FieldMap {
 
   case class Item(name: String, tpe: Type, optional: Boolean)
 
-  implicit def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = new FieldMap[A]{
-    override val fields = fieldsFromType("", ttag.tpe, false)
-  }
+  implicit def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = FieldMap[A](
+    firstFieldNameOfType(ttag.tpe),
+    fieldsFromType("", ttag.tpe, false)
+  )
+
+  private def firstFieldNameOfType(tpe: Type): String = 
+    tpe.members.sorted.find(isCaseMethod(_)) match {
+      case None => ""
+      case Some(m) => m.name.toString()
+    }
 
   private def isCaseMethod(s: ReflectionSymbol): Boolean = 
     s.isMethod && s.asMethod.isCaseAccessor
@@ -46,10 +52,9 @@ object FieldMap {
         lazy val name = (if (pre == "") "" else pre+"_") + m.name
         if (m.returnType <:< typeOf[Option[Any]])
           fieldsFromType(name, m.returnType.typeArgs.head, true)
-        else if (isCaseClass(m.returnType)) {
-          val prefix = if (tpe <:< typeOf[Entity[Any]] && m.name.toString == "id") pre else name
-          fieldsFromType(prefix, m.returnType, opt)
-        } else Seq(Item(name, m.returnType, opt))
+        else if (isCaseClass(m.returnType)) 
+          fieldsFromType(name, m.returnType, opt)
+        else Seq(Item(name, m.returnType, opt))
       }
     }
     if (!members.isEmpty)
@@ -59,13 +64,11 @@ object FieldMap {
   }
 
   private[scarm] def prefix[A](pre: String, from: FieldMap[A]): FieldMap[A] =
-    new FieldMap[A] {
-      override val fields = from.fields.map(it => it.copy(name=pre+it.name))
-    }
+    FieldMap[A](pre+from.firstFieldName,
+      from.fields.map(it => it.copy(name=pre+it.name))
+    )
 
   private[scarm] def concat[A,B<:HList](l: FieldMap[A], r: FieldMap[B]) =
-    new FieldMap[A :: B] {
-      override val fields = l.fields ++ r.fields
-    }
+    FieldMap[A :: B](l.firstFieldName, l.fields ++ r.fields)
 }
 

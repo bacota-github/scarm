@@ -119,7 +119,7 @@ trait DSLTestBase extends Suite with BeforeAndAfterAll {
 
 
 case class StringId(id: String) extends AnyVal
-case class StringKeyEntity(id: StringId, name: String) extends Entity[StringId]
+case class StringKeyEntity(id: StringId, name: String)
 
 case class TestWithStringPrimaryKey(
   override val xa: Transactor[IO],
@@ -243,7 +243,7 @@ case class TestWithStringPrimaryKey(
 }
 
 case class Id(id: Int) extends AnyVal
-case class IntEntity(id: Id, name: String) extends Entity[Id]
+case class IntEntity(id: Id, name: String)
 
 case class TestWithPrimitivePrimaryKey(
   override val xa: Transactor[IO],
@@ -371,8 +371,6 @@ case class TestWithPrimitivePrimaryKey(
 case class InnerKey(x: Short, y: Short)
 case class CompositeKey(first: Long, inner: InnerKey, last: String)
 case class CompositeKeyEntity(id: CompositeKey, name: String)
-    extends Entity[CompositeKey]
-
 
 case class TestWithCompositePrimaryKey(
   override val xa: Transactor[IO],
@@ -644,7 +642,7 @@ case class DateEntity(id: Id,
   localDate: LocalDate = LocalDate.now,
   localDateTime: LocalDateTime = LocalDateTime.now,
   localTimex: LocalTime = LocalTime.now
-) extends Entity[Id]
+)
 
 
 case class TestJavaTime(
@@ -690,7 +688,6 @@ case class TestJavaTime(
 case class Level2(x: Int, y: String)
 case class Level1(x: Int, y: Int, level2: Level2)
 case class DeeplyNestedEntity(id: Id, x: Int, nested: Level1)
-    extends Entity[Id]
 
 case class TestNestedObjectTable(
   override val xa: Transactor[IO],
@@ -716,7 +713,6 @@ case class EntityWithAllPrimitiveTypes(id: Id,
   longCol: Long,
   floatCol: Float,
   doubleCol: Double)
-    extends Entity[Id]
 
 case class TestAllPrimitivesTable(
   override val xa: Transactor[IO],
@@ -735,10 +731,9 @@ case class TestAllPrimitivesTable(
 }
 
 
-case class NullableEntity(id: Id, name: Option[String]) extends Entity[Id]
+case class NullableEntity(id: Id, name: Option[String])
 
 case class NullableNestedEntity(id: Id, nested: Option[Level1])
-    extends Entity[Id]
 
 case class TestNullableFields(
   override val xa: Transactor[IO],
@@ -777,7 +772,7 @@ case class TestNullableFields(
   }
 }
 
-case class MultiEntity(id: Id, name: String, x: Int) extends Entity[Id]
+case class MultiEntity(id: Id, name: String, x: Int)
 case class MultiIndexKey(x: Int, name: String) 
 case class MultiIndexKeyNotQuiteRight(x: Int, nme: String)
 
@@ -816,7 +811,7 @@ case class TestIndex(
   }
 }
 
-case class UniqueIndexEntity(id: Id, name: String) extends Entity[Id]
+case class UniqueIndexEntity(id: Id, name: String)
 case class UniqueKey(name: String)
 case class WrongUniqueKey(nme: String)
 

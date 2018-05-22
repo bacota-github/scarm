@@ -13,6 +13,7 @@ import scala.language.higherKinds
 
 import doobie._
 import doobie.implicits._
+import shapeless.ops.record.Keys
 import shapeless.{ Generic, HList, LabelledGeneric, Lazy, Lens,MkFieldLens, Nat, Witness, lens }
 import shapeless.ops.hlist
 import shapeless.ops.hlist.{Length, Prepend}
@@ -34,11 +35,6 @@ private[scarm] object dslUtil {
 }
 
 import dslUtil._
-
-trait Entity[+K] {
-  def id: K
-}
-
 
 /** A database object such as a table or index, created in the RDBMS. */
 sealed trait DatabaseObject {
@@ -106,9 +102,8 @@ sealed trait Queryable[K, F[_], E, RT] {
 }
 
 
-case class Table[K, E<:Entity[K]](
+case class Table[K, E](
   name: String,
-  id: E=>K,
   fieldMap: FieldMap[E],
   keyNames: Seq[String],
   autogen: Boolean,
@@ -191,7 +186,7 @@ case class Table[K, E<:Entity[K]](
     remTupler: hlist.Tupler.Aux[REMList,REM]
   ): ConnectionIO[K] = {
     val frag = insertFragment(entity)
-    if (!autogen) frag.run.map(_ => entity.id)
+    if (!autogen) frag.run.map(_ => primaryKey(entity))
     else {
       dialect match {
         case Hsqldb|Postgresql => 
@@ -231,7 +226,7 @@ case class Table[K, E<:Entity[K]](
       case Postgresql =>
         dml.withUniqueGeneratedKeys[E](fieldNames:_*)(entityComposite)
       case Hsqldb|Mysql if !autogen => 
-        dml.run.flatMap(_ => fetchEntity(entity.id))
+        dml.run.flatMap(_ => fetchEntity(primaryKey(entity)))
       case Hsqldb if autogen =>
         dml.withUniqueGeneratedKeys[K](keyNames.head)(keyComposite).
           flatMap(k => fetchEntity(k))
@@ -315,7 +310,7 @@ case class Table[K, E<:Entity[K]](
     revComposite: Composite[REVList],
     revTupler: hlist.Tupler.Aux[REVList, REV]
   ): ConnectionIO[Int] = {
-    val key: KList = kGeneric.to(entity.id)
+    val key: KList = kGeneric.to(primaryKey(entity))
     val remainder: REMList = remList(eGeneric.to(entity))
     val reversed: REVList = revList(remainder, key)
     Fragment(updateSql, reversed)(revComposite).update.run
@@ -331,28 +326,32 @@ case class Table[K, E<:Entity[K]](
 
 object Table {
 
-  def apply[K,E<:Entity[K]](name: String)
+  private def pkeyColumns[K,E](kmap: FieldMap[K], fmap: FieldMap[E]) =
+    kmap.names.map(fmap.firstFieldName + "_" + _)
+
+  def apply[K,E](name: String)
     (implicit dialect: SqlDialect,
       kmap: FieldMap[K],
       fmap: FieldMap[E],
       kcomp: Composite[K],
       ecomp: Composite[E],
       primaryKey: PrimaryKey[K,E]
-    ): Table[K,E] =
-    Table[K,E](name, (e:E) => e.id, fmap, kmap.names, false, dialect, kcomp,
+    ): Table[K,E] = {
+    Table[K,E](name, fmap, pkeyColumns(kmap,fmap), false, dialect, kcomp,
       ecomp, primaryKey)
+  }
 
-  def apply[K,E<:Entity[K]](name: String, kNames: Seq[String])
+  def apply[K,E](name: String, kNames: Seq[String])
     (implicit dialect: SqlDialect,
       fmap: FieldMap[E],
       kcomp: Composite[K],
       ecomp: Composite[E],
       primaryKey: PrimaryKey[K,E]
     ): Table[K,E] =
-    Table[K,E](name, (e:E) => e.id, fmap, kNames, false, dialect, kcomp,
+    Table[K,E](name, fmap, kNames, false, dialect, kcomp,
       ecomp, primaryKey)
 
-  def apply[K,E<:Entity[K]](name: String, key: Witness.Aux[K])
+  def apply[K,E](name: String, key: Witness.Aux[K])
     (implicit dialect: SqlDialect,
       kmap: FieldMap[K],
       fmap: FieldMap[E],
@@ -362,7 +361,7 @@ object Table {
       primaryKey: PrimaryKey[K,E]
     ): Table[K,E] = {
     val keyLens: Lens[E,K] = lens[E] >> key
-    Table(name, keyLens.get(_), fmap, kmap.names, false, dialect, kcomp,
+    Table(name, fmap, pkeyColumns(kmap,fmap), false, dialect, kcomp,
       ecomp, primaryKey)
   }
 
@@ -391,7 +390,7 @@ object Table {
     }
   }
 
-  def createSql[K,E<:Entity[K]](
+  def createSql[K,E](
     dialect: SqlDialect,
     table: Table[K,E],
     fieldOverrides: Map[String, String] = Map(),
@@ -428,7 +427,7 @@ object Table {
 
 object Autogen {
 
-  def apply[K,E<:Entity[K]](name: String)
+  def apply[K,E](name: String)
     (implicit dialect: SqlDialect,
       kmap: FieldMap[K],
       fmap: FieldMap[E],
@@ -437,15 +436,15 @@ object Autogen {
       primaryKey: PrimaryKey[K,E]
     ): Table[K,E] = Table[K,E](name).copy(autogen=true)
 
-  def apply[K,E<:Entity[K]](name: String, kNames: Seq[String])
+  def apply[K,E](name: String, kNames: Seq[String])
     (implicit dialect: SqlDialect,
       fmap: FieldMap[E],
       kcomp: Composite[K],
       ecomp: Composite[E],
-      primaryKey: PrimaryKey[K,E]
+      primaryKey: PrimaryKey[K,E],
     ): Table[K,E] = Table[K,E](name,kNames).copy(autogen=true)
 
-  def apply[K,E<:Entity[K]](name: String, key: Witness.Aux[K])
+  def apply[K,E](name: String, key: Witness.Aux[K])
     (implicit dialect: SqlDialect,
       kmap: FieldMap[K],
       fmap: FieldMap[E],
@@ -457,7 +456,7 @@ object Autogen {
 }
 
 
-case class TableScan[K,E<:Entity[K]](table: Table[K,E])
+case class TableScan[K,E](table: Table[K,E])
     extends Queryable[Unit, Set, E, E] {
   def keyNames = Seq()
   override private[scarm] def selectList(ct: Int): String = table.selectList(ct)
@@ -497,7 +496,7 @@ object View {
 }
 
 
-trait IndexBase[K,PK,E<:Entity[PK]] {
+trait IndexBase[K,PK,E] {
   def name: String
   def table: Table[PK,E]
   def keyNames: Seq[String]
@@ -511,7 +510,7 @@ trait IndexBase[K,PK,E<:Entity[PK]] {
   }
 }
 
-case class Index[K,PK,E<:Entity[PK]](
+case class Index[K,PK,E](
   override val name: String,
   table: Table[PK,E],
   override val keyNames: Seq[String]
@@ -530,7 +529,7 @@ object Index {
   private[scarm] def indexName(table: Table[_,_], ttag: TypeTag[_]) =
     table.name + "_" + ttag.tpe.typeSymbol.name + "_idx"
 
-  def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
+  def apply[K,PK,E,KList<:HList,EList<:HList](
     table: Table[PK,E],
     key: E => K
   )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
@@ -540,7 +539,7 @@ object Index {
     ktag: TypeTag[K]
   ): Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
 
-  def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
+  def apply[K,PK,E,KList<:HList,EList<:HList](
     name: String,
     table: Table[PK,E],
     key: E => K
@@ -551,7 +550,7 @@ object Index {
   ): Index[K,PK,E] = Index(name, table, kmap.names)
 }
 
-case class UniqueIndex[K,PK,E<:Entity[PK]](
+case class UniqueIndex[K,PK,E](
   override val name: String,
   table: Table[PK,E],
   override val keyNames: Seq[String]
@@ -569,7 +568,7 @@ case class UniqueIndex[K,PK,E<:Entity[PK]](
 
 object UniqueIndex {
 
-  def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
+  def apply[K,PK,E,KList<:HList,EList<:HList](
     table: Table[PK,E],
     key: E => K
   )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
@@ -579,7 +578,7 @@ object UniqueIndex {
     ktag: TypeTag[K]
   ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
 
-  def apply[K,PK,E<:Entity[PK],KList<:HList,EList<:HList](
+  def apply[K,PK,E,KList<:HList,EList<:HList](
     name: String,
     table: Table[PK,E]
   )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
@@ -591,7 +590,7 @@ object UniqueIndex {
 }
 
 
-sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
+sealed trait ForeignKey[FPK, FROM, TPK, TO, F[_]]
     extends DatabaseObject
     with Queryable[FROM, F, TO, TO] {
 
@@ -612,7 +611,7 @@ sealed trait ForeignKey[FPK, FROM<:Entity[FPK], TPK, TO<:Entity[TPK], F[_]]
 }
 
 
-case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+case class MandatoryForeignKey[FPK,FROM,TPK,TO](
   override val from: Table[FPK,FROM],
   val indexKey: FROM => TPK,
   override val to: Table[TPK,TO],
@@ -626,14 +625,14 @@ case class MandatoryForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
 
 
 object MandatoryForeignKey {
-  def apply[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+  def apply[FPK,FROM,TPK,TO](
     from: Table[FPK,FROM], indexKey: FROM=>TPK, to:Table[TPK,TO]
   )(implicit keyList: FieldList[FROM]): MandatoryForeignKey[FPK,FROM,TPK,TO] =
     MandatoryForeignKey(from, indexKey, to, keyList.names)
 }
 
 
-case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+case class OptionalForeignKey[FPK,FROM,TPK,TO](
   override val from: Table[FPK,FROM],
   override val fromKey: FROM => Option[TPK],
   override val to: Table[TPK,TO],
@@ -645,13 +644,13 @@ case class OptionalForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
 }
 
 object OptionalForeignKey {
-  def apply[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK]](
+  def apply[FPK,FROM,TPK,TO](
     from: Table[FPK,FROM], indexKey: FROM=>Option[TPK], to:Table[TPK,TO]
   )(implicit keyList: FieldList[FROM]): OptionalForeignKey[FPK,FROM,TPK,TO] =
     OptionalForeignKey(from, indexKey, to, keyList.names)
 }
 
-case class ReverseForeignKey[FPK,FROM<:Entity[FPK],TPK,TO<:Entity[TPK],F[_]](
+case class ReverseForeignKey[FPK,FROM,TPK,TO,F[_]](
   val foreignKey: ForeignKey[TPK,TO,FPK,FROM,F]
 ) extends Queryable[FROM, Set, TO, TO] {
 
