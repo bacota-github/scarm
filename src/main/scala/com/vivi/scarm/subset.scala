@@ -21,3 +21,16 @@ object Subset extends LowerPrioritySubset {
 
   implicit def containedInHead[A,TAIL<:HList] = new Subset[A,A::TAIL] {}
 }
+
+
+trait Projection[TO,FROM]
+
+object Projection {
+  def apply[TO,FROM](implicit projection: Projection[TO,FROM]) = projection
+
+  implicit def project[TO,TO_LIST<:HList,FROM,FROM_LIST<:HList](implicit
+    toGen: LabelledGeneric.Aux[TO,TO_LIST],
+    fromGen: LabelledGeneric.Aux[FROM,FROM_LIST],
+    subset: Subset[TO_LIST,FROM_LIST]
+  ) = new Projection[TO,FROM] {}
+}
