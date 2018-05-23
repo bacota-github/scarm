@@ -1,6 +1,6 @@
-package com.vivi.scarm.test
+package com.vivi.scarm.subsetTest
 
-import com.vivi.scarm.{Subset,Projection}
+import com.vivi.scarm.Subset
 
 import org.scalatest._
 import shapeless._
@@ -42,20 +42,20 @@ case class Projection7(y: Int, z: Int, x: String)
 
 class ProjectionTest extends FunSuite {
 
-  val a = Projection[Projection1,Projection1]
-  val b = Projection[Projection1,Projection2]
-  val c = Projection[Projection1,Projection3]
-  val d = Projection[Projection1,Projection4]
+  val a = Subset[Projection1,Projection1]
+  val b = Subset[Projection1,Projection2]
+  val c = Subset[Projection1,Projection3]
+  val d = Subset[Projection1,Projection4]
 
   test("not everything is a projection") {
     assertDoesNotCompile(
-      "val e = Projection[Projection1,Projection5]"
+      "val e = Subset[Projection1,Projection5]"
     )
     assertDoesNotCompile(
-      "val e = Projection[Projection1,Projection6]"
+      "val e = Subset[Projection1,Projection6]"
     )
     assertDoesNotCompile(
-      "val e = Projection[Projection1,Projection7]"
+      "val e = Subset[Projection1,Projection7]"
     )
   }
 }
