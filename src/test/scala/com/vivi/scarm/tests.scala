@@ -785,7 +785,7 @@ case class TestIndex(
   override val allTables = Seq(multiTable)
 
   test("Query by multi-column Index") {
-    val index = Index(multiTable, (t:MultiEntity) => MultiIndexKey(t.x, t.name))
+    val index: Index[MultiIndexKey,Id,MultiEntity] = Index(multiTable)
     val name = randomString
     val e1 = MultiEntity(nextId, name, 1)
     val e2 = MultiEntity(nextId, randomString, 2)
@@ -801,12 +801,12 @@ case class TestIndex(
 
   test("An index doesn't compile unless the fields are subset of the table") {
     assertDoesNotCompile(
-      "Index(multiTable, (t:MultiEntity) => MultiIndexKeyNotQuiteRight(t.x, t.name))"
+      "val index2: Index[MultiIndexKeyNotQuiteRight,Id,MultiEntity] = Index(multiTable)"
     )
   }
 
   test("Query by Index with no results returns an empty set") {
-    val index = Index(multiTable, (t:MultiEntity) => MultiIndexKey(t.x, t.name))
+    val index: Index[MultiIndexKey,Id,MultiEntity] = Index(multiTable)
     assert(run(index(MultiIndexKey(0, randomString))) == Set())
   }
 }
@@ -823,8 +823,8 @@ case class TestUniqueIndex(
 
   val uniqueTable = Table[Id,UniqueIndexEntity]("uniqueTable")
   override val allTables = Seq(uniqueTable)
-  val index = UniqueIndex(uniqueTable, (t:UniqueIndexEntity) => UniqueKey(t.name)
-  )
+  val index: UniqueIndex[UniqueKey,Id,UniqueIndexEntity] = UniqueIndex(uniqueTable)
+  
 
   test("A unique index enforces uniqueness") {
     run(index.create)
@@ -851,7 +851,7 @@ case class TestUniqueIndex(
 
   test("A unique index doesn't compile unless the fields are subset of the table") {
     assertDoesNotCompile(
-      "UniqueIndex(uniqueTable, (t:UniqueIndexEntity) => WrongUniqueKey(t.name))"
+      "val index: UniqueIndex[UniqueKeyNotQuiteRight,Id,UniqueIndexEntity] = UniqueIndex(uniqueTable)"
     )
   }
 

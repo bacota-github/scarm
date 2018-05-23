@@ -529,25 +529,20 @@ object Index {
   private[scarm] def indexName(table: Table[_,_], ttag: TypeTag[_]) =
     table.name + "_" + ttag.tpe.typeSymbol.name + "_idx"
 
-  def apply[K,PK,E,KList<:HList,EList<:HList](
-    table: Table[PK,E],
-    key: E => K
-  )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
-    kGeneric: LabelledGeneric.Aux[K,KList],
-    subset: Subset[KList,EList],
-    kmap: FieldMap[K],
-    ktag: TypeTag[K]
-  ): Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
+  def apply[K,PK,E,KList<:HList,EList<:HList](table: Table[PK,E])
+    (implicit eGeneric: LabelledGeneric.Aux[E,EList],
+      kGeneric: LabelledGeneric.Aux[K,KList],
+      subset: Subset[KList,EList],
+      kmap: FieldMap[K],
+      ktag: TypeTag[K]
+    ): Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
 
-  def apply[K,PK,E,KList<:HList,EList<:HList](
-    name: String,
-    table: Table[PK,E],
-    key: E => K
-  )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
-    kGeneric: LabelledGeneric.Aux[K,KList],
-    subset: Subset[KList,EList],
-    kmap: FieldMap[K]
-  ): Index[K,PK,E] = Index(name, table, kmap.names)
+  def apply[K,PK,E,KList<:HList,EList<:HList](name: String, table: Table[PK,E])
+    (implicit eGeneric: LabelledGeneric.Aux[E,EList],
+      kGeneric: LabelledGeneric.Aux[K,KList],
+      subset: Subset[KList,EList],
+      kmap: FieldMap[K]
+    ): Index[K,PK,E] = Index(name, table, kmap.names)
 }
 
 case class UniqueIndex[K,PK,E](
@@ -568,25 +563,20 @@ case class UniqueIndex[K,PK,E](
 
 object UniqueIndex {
 
-  def apply[K,PK,E,KList<:HList,EList<:HList](
-    table: Table[PK,E],
-    key: E => K
-  )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
-    kGeneric: LabelledGeneric.Aux[K,KList],
-    subset: Subset[KList,EList],
-    kmap: FieldMap[K],
-    ktag: TypeTag[K]
-  ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
+  def apply[K,PK,E,KList<:HList,EList<:HList](table: Table[PK,E])
+    (implicit eGeneric: LabelledGeneric.Aux[E,EList],
+      kGeneric: LabelledGeneric.Aux[K,KList],
+      subset: Subset[KList,EList],
+      kmap: FieldMap[K],
+      ktag: TypeTag[K]
+    ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
 
-  def apply[K,PK,E,KList<:HList,EList<:HList](
-    name: String,
-    table: Table[PK,E]
-  )(implicit eGeneric: LabelledGeneric.Aux[E,EList],
-    kGeneric: LabelledGeneric.Aux[K,KList],
-    subset: Subset[KList,EList],
-    kmap: FieldMap[K]
-  ): UniqueIndex[K,PK,E] = UniqueIndex(name, table, kmap.names)
-
+  def apply[K,PK,E,KList<:HList,EList<:HList](name: String,  table: Table[PK,E])
+    (implicit eGeneric: LabelledGeneric.Aux[E,EList],
+      kGeneric: LabelledGeneric.Aux[K,KList],
+      subset: Subset[KList,EList],
+      kmap: FieldMap[K]
+    ): UniqueIndex[K,PK,E] = UniqueIndex(name, table, kmap.names)
 }
 
 
