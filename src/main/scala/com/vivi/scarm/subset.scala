@@ -2,7 +2,7 @@ package com.vivi.scarm
 
 import shapeless._
 
-trait Subset[A,SET<:HList]
+trait Subset[A,SET]
 
 trait LowerPrioritySubset {
   //conflicst with hnilIsSubset
@@ -12,7 +12,7 @@ trait LowerPrioritySubset {
 }
 
 object Subset extends LowerPrioritySubset {
-  def apply[A,SET<:HList](implicit subset: Subset[A,SET]) = subset
+  def apply[A,SET](implicit subset: Subset[A,SET]) = subset
 
   implicit def hnilIsSubset[SET<:HList] = new Subset[HNil,SET] {}
 
@@ -20,19 +20,39 @@ object Subset extends LowerPrioritySubset {
     (implicit hd: Subset[A,SET], tl: Subset[TAIL,SET]) = new Subset[A::TAIL,SET] {}
 
   implicit def containedInHead[A,TAIL<:HList] = new Subset[A,A::TAIL] {}
+
+  implicit def project[TO,TREPR<:HList,FROM,FREPR<:HList](implicit
+    toGen: LabelledGeneric.Aux[TO,TREPR],
+    fromGen: LabelledGeneric.Aux[FROM,FREPR],
+    subset: Subset[TREPR,FREPR]
+  ) = new Subset[TO,FROM] {}
 }
 
 
-trait Projection[TO,FROM]
 
-object Projection {
-  def apply[TO,FROM](implicit projection: Projection[TO,FROM]) = projection
+/*
+trait StructuralEquality[A<:HList,B<:HList]
 
-  implicit def project[TO,TO_LIST<:HList,FROM,FROM_LIST<:HList](implicit
-    toGen: LabelledGeneric.Aux[TO,TO_LIST],
-    fromGen: LabelledGeneric.Aux[FROM,FROM_LIST],
-    subset: Subset[TO_LIST,FROM_LIST]
-  ) = new Projection[TO,FROM] {}
+object  StructuralEquality{
+  def apply[A<:HList,B<:HList](implicit same: StructuralEquality[A,B]) = same
+
+  implicit def hnilsAreEqual = StructuralEquality[HNil,HNil] {}
+
+  implicit def headsAreEqual[HD,TL1<:HList,TL2<:HList]
+  (implicit tailsAreEqual: StructuralEquality[TL1,TL2]) =
+    StructuralEquality[HD::TL1, HD::TL] {}
 }
 
-trait StructuralEquality
+trait StructurallyEqual[A,B]
+
+object StructurallyEqual {
+  def apply[A,B](implicit same: StructuralllyEqual[A,B]) = same
+
+  implicit def equalHLists[A,ARepr,B,BRepr](
+    implicit aGen: LabelledGeneric.Aux[A,ARepr],
+    implicit aGen: LabelledGeneric.Aux[A,ARepr],
+      equality: StructuralEquality[A,B]
+  ) =
+    StructuralEquality[A,B] {}
+}
+ */
