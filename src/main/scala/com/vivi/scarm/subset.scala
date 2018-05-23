@@ -21,7 +21,7 @@ object Subset extends LowerPrioritySubset {
 
   implicit def containedInHead[A,TAIL<:HList] = new Subset[A,A::TAIL] {}
 
-  implicit def project[TO,TREPR<:HList,FROM,FREPR<:HList](implicit
+  implicit def convertToHLists[TO,TREPR<:HList,FROM,FREPR<:HList](implicit
     toGen: LabelledGeneric.Aux[TO,TREPR],
     fromGen: LabelledGeneric.Aux[FROM,FREPR],
     subset: Subset[TREPR,FREPR]
@@ -30,29 +30,20 @@ object Subset extends LowerPrioritySubset {
 
 
 
-/*
-trait StructuralEquality[A<:HList,B<:HList]
-
-object  StructuralEquality{
-  def apply[A<:HList,B<:HList](implicit same: StructuralEquality[A,B]) = same
-
-  implicit def hnilsAreEqual = StructuralEquality[HNil,HNil] {}
-
-  implicit def headsAreEqual[HD,TL1<:HList,TL2<:HList]
-  (implicit tailsAreEqual: StructuralEquality[TL1,TL2]) =
-    StructuralEquality[HD::TL1, HD::TL] {}
-}
-
 trait StructurallyEqual[A,B]
 
-object StructurallyEqual {
-  def apply[A,B](implicit same: StructuralllyEqual[A,B]) = same
+object  StructurallyEqual{
+  def apply[A,B](implicit same: StructurallyEqual[A,B]) = same
 
-  implicit def equalHLists[A,ARepr,B,BRepr](
-    implicit aGen: LabelledGeneric.Aux[A,ARepr],
-    implicit aGen: LabelledGeneric.Aux[A,ARepr],
-      equality: StructuralEquality[A,B]
-  ) =
-    StructuralEquality[A,B] {}
+  implicit def convertToHLists[A,ARepr<:HList,B,BRepr<:HList](implicit
+    aGen: LabelledGeneric.Aux[A,ARepr],
+    bGen: LabelledGeneric.Aux[B,BRepr],
+    equality: StructurallyEqual[ARepr,BRepr]
+  ) = new StructurallyEqual[A,B] {}
+
+  implicit def reflexivity[A] = new StructurallyEqual[A,A] {}
+
+  implicit def headsAreEqual[HD,TL1<:HList,TL2<:HList]
+  (implicit tailsAreEqual: StructurallyEqual[TL1,TL2]) =
+    new StructurallyEqual[HD::TL1, HD::TL2] {}
 }
- */

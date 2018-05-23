@@ -1,6 +1,6 @@
 package com.vivi.scarm.subsetTest
 
-import com.vivi.scarm.Subset
+import com.vivi.scarm.{Subset,StructurallyEqual}
 
 import org.scalatest._
 import shapeless._
@@ -57,5 +57,49 @@ class ProjectionTest extends FunSuite {
     assertDoesNotCompile(
       "val e = Subset[Projection1,Projection7]"
     )
+  }
+}
+
+class StructuralEqualityTest extends FunSuite {
+  val a = StructurallyEqual[Int,Int]
+  val b = StructurallyEqual[(Int,String),(Int,String)]
+  val c = StructurallyEqual[Projection1,Projection1]
+  val d = StructurallyEqual[Projection1,Projection2]
+
+  test("not everything is equal") {
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[Int,String]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[(Int,Int),(Int,String)]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[(String,Int),(Int,String)]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[(String,Int),(String)]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[(String),(String,Int)]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[Projection1,Projection3]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[Projection1,Projection4]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[Projection1,Projection5]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[Projection1,Projection6]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[Projection1,Projection7]"
+    )
+    assertDoesNotCompile(
+      "val e = StructurallyEqual[Projection7,Projection1)"
+    )
+
   }
 }
