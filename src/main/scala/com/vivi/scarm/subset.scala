@@ -34,3 +34,5 @@ object Projection {
     subset: Subset[TO_LIST,FROM_LIST]
   ) = new Projection[TO,FROM] {}
 }
+
+trait StructuralEquality
