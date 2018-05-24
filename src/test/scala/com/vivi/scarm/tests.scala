@@ -809,6 +809,8 @@ case class TestIndex(
     val index: Index[MultiIndexKey,Id,MultiEntity] = Index(multiTable)
     assert(run(index(MultiIndexKey(0, randomString))) == Set())
   }
+
+  test("An index can be created and used on a field of a nested object") (pending)
 }
 
 case class UniqueIndexEntity(id: Id, name: String)
@@ -858,6 +860,8 @@ case class TestUniqueIndex(
   test("Query by unique Index with no results returns None") {
     assert(run(index(UniqueKey(randomString))) == None)
   }
+
+  test("A unique index can be created and used on a field of a nested object") (pending)
 }
 
 
@@ -867,13 +871,9 @@ class PendingTests extends FunSuite {
 
   test("Query by Foreign Key returns only entities with correct key") (pending)
 
-  test("Query a View") (pending)
+  test("A foreign key is a constraint")(pending)
 
-  test("A mandatory foreign key is a constraint")(pending)
-
-  test("An optional foreign key is a constraint")(pending)
-
-  test("An optional foreign key is optional")(pending)
+  test("A foreign key can be a field of a nested object")(pending)
 
   test("Query a Many to One Join on Mandatory Foreign Key") (pending)
 
@@ -904,6 +904,10 @@ class PendingTests extends FunSuite {
   test("Query with Join with primitive primary key") (pending)
 
   test("Query with Join with compound primary key containing nested object") (pending)
+
+  test("Query a View") (pending)
+
+  test("Join with a View") (pending)
 
   test("field name overrides work") (pending)
 

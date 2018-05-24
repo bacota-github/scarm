@@ -1,6 +1,6 @@
 package com.vivi.scarm.subsetTest
 
-import com.vivi.scarm.{Subset,StructurallyEqual}
+import com.vivi.scarm.{Subset,StructurallyEqual,HeadIsStructurallyEqual}
 
 import org.scalatest._
 import shapeless._
@@ -40,6 +40,8 @@ case class Projection6(x: Int, y: String)
 case class Projection7(y: Int, z: Int, x: String)
 
 
+case class WrappedProjection(id: Projection1)
+
 class ProjectionTest extends FunSuite {
 
   val a = Subset[Projection1,Projection1]
@@ -65,6 +67,7 @@ class StructuralEqualityTest extends FunSuite {
   val b = StructurallyEqual[(Int,String),(Int,String)]
   val c = StructurallyEqual[Projection1,Projection1]
   val d = StructurallyEqual[Projection1,Projection2]
+  val hd = HeadIsStructurallyEqual[WrappedProjection,Projection1]
 
   test("not everything is equal") {
     assertDoesNotCompile(
@@ -103,3 +106,4 @@ class StructuralEqualityTest extends FunSuite {
 
   }
 }
+

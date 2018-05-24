@@ -7,7 +7,6 @@ import doobie.ConnectionIO
 import fs2.Stream
 import cats.effect.IO
 
-import scala.util.{Failure,Success,Try}
 import scala.reflect.runtime.universe.{Type,TypeTag,typeOf,Symbol=>RSymbol}
 import scala.language.higherKinds
 
@@ -39,7 +38,6 @@ import dslUtil._
 /** A database object such as a table or index, created in the RDBMS. */
 sealed trait DatabaseObject {
   def name: String
-  def fieldNames: Seq[String]
   private[scarm] def tablect: Int = 1
   private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(name, ct))
 }
@@ -124,7 +122,6 @@ case class Table[K, E](
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     primaryKeyIndex.collectResults(reduced)
-
 
   def create(
     fieldOverrides: Map[String, String] = Map(),
@@ -279,11 +276,8 @@ case class Table[K, E](
     s"INSERT INTO ${name} (${names}) values (${values})"
   }
 
-  def save(enties: E*): Try[Unit] = ???
-
   lazy val scan = TableScan(this)
 
-  //Primary key columns must be the first columns
   def update[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList]
     (entities: E*)(implicit
       kGeneric: LabelledGeneric.Aux[K,KList],
@@ -474,7 +468,7 @@ case class View[K,E](
   override val name: String,
   val definition: String,
   override val keyNames: Seq[String],
-  override val fieldNames: Seq[String]
+  val fieldNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
 
   override private[scarm] def selectList(ct: Int): String = 
@@ -515,7 +509,6 @@ case class Index[K,PK,E](
   table: Table[PK,E],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Set,E,E] with IndexBase[K,PK,E]{
-  override val fieldNames = table.fieldNames
   override private[scarm] def selectList(ct: Int): String = table.selectList(ct)
   override private[scarm] def tableList(ct: Int=0): Seq[String ]= Seq(alias(table.name, ct))
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
@@ -544,7 +537,6 @@ case class UniqueIndex[K,PK,E](
   table: Table[PK,E],
   override val keyNames: Seq[String]
 ) extends DatabaseObject with Queryable[K,Option,E,E] with IndexBase[K,PK,E] {
-  override val fieldNames = table.fieldNames
   override private[scarm] def selectList(ct: Int): String = table.selectList(ct)
   override private[scarm] def tableList(ct: Int=0): Seq[String] = Seq(alias(table.name, ct))
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
@@ -567,46 +559,78 @@ object UniqueIndex {
 }
 
 
-case class ForeignKey[FPK, FROM, TPK, TO](
-  override val name: String,
+case class ManyToOne[FPK,FROM,TPK,TO](
   from: Table[FPK,FROM],
   to: Table[TPK,TO],
   override val keyNames: Seq[String]
-) extends DatabaseObject with Queryable[FROM, Option, TO, TO] {
-  override val fieldNames = to.fieldNames
+) extends Queryable[FROM, Option, TO, TO] {
   override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
   override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
   override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
-  lazy val oneToMany = ReverseForeignKey(this)
-  lazy val reverse = oneToMany
-  lazy val index: Index[TPK,FPK,FROM] = Index(name+"_ix", from, keyNames)
 
   override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
+  override def tablect: Int = 1
+}
+
+
+case class OneToMany[FPK,ONE,TPK,MANY](
+  one: Table[FPK,ONE],
+  many: Table[TPK,MANY],
+  override val keyNames: Seq[String]
+) extends Queryable[ONE, Set, MANY, MANY] {
+  override private[scarm] def joinKeyNames: Seq[String] = many.keyNames
+  override private[scarm] def selectList(ct: Int): String = many.selectList(ct)
+  override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(many.name, ct))
+
+  override private[scarm] def reduceResults(rows: Traversable[MANY]): Traversable[MANY] = rows
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Set[T] =
+    reduced.toSet
+  override def tablect: Int = 1
+}
+
+
+case class ForeignKey[FPK, FROM, TPK, TO](
+  from: Table[FPK,FROM],
+  to: Table[TPK,TO],
+  val keyMapping: Seq[(String,String)]
+) extends DatabaseObject {
+  override lazy val name: String = s"${from.name}_${to.name}_fk"
+
+  lazy val keyNames = keyMapping.map(_._1)
+
+  def create(fkeyName: String = name): ConnectionIO[Int] = {
+    val keys = keyNames.mkString(",")
+    val sql = s"ALTER TABLE ${from.name} ADD CONSTRAINT ${fkeyName} (${keys}) REFERENCES ${to.name}"
+    Fragment(sql, ()).update.run
+  }
+
+  lazy val index = Index[TPK,FPK,FROM](name + "_idx", from, keyNames)
+  lazy val manyToOne: ManyToOne[FPK,FROM,TPK,TO] = ManyToOne(from,to,keyNames)
+  lazy val oneToMany: OneToMany[TPK,TO,FPK,FROM] = OneToMany(to,from,keyNames)
 }
 
 
 object ForeignKey {
-  def apply[FPK,FROM,TPK,TO](
-    from: Table[FPK,FROM], indexKey: FROM=>TPK, to:Table[TPK,TO]
-  )(implicit  keyList: FieldList[FROM]): ForeignKey[FPK,FROM,TPK,TO] = 
-    ForeignKey(s"${from.name}_${to.name}_fk", from, to, keyList.names)
-}
+  def apply[FPK,FROM,FK,FKRepr,TPK,TO](from: Table[FPK,FROM], to:Table[TPK,TO])
+    (implicit fkIsSubset: Subset[FK,FROM],
+      structuralEquality: HeadIsStructurallyEqual[FK,TPK],
+      fkmap: FieldMap[FK]
+    ): ForeignKey[FPK,FROM,TPK,TO] = {
+    val fknames = fkmap.names
+    if (to.keyNames.size != fknames.size)
+      throw new RuntimeException(s"Foreign key ${fknames.mkString} from ${from.name} to ${to.name} does not match primary key ${to.keyNames.mkString}")
+    ForeignKey(from,to, fknames.zip(to.keyNames))
+  }
 
-
-case class ReverseForeignKey[FPK,FROM,TPK,TO](
-  val foreignKey: ForeignKey[TPK,TO,FPK,FROM]
-) extends Queryable[FROM, Set, TO, TO] {
-
-  override val keyNames: Seq[String] = foreignKey.to.keyNames
-  override def joinKeyNames: Seq[String] = foreignKey.keyNames
-  override def selectList(ct: Int): String = foreignKey.to.selectList(ct)
-  override def tablect: Int = 1
-  override def tableList(ct: Int): Seq[String] =
-    Seq(alias(foreignKey.from.name, ct))
-  override def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
-  override def collectResults[T](reduced: Traversable[T]): Set[T] =  reduced.toSet
+  def apply[FPK,FROM,FK,FKRepr,TPK,TO]
+    (from: Table[FPK,FROM], to:Table[TPK,TO], clazz: Class[FK])
+    (implicit fkIsSubset: Subset[FK,FROM],
+      structuralEquality: HeadIsStructurallyEqual[FK,TPK],
+      fkmap: FieldMap[FK]
+    ): ForeignKey[FPK,FROM,TPK,TO] =
+    apply(from, to)(fkIsSubset,structuralEquality,fkmap)
 }
 
 

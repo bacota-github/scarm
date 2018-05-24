@@ -5,10 +5,8 @@ import shapeless._
 trait Subset[A,SET]
 
 trait LowerPrioritySubset {
-  //conflicst with hnilIsSubset
   implicit def containedInTail[A,HD,TAIL<:HList]
     (implicit subset: Subset[A,TAIL]) = new Subset[A,HD::TAIL] {}
-
 }
 
 object Subset extends LowerPrioritySubset {
@@ -47,3 +45,22 @@ object  StructurallyEqual{
   (implicit tailsAreEqual: StructurallyEqual[TL1,TL2]) =
     new StructurallyEqual[HD::TL1, HD::TL2] {}
 }
+
+
+
+
+trait HeadIsStructurallyEqual[A,B]
+
+object HeadIsStructurallyEqual {
+  def apply[A,B](implicit same: HeadIsStructurallyEqual[A,B]) = same
+
+  implicit def headIsStructurallyEqual[HD,TL<:HList,B](implicit
+    equality: StructurallyEqual[HD,B]
+  ) = new HeadIsStructurallyEqual[HD::TL,B] {}
+
+  implicit def isStructurallyEqual[A,ARepr<:HList,B](implicit
+    agen: Generic.Aux[A, ARepr],
+    equality: HeadIsStructurallyEqual[ARepr,B]
+  ) = new HeadIsStructurallyEqual[A,B] {}
+}
+
