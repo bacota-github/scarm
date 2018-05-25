@@ -30,7 +30,7 @@ object Subset extends LowerPrioritySubset {
 
 trait StructurallyEqual[A,B]
 
-object  StructurallyEqual{
+object  StructurallyEqual {
   def apply[A,B](implicit same: StructurallyEqual[A,B]) = same
 
   implicit def convertToHLists[A,ARepr<:HList,B,BRepr<:HList](implicit
@@ -47,8 +47,6 @@ object  StructurallyEqual{
 }
 
 
-
-
 trait HeadIsStructurallyEqual[A,B]
 
 object HeadIsStructurallyEqual {
@@ -62,5 +60,48 @@ object HeadIsStructurallyEqual {
     agen: Generic.Aux[A, ARepr],
     equality: HeadIsStructurallyEqual[ARepr,B]
   ) = new HeadIsStructurallyEqual[A,B] {}
+}
+
+
+
+trait StructurallySimilar[A,B]
+
+object StructurallySimilar  {
+  def apply[A,B](implicit similar: StructurallySimilar[A,B]) = similar
+
+
+  implicit def convertToHLists[A,ARepr<:HList,B,BRepr<:HList](implicit
+    aGen: LabelledGeneric.Aux[A,ARepr],
+    bGen: LabelledGeneric.Aux[B,BRepr],
+    equality: StructurallySimilar[ARepr,BRepr]
+  ) = new StructurallySimilar[A,B] {}
+
+  implicit def reflexivity[A] = new StructurallySimilar[A,A] {}
+
+  implicit def similarity[A] = new StructurallySimilar[Option[A] ,A] {}
+
+  implicit def headsAreEqual[HD,TL1<:HList,TL2<:HList]
+  (implicit tailsAreSimilar: StructurallySimilar[TL1,TL2]) =
+    new StructurallySimilar[HD::TL1, HD::TL2] {}
+
+  implicit def headsAreSimilar[HD,TL1<:HList,TL2<:HList]
+  (implicit tailsAreSimilar: StructurallySimilar[TL1,TL2]) =
+    new StructurallySimilar[Option[HD]::TL1, HD::TL2] {}
+}
+
+
+trait HeadIsStructurallySimilar[A,B]
+
+object HeadIsStructurallySimilar {
+  def apply[A,B](implicit same: HeadIsStructurallySimilar[A,B]) = same
+
+  implicit def headIsStructurallySimilar[HD,TL<:HList,B](implicit
+    equality: StructurallySimilar[HD,B]
+  ) = new HeadIsStructurallySimilar[HD::TL,B] {}
+
+  implicit def isStructurallySimilar[A,ARepr<:HList,B](implicit
+    agen: Generic.Aux[A, ARepr],
+    equality: HeadIsStructurallySimilar[ARepr,B]
+  ) = new HeadIsStructurallySimilar[A,B] {}
 }
 
