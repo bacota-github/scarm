@@ -7,29 +7,29 @@ import com.vivi.scarm._
 import java.time._
 
 case class TeacherId(id: Int) extends AnyVal
-case class CourseId(id: Int) extends AnyVal
-case class StudentId(id: Int) extends AnyVal
-case class SectionId(course: CourseId, semester: Int, number: Int)
-case class EnrollmentId(student: StudentId, section: SectionId)
-case class AssignmentId(id: Int) extends AnyVal
-
 case class Teacher(id: TeacherId, name: String)
 
+case class CourseId(id: Int) extends AnyVal
 case class Course(id: CourseId, subject: String, prerequisite: Option[CourseId])
 case class CoursePrerequisite(prerequisite: Option[CourseId])
 
+case class SectionId(course: CourseId, semester: Int, number: Int)
 case class Section(id: SectionId, instructor: TeacherId,
   room: String, meetingTime: LocalTime,
   startDate: LocalDate, endDate: java.time.LocalDate)
 case class SectionTeacher(instructor: TeacherId)
-case class SectionCourse(id_course: CourseId)
+case class CourseIdInSectionId(course: CourseId)
+case class SectionCourse(id: CourseIdInSectionId)
 
+case class StudentId(id: Int) extends AnyVal
 case class Student(id: StudentId, name: String, level: Int)
 
+case class EnrollmentId(student: StudentId, section: SectionId)
 case class Enrollment(id: EnrollmentId, grade: Option[String])
 case class EnrollmentStudent(id_student: StudentId)
 case class EnrollmentSection(id_section: SectionId)
 
+case class AssignmentId(id: Int) extends AnyVal
 case class Assignment(id: AssignmentId, name: String,
   dueDate: java.time.LocalDate, section: SectionId
 )

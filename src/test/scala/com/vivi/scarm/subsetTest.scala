@@ -103,7 +103,16 @@ class StructuralEqualityTest extends FunSuite {
     assertDoesNotCompile(
       "val e = StructurallyEqual[Projection7,Projection1)"
     )
-
   }
 }
 
+
+case class Inner(x: Int, y: Int)
+case class Outer(x: Int, nm: String, inner: Inner)
+
+case class InnerSub(x: Int)
+case class OuterSub(x: Int, inner: InnerSub, nm:String)
+
+class NestedSubsetTest extends FunSuite {
+  val a = Subset[OuterSub,Outer]
+}

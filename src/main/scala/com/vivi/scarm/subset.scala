@@ -1,12 +1,22 @@
 package com.vivi.scarm
 
 import shapeless._
+import shapeless.labelled._
+
 
 trait Subset[A,SET]
 
-trait LowerPrioritySubset {
-  implicit def containedInTail[A,HD,TAIL<:HList]
+trait LowestPrioritySubset {
+  implicit def headIsSubset[A,HD,TAIL<:HList](implicit s: Subset[A,HD]) =
+    new Subset[A, HD::TAIL] {}
+}
+
+trait LowerPrioritySubset extends LowestPrioritySubset {
+  implicit def subsetOfTail[A,HD,TAIL<:HList]
     (implicit subset: Subset[A,TAIL]) = new Subset[A,HD::TAIL] {}
+
+  implicit def fieldTypes[K <: Symbol, A, B](implicit isSubset: Lazy[Subset[A,B]]) =
+    new Subset[FieldType[K,A],FieldType[K,B]] {}
 }
 
 object Subset extends LowerPrioritySubset {
@@ -14,16 +24,18 @@ object Subset extends LowerPrioritySubset {
 
   implicit def hnilIsSubset[SET<:HList] = new Subset[HNil,SET] {}
 
-  implicit def headAndTail[A,TAIL<:HList,SET<:HList]
-    (implicit hd: Subset[A,SET], tl: Subset[TAIL,SET]) = new Subset[A::TAIL,SET] {}
+  implicit def isHead[A,TAIL<:HList] = new Subset[A, A::TAIL] {}
 
-  implicit def containedInHead[A,TAIL<:HList] = new Subset[A,A::TAIL] {}
+  implicit def headAndTail[HD,TAIL<:HList,SET<:HList](implicit
+    hd: Subset[HD,SET],
+    tl: Subset[TAIL,SET]
+  ) = new Subset[HD::TAIL,SET] {}
 
-  implicit def convertToHLists[TO,TREPR<:HList,FROM,FREPR<:HList](implicit
-    toGen: LabelledGeneric.Aux[TO,TREPR],
-    fromGen: LabelledGeneric.Aux[FROM,FREPR],
-    subset: Subset[TREPR,FREPR]
-  ) = new Subset[TO,FROM] {}
+  implicit def convertToHLists[A,AREPR<:HList,B,BREPR<:HList](implicit
+    aGen: LabelledGeneric.Aux[A,AREPR],
+    bGen: LabelledGeneric.Aux[B,BREPR],
+    subset: Subset[AREPR,BREPR]
+  ) = new Subset[A,B] {}
 }
 
 

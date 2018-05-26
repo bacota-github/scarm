@@ -875,6 +875,14 @@ class PendingTests extends FunSuite {
 
   test("A foreign key can be a field of a nested object")(pending)
 
+  test("An optional foreign key") (pending)
+
+  test("A foreign key that is part of an embedded object") (pending)
+
+  test("A foreign key must be a subset of the from table") (pending)
+
+  test("A foreign key must line up with the primary key") (pending)
+
   test("Query a Many to One Join on Mandatory Foreign Key") (pending)
 
   test("Many to One Join on Mandatory Foreign Key is Inner") (pending)
@@ -924,4 +932,5 @@ class PendingTests extends FunSuite {
   //Select by sets of key values
   //Naming conversions
   //tuples to Case Classes for index queries
+  //error messags on implicit failures?
 }
