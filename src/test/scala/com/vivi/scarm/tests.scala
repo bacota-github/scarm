@@ -67,7 +67,8 @@ case class DSLTest(driver: String,
   TestAllPrimitivesTable(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   TestNullableFields(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   TestIndex(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
-  TestUniqueIndex(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
+  TestUniqueIndex(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  ForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
 )
 
 
@@ -854,13 +855,14 @@ case class TestUniqueIndex(
     run(index.create)
     val name = randomString
     run(uniqueTable.insert(UniqueIndexEntity(nextId, name)))
+    val violation = uniqueTable.insert(UniqueIndexEntity(nextId, name))
     if (dialect == Postgresql) {
       assertThrows[Exception] { 
-        run(uniqueTable.insert(UniqueIndexEntity(nextId, name)))
+        run(violation)
       }
     } else {
       assertThrows[java.sql.SQLIntegrityConstraintViolationException] {
-        run(uniqueTable.insert(UniqueIndexEntity(nextId, name)))
+        run(violation)
       }
     }
   }
@@ -889,7 +891,7 @@ case class Parent(id: Id, name: String)
 case class Child(id: Id, parentId: Id, x: Int)
 case class ChildToParent(parentId: Id)
 
-class ForeignKeyTests(
+case class ForeignKeyTests(
   override val xa: Transactor[IO],
   override val dialect: SqlDialect,
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
@@ -900,6 +902,11 @@ class ForeignKeyTests(
   override val allTables = Seq(parentTable,childTable)
   implicit val flattenedChildToParent = Flattened[ChildToParent, Int::HNil]
   val foreignKey = ForeignKey(childTable, parentTable, classOf[ChildToParent])
+
+  override def afterAll() {
+    run(childTable.drop)
+    super.afterAll()
+  }
 
   test("Query by Foreign Key") {
     val parent1 = Parent(nextId, "parent1")
@@ -921,9 +928,10 @@ class ForeignKeyTests(
     })
   }
 
-  test("Query by Foreign Key returns only entities with correct key") (pending)
-
-  test("A foreign key is a constraint")(pending)
+  test("A foreign key is a constraint") {
+    run(foreignKey.create())
+    assertThrows[Exception] { run(childTable.insert(Child(nextId, nextId, 10))) }
+  }
 
   test("A foreign key can be a field of a nested object")(pending)
 

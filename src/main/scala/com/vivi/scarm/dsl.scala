@@ -602,7 +602,8 @@ case class ForeignKey[FPK, FROM, TPK, TO](
 
   def create(fkeyName: String = name): ConnectionIO[Int] = {
     val keys = keyNames.mkString(",")
-    val sql = s"ALTER TABLE ${from.name} ADD CONSTRAINT ${fkeyName} (${keys}) REFERENCES ${to.name}"
+    val pkeyNames = to.keyNames.mkString(",")
+    val sql = s"ALTER TABLE ${from.name} ADD FOREIGN KEY (${keys}) REFERENCES ${to.name} (${pkeyNames})"
     Fragment(sql, ()).update.run
   }
 
