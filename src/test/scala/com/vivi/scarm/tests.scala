@@ -772,9 +772,13 @@ case class TestNullableFields(
   }
 }
 
-case class MultiEntity(id: Id, name: String, x: Int)
-case class MultiIndexKey(x: Int, name: String) 
+case class MultiEntity(id: Id, name: String, x: Option[Int])
+case class MultiIndexKey(x: Option[Int], name: String) 
 case class MultiIndexKeyNotQuiteRight(x: Int, nme: String)
+
+//case class NestedField(x: Int, y: String)
+//case class NestedField(x: Int, y: String)
+//case class NestedEntity(id: Id, nested: NestedField)
 
 case class TestIndex(
   override val xa: Transactor[IO],
@@ -787,13 +791,14 @@ case class TestIndex(
   test("Query by multi-column Index") {
     val index: Index[MultiIndexKey,Id,MultiEntity] = Index(multiTable)
     val name = randomString
-    val e1 = MultiEntity(nextId, name, 1)
-    val e2 = MultiEntity(nextId, randomString, 2)
-    val e3 = MultiEntity(nextId, name, 1)
+    val e1 = MultiEntity(nextId, name, Some(1))
+    val e2 = MultiEntity(nextId, randomString, Some(2))
+    val e3 = MultiEntity(nextId, name, Some(1))
+    val e4 = MultiEntity(nextId, name, None)
     run(for {
       _ <- index.create
-      _ <- multiTable.insertBatch(e1,e2,e3)
-      results <- index(MultiIndexKey(1, name))
+      _ <- multiTable.insertBatch(e1,e2,e3,e4)
+      results <- index(MultiIndexKey(Some(1), name))
     } yield {
       assert(results == Set(e1,e3))
     })
@@ -807,10 +812,11 @@ case class TestIndex(
 
   test("Query by Index with no results returns an empty set") {
     val index: Index[MultiIndexKey,Id,MultiEntity] = Index(multiTable)
-    assert(run(index(MultiIndexKey(0, randomString))) == Set())
+    assert(run(index(MultiIndexKey(Some(0), randomString))) == Set())
   }
 
   test("An index can be created and used on a field of a nested object") (pending)
+
 }
 
 case class UniqueIndexEntity(id: Id, name: String)
@@ -923,8 +929,6 @@ class PendingTests extends FunSuite {
 
   test("select by in clause (new feature)") (pending)
 
-  //Can primary key type be inferred or required to be the first column?
-  //Is the Entity type really required?
   //creating an Autogen with a non-integral primary key shouldn't compile
   //Primitive primary key is called "id"
   //Name of primitive primary key can be overridden
@@ -933,4 +937,5 @@ class PendingTests extends FunSuite {
   //Naming conversions
   //tuples to Case Classes for index queries
   //error messags on implicit failures?
+  //Define foreign keys and indexes by explicitly passing column names
 }

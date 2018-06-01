@@ -28,8 +28,12 @@ case class Student(id: StudentId, name: String, level: Int)
 
 case class EnrollmentId(student: StudentId, section: SectionId)
 case class Enrollment(id: EnrollmentId, grade: Option[String])
-case class EnrollmentStudent(id_student: StudentId)
-case class EnrollmentSection(id_section: SectionId)
+
+case class WrappedEnrollmentStudent(student: StudentId)
+case class EnrollmentStudent(id: WrappedEnrollmentStudent)
+
+case class WrappedEnrollmentSection(section: SectionId)
+case class EnrollmentSection(id: WrappedEnrollmentSection)
 
 case class AssignmentId(id: Int) extends AnyVal
 case class Assignment(id: AssignmentId, name: String,
@@ -53,20 +57,20 @@ case class TestObjects(dialect: SqlDialect) {
   val sectionsBySemester =
     Index[String,SectionId,Section]("sectionsBySemester", sections, Seq("semester"))
 
-  /*
-  implicit val flattenedTeacherId = Flattened[TeacherId, Int :: HNil]
-  implicit val catenated = Catenation[Int :: HNil,  HNil, Int :: HNil]
-   */
-
   implicit val flattenedSectionTeacher = Flattened[SectionTeacher, Int :: HNil]
   val instructor = ForeignKey(sections, teachers, classOf[SectionTeacher])
 
   implicit val flattenedPrerequisite = Flattened[CoursePrerequisite, Int::HNil]
   val prerequisite = ForeignKey(courses, courses, classOf[CoursePrerequisite])
+
+  implicit val flattenedSectionId = Flattened[SectionId, Int::Int::Int::HNil]
+  implicit val flattenedSectionCourse = Flattened[SectionCourse, SectionId::HNil]
   val sectionCourse = ForeignKey(sections, courses, classOf[SectionCourse])
 
+  implicit val flattenedEnrollmentSection = Flattened[EnrollmentSection, Int::Int::Int::HNil]
   val enrollmentSection = ForeignKey(enrollments, sections, classOf[EnrollmentSection])
 
+  implicit val flattenedEnrollmentStudent = Flattened[EnrollmentStudent, Int::HNil]
   val enrollmentStudent = ForeignKey(enrollments, students, classOf[EnrollmentStudent])
 
   val courseWithTeacher = sections :: instructor.manyToOne

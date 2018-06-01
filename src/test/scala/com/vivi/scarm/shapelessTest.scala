@@ -21,10 +21,15 @@ case class Projection5(x: Int, z: Int)
 case class Projection6(x: Int, y: String)
 case class Projection7(y: Int, z: Int, x: String)
 
+case class Projection8(x: Option[Int], y: Int)
+case class Projection9(x:Int, y:Int, z: Int)
+
 case class WrappedProjection(id: Projection1)
 case class WrappedProjection2(z: String, id: Projection1, x: Int)
 case class DeeplyWrappedProjection(wrapped: WrappedProjection)
 case class DeeplyDeeplyWrappedProjection(wrapped: DeeplyWrappedProjection)
+
+case class WrappedOption(id: Option[Projection1])
 
 
 class ShapelessTest extends FunSuite {

@@ -10,6 +10,9 @@ import java.time._
 trait Subset[A,SET]
 
 trait LowestPrioritySubset {
+  implicit def ignoreOption[A,SET](implicit s: Subset[A,SET]) =
+    new Subset[Option[A],SET] {}
+
   implicit def headIsSubset[A,HD,TAIL<:HList](implicit s: Subset[A,HD]) =
     new Subset[A, HD::TAIL] {}
 }
@@ -20,6 +23,9 @@ trait LowerPrioritySubset extends LowestPrioritySubset {
 
   implicit def fieldTypes[K <: Symbol, A, B](implicit isSubset: Lazy[Subset[A,B]]) =
     new Subset[FieldType[K,A],FieldType[K,B]] {}
+
+  implicit def optionTypes[K <: Symbol, A] =
+    new Subset[FieldType[K,Option[A]],FieldType[K,A]] {}
 }
 
 object Subset extends LowerPrioritySubset {
@@ -66,25 +72,35 @@ trait Flattened[A,FLAT]
 trait LowPriorityFlattened {
   implicit def flathead[HD,TAIL<:HList,FTAIL<:HList](implicit
     flatTail: Flattened[TAIL,FTAIL]
-  ) = new Flattened[HD::TAIL, HD::FTAIL] {}
+  ): Flattened[HD::TAIL, HD::FTAIL] = new Flattened[HD::TAIL, HD::FTAIL] {}
+
+  implicit def optionHead[HD,TAIL<:HList,FTAIL<:HList](implicit
+    flatTail: Flattened[TAIL,FTAIL]
+  ): Flattened[Option[HD]::TAIL, HD::FTAIL] = new Flattened[Option[HD]::TAIL, HD::FTAIL] {}
+
+  implicit def transitive[A,B,C](implicit
+    ab: Flattened[A,B],
+    bc: Lazy[Flattened[B,C]]
+  ): Flattened[A,C] = new Flattened[A,C] {}
 }
 
 object Flattened extends LowPriorityFlattened { 
   def apply[A,FLAT](implicit flat: Flattened[A,FLAT]) = flat
 
-  implicit def reflexive[A] = new Flattened[A,A] {}
+  implicit def reflexive[A]: Flattened[A,A] = new Flattened[A,A] {}
 
   implicit def flattenedCaseClass[A,Repr<:HList,FLAT<:HList](implicit
     gen: Generic.Aux[A,Repr],
     flat: Flattened[Repr,FLAT]
-  ) = new Flattened[A,FLAT] {}
+  ): Flattened[A,FLAT] = new Flattened[A,FLAT] {}
 
   implicit def flattenedHList[HD,FHD<:HList,TAIL<:HList,FTAIL<:HList,FLAT<:HList](implicit
     flatHead: Flattened[HD,FHD],
     flatTail: Flattened[TAIL,FTAIL],
     cat: Catenation[FHD,FTAIL,FLAT]
-  ) = new Flattened[HD::TAIL, FLAT] {}
+  ): Flattened[HD::TAIL, FLAT]  = new Flattened[HD::TAIL, FLAT] {}
 }
+
 
 
 
@@ -125,6 +141,5 @@ object StructurallyEqual {
     aflat: Flattened[A,FLAT],
     bflat: Flattened[B,FLAT]
   ) = new StructurallyEqual[A,B] {}
-
 }
 
