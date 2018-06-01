@@ -973,8 +973,48 @@ case class NestedForeignKeyTests(
       assert(childrenOf2 == Set(child2))
     })
   }
+}
 
-  test("Composite foreign key can be a field of a nested object")(pending)
+case class CompositeId(x: Int, y: Int)
+case class CompositeParent(id: CompositeId, name: String)
+case class CompositeChild(id: Id, y: Int)
+case class CompositeComponent(id: Int)
+case class CompositeToParent(id: CompositeComponent, y: Int)
+
+
+case class CompositeForeignKeyTests(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+
+  val parentTable = Table[CompositeId,CompositeParent]("compositeParent")
+  val childTable = Table[Id,CompositeChild]("compositeChild")
+  override val allTables = Seq(parentTable,childTable)
+  implicit val flattenedChildToParent = Flattened[CompositeToParent, Int::Int::HNil]
+  val foreignKey = ForeignKey(childTable, parentTable, classOf[CompositeToParent])
+
+  override def afterAll() {
+    run(childTable.drop)
+    super.afterAll()
+  }
+
+  test("Composite foreign key can be a field of a nested object") {
+    val parent1 = CompositeParent(CompositeId(1,2), "parent1")
+    val parent2 = CompositeParent(CompositeId(2,3), "parent2")
+    val child1 = CompositeChild(Id(parent1.id.x), parent1.id.y)
+    val child2 = CompositeChild(Id(parent2.id.x), parent2.id.y)
+    val parent3 = CompositeParent(CompositeId(3,4), "parent3")
+    run(for {
+      _ <- parentTable.insertBatch(parent1, parent2, parent3)
+      _ <- childTable.insertBatch(child1, child2)
+      childrenOf1 <- foreignKey.index(parent1.id)
+      childrenOf2 <- foreignKey.index(parent2.id)
+    } yield {
+      assert(childrenOf1 == Set(child1))
+      assert(childrenOf2 == Set(child2))
+    })
+  }
 
   test("An optional foreign key") (pending)
 

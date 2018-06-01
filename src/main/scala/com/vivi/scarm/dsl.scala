@@ -613,7 +613,7 @@ case class ForeignKey[FPK, FROM, TPK, TO](
 
 object ForeignKey {
   def apply[FPK,FROM,FK,FKRepr,TPK,TO](from: Table[FPK,FROM], to:Table[TPK,TO])
-    (implicit fkIsSubset: Subset[FK,FROM],
+    (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
       structuralEquality: StructurallyEqual[FK,TPK],
       fkmap: FieldMap[FK]
     ): ForeignKey[FPK,FROM,TPK,TO] = {
@@ -625,11 +625,11 @@ object ForeignKey {
 
   def apply[FPK,FROM,FK,FKRepr,TPK,TO]
     (from: Table[FPK,FROM], to:Table[TPK,TO], clazz: Class[FK])
-    (implicit fkIsSubset: Subset[FK,FROM],
+    (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
       structuralEquality: StructurallyEqual[FK,TPK],
       fkmap: FieldMap[FK]
     ): ForeignKey[FPK,FROM,TPK,TO] =
-    apply(from, to)(fkIsSubset,structuralEquality,fkmap)
+    apply(from, to)(foreignKeyIsSubsetOfChildEntity,structuralEquality,fkmap)
 }
 
 
