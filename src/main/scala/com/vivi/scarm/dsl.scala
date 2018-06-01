@@ -53,7 +53,6 @@ sealed trait Queryable[K, F[_], E, RT] {
   def apply(k: K)(implicit kComp: Composite[K], rtComp: Composite[RT])
       :ConnectionIO[F[E]] = query(k)(kComp, rtComp)
 
-
   private[scarm] def innerJoinKeyNames: Seq[String] = joinKeyNames
   private[scarm] def joinKeyNames: Seq[String] = keyNames
   private[scarm] def selectList(ct: Int): String
@@ -69,7 +68,6 @@ sealed trait Queryable[K, F[_], E, RT] {
   lazy val sql: String = {
     val tables = tableList(1).mkString(" ")
     s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
-
   }
 
   private[scarm] def reduceResults(rows: Traversable[RT]): Traversable[E]
@@ -600,7 +598,7 @@ case class ForeignKey[FPK, FROM, TPK, TO](
 
   lazy val keyNames = keyMapping.map(_._1)
 
-  def create(fkeyName: String = name): ConnectionIO[Int] = {
+  def create: ConnectionIO[Int] = {
     val keys = keyNames.mkString(",")
     val pkeyNames = to.keyNames.mkString(",")
     val sql = s"ALTER TABLE ${from.name} ADD FOREIGN KEY (${keys}) REFERENCES ${to.name} (${pkeyNames})"
