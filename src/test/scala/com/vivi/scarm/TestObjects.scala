@@ -6,6 +6,8 @@ import org.scalatest.FunSuite
 import com.vivi.scarm._
 import java.time._
 
+import shapeless._
+
 case class TeacherId(id: Int) extends AnyVal
 case class Teacher(id: TeacherId, name: String)
 
@@ -51,10 +53,16 @@ case class TestObjects(dialect: SqlDialect) {
   val sectionsBySemester =
     Index[String,SectionId,Section]("sectionsBySemester", sections, Seq("semester"))
 
+  /*
+  implicit val flattenedTeacherId = Flattened[TeacherId, Int :: HNil]
+  implicit val catenated = Catenation[Int :: HNil,  HNil, Int :: HNil]
+   */
+
+  implicit val flattenedSectionTeacher = Flattened[SectionTeacher, Int :: HNil]
   val instructor = ForeignKey(sections, teachers, classOf[SectionTeacher])
 
+  implicit val flattenedPrerequisite = Flattened[CoursePrerequisite, Int::HNil]
   val prerequisite = ForeignKey(courses, courses, classOf[CoursePrerequisite])
-
   val sectionCourse = ForeignKey(sections, courses, classOf[SectionCourse])
 
   val enrollmentSection = ForeignKey(enrollments, sections, classOf[EnrollmentSection])

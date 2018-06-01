@@ -1,12 +1,12 @@
 scalaVersion := "2.12.6"
 ensimeScalaVersion in ThisBuild := "2.12.6"
 
-scalacOptions ++= Seq("-Ypartial-unification", "-deprecation", "-feature")
+scalacOptions ++= Seq("-Ypartial-unification", "-deprecation", "-feature")// "-Xlog-implicits")
 
 val doobieVersion = "0.5.2"
 
 libraryDependencies ++= Seq(
-
+  "com.chuusai" %% "shapeless" % "2.3.3",
   "org.tpolecat" %% "doobie-h2"        % doobieVersion, // H2 driver 1.4.196 + type mappings.
   "org.tpolecat" %% "doobie-core"      % doobieVersion,
   "org.tpolecat" %% "doobie-hikari"    % doobieVersion, // HikariCP transactor.
