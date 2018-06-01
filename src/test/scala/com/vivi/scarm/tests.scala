@@ -891,6 +891,9 @@ case class Parent(id: Id, name: String)
 case class Child(id: Id, parentId: Id, x: Int)
 case class ChildToParent(parentId: Id)
 
+case class OptChild(id: Id, parentId: Option[Id], x: Int)
+case class OptChildToParent(parentId: Option[Id])
+
 case class ForeignKeyTests(
   override val xa: Transactor[IO],
   override val dialect: SqlDialect,
@@ -899,7 +902,8 @@ case class ForeignKeyTests(
 
   val parentTable = Table[Id,Parent]("parent")
   val childTable = Table[Id,Child]("child")
-  override val allTables = Seq(parentTable,childTable)
+  val optChildTable = Table[Id,OptChild]("optChild")
+  override val allTables = Seq(parentTable,childTable,optChildTable)
   implicit val flattenedChildToParent = Flattened[ChildToParent, Int::HNil]
   val foreignKey = ForeignKey(childTable, parentTable, classOf[ChildToParent])
 
@@ -931,6 +935,21 @@ case class ForeignKeyTests(
   test("A foreign key is a constraint") {
     run(foreignKey.create)
     assertThrows[Exception] { run(childTable.insert(Child(nextId, nextId, 10))) }
+  }
+
+  test("An optional foreign key") {
+    val parent = Parent(nextId, "parent1")
+    val childOfSome = OptChild(nextId, Some(parent.id),1)
+    val childOfNone = OptChild(nextId, None, 2)
+    implicit val flattenedOptChildToParent = Flattened[OptChildToParent, Int::HNil]
+    val fkey = ForeignKey(optChildTable, parentTable, classOf[OptChildToParent])
+    run(for {
+      _ <- parentTable.insert(parent)
+      _ <- optChildTable.insertBatch(childOfSome, childOfNone)
+      children <- fkey.index(parent.id)
+    } yield {
+      assert(children == Set(childOfSome))
+    })
   }
 }
 
@@ -1015,8 +1034,6 @@ case class CompositeForeignKeyTests(
       assert(childrenOf2 == Set(child2))
     })
   }
-
-  test("An optional foreign key") (pending)
 
   test("A foreign key must be a subset of the from table") (pending)
 
