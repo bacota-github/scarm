@@ -776,9 +776,13 @@ case class MultiEntity(id: Id, name: String, x: Option[Int])
 case class MultiIndexKey(x: Option[Int], name: String) 
 case class MultiIndexKeyNotQuiteRight(x: Int, nme: String)
 
-//case class NestedField(x: Int, y: String)
-//case class NestedField(x: Int, y: String)
-//case class NestedEntity(id: Id, nested: NestedField)
+case class NestedField(x: Int, y: String)
+case class NestedEntity(id: Id, nested: NestedField)
+
+case class NestedKey(x: Int)
+case class NestedIndexKey(nested: NestedKey)
+case class NotQuiteRightNestedIndexKey(nestd: NestedKey)
+
 
 case class TestIndex(
   override val xa: Transactor[IO],
@@ -786,7 +790,8 @@ case class TestIndex(
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
 ) extends FunSuite with DSLTestBase  {
   val multiTable = Table[Id,MultiEntity]("multi")
-  override val allTables = Seq(multiTable)
+  val nestedTable = Table[Id,NestedEntity]("nestedTable")
+  override val allTables = Seq(multiTable,nestedTable)
 
   test("Query by multi-column Index") {
     val index: Index[MultiIndexKey,Id,MultiEntity] = Index(multiTable)
@@ -815,7 +820,16 @@ case class TestIndex(
     assert(run(index(MultiIndexKey(Some(0), randomString))) == Set())
   }
 
-  test("An index can be created and used on a field of a nested object") (pending)
+  test("An index can be created and used on a field of a nested object") {
+    val index: Index[NestedIndexKey,Id,NestedEntity] = Index(nestedTable)
+    run(index.create)
+  }
+
+  test("compile time checking on index with with a nested object key") {
+    assertDoesNotCompile(
+      "val index: Index[NotQuiteRightNestedIndexKey,Id,NestedEntity] = Index(nestedTable)"
+    )
+  }
 
 }
 
