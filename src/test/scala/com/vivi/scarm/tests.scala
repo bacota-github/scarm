@@ -12,6 +12,8 @@ import org.scalatest._
 import com.vivi.scarm._
 import com.vivi.scarm.FieldMap._
 
+import shapeless._
+
 import TestObjects._
 import com.vivi.scarm.JavaTimeLocalDateMeta
 
@@ -880,14 +882,44 @@ case class TestUniqueIndex(
   test("Query by unique Index with no results returns None") {
     assert(run(index(UniqueKey(randomString))) == None)
   }
-
-  test("A unique index can be created and used on a field of a nested object") (pending)
 }
 
 
+case class Parent(id: Id, name: String)
+case class Child(id: Id, parentId: Id, x: Int)
+case class ChildToParent(parentId: Id)
 
-class PendingTests extends FunSuite {
-  test("Query by Foreign Key") (pending)
+class ForeignKeyTests(
+  override val xa: Transactor[IO],
+  override val dialect: SqlDialect,
+  override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite with DSLTestBase  {
+
+  val parentTable = Table[Id,Parent]("parent")
+  val childTable = Table[Id,Child]("child")
+  override val allTables = Seq(parentTable,childTable)
+  implicit val flattenedChildToParent = Flattened[ChildToParent, Int::HNil]
+  val foreignKey = ForeignKey(childTable, parentTable, classOf[ChildToParent])
+
+  test("Query by Foreign Key") {
+    val parent1 = Parent(nextId, "parent1")
+    val childOf1a = Child(nextId, parent1.id, 1)
+    val childOf1b = Child(nextId, parent1.id, 2)
+    val parent2 = Parent(nextId, "parent2")
+    val childOf2 = Child(nextId, parent2.id, 3)
+    val parent3 = Parent(nextId, "parent3")
+    run(for {
+      _ <- parentTable.insertBatch(parent1, parent2, parent3)
+      _ <- childTable.insertBatch(childOf1a, childOf1b, childOf2)
+      childrenOf1 <- foreignKey.index(parent1.id)
+      childrenOf2 <- foreignKey.index(parent2.id)
+      childrenOf3 <- foreignKey.index(parent3.id)
+    } yield {
+      assert(childrenOf1 == Set(childOf1a, childOf1b))
+      assert(childrenOf2 == Set(childOf2))
+      assert(childrenOf3 == Set())
+    })
+  }
 
   test("Query by Foreign Key returns only entities with correct key") (pending)
 
@@ -897,11 +929,13 @@ class PendingTests extends FunSuite {
 
   test("An optional foreign key") (pending)
 
-  test("A foreign key that is part of an embedded object") (pending)
-
   test("A foreign key must be a subset of the from table") (pending)
 
   test("A foreign key must line up with the primary key") (pending)
+}
+
+
+class PendingTests extends FunSuite {
 
   test("Query a Many to One Join on Mandatory Foreign Key") (pending)
 
