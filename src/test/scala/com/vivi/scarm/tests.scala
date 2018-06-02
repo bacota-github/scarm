@@ -888,8 +888,11 @@ case class TestUniqueIndex(
 
 
 case class Parent(id: Id, name: String)
-case class Child(id: Id, parentId: Id, x: Int)
+case class Child(id: Id, parentId: Id, x: Int, name: String)
 case class ChildToParent(parentId: Id)
+
+case class WrongKeyName(parent: Id)
+case class WrongKeyType(name: String)
 
 case class OptChild(id: Id, parentId: Option[Id], x: Int)
 case class OptChildToParent(parentId: Option[Id])
@@ -914,10 +917,10 @@ case class ForeignKeyTests(
 
   test("Query by Foreign Key") {
     val parent1 = Parent(nextId, "parent1")
-    val childOf1a = Child(nextId, parent1.id, 1)
-    val childOf1b = Child(nextId, parent1.id, 2)
+    val childOf1a = Child(nextId, parent1.id, 1, randomString)
+    val childOf1b = Child(nextId, parent1.id, 2, randomString)
     val parent2 = Parent(nextId, "parent2")
-    val childOf2 = Child(nextId, parent2.id, 3)
+    val childOf2 = Child(nextId, parent2.id, 3, randomString)
     val parent3 = Parent(nextId, "parent3")
     run(for {
       _ <- parentTable.insertBatch(parent1, parent2, parent3)
@@ -934,7 +937,9 @@ case class ForeignKeyTests(
 
   test("A foreign key is a constraint") {
     run(foreignKey.create)
-    assertThrows[Exception] { run(childTable.insert(Child(nextId, nextId, 10))) }
+    assertThrows[Exception] {
+      run(childTable.insert(Child(nextId, nextId, 10, randomString)))
+    }
   }
 
   test("An optional foreign key") {
@@ -950,6 +955,19 @@ case class ForeignKeyTests(
     } yield {
       assert(children == Set(childOfSome))
     })
+  }
+
+  test("A foreign key must be a subset of the from table") {
+    implicit val flattened = Flattened[WrongKeyName, Int::HNil]
+    assertDoesNotCompile(
+      "val badKey = ForeignKey(childTable, parentTable, classOf[WrongKeyName])"
+    )
+  }
+
+  test("A foreign key must line up with the primary key") {
+    implicit val flattened = Flattened[WrongKeyType, String::HNil]
+    implicit val eq = StructurallyEqual[WrongKeyType,Id]
+    val badKey = ForeignKey(childTable, parentTable, classOf[WrongKeyType])
   }
 }
 
@@ -1035,9 +1053,6 @@ case class CompositeForeignKeyTests(
     })
   }
 
-  test("A foreign key must be a subset of the from table") (pending)
-
-  test("A foreign key must line up with the primary key") (pending)
 }
 
 
