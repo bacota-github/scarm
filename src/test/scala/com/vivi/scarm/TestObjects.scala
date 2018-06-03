@@ -57,20 +57,10 @@ case class TestObjects(dialect: SqlDialect) {
   val sectionsBySemester =
     Index[String,SectionId,Section]("sectionsBySemester", sections, Seq("semester"))
 
-  implicit val flattenedSectionTeacher = Flattened[SectionTeacher, Int :: HNil]
   val instructor = ForeignKey(sections, teachers, classOf[SectionTeacher])
-
-  implicit val flattenedPrerequisite = Flattened[CoursePrerequisite, Int::HNil]
   val prerequisite = ForeignKey(courses, courses, classOf[CoursePrerequisite])
-
-  implicit val flattenedSectionId = Flattened[SectionId, Int::Int::Int::HNil]
-  implicit val flattenedSectionCourse = Flattened[SectionCourse, SectionId::HNil]
   val sectionCourse = ForeignKey(sections, courses, classOf[SectionCourse])
-
-  implicit val flattenedEnrollmentSection = Flattened[EnrollmentSection, Int::Int::Int::HNil]
   val enrollmentSection = ForeignKey(enrollments, sections, classOf[EnrollmentSection])
-
-  implicit val flattenedEnrollmentStudent = Flattened[EnrollmentStudent, Int::HNil]
   val enrollmentStudent = ForeignKey(enrollments, students, classOf[EnrollmentStudent])
 
   val courseWithTeacher = sections :: instructor.manyToOne

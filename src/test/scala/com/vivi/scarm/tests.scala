@@ -907,7 +907,6 @@ case class ForeignKeyTests(
   val childTable = Table[Id,Child]("child")
   val optChildTable = Table[Id,OptChild]("optChild")
   override val allTables = Seq(parentTable,childTable,optChildTable)
-  implicit val flattenedChildToParent = Flattened[ChildToParent, Int::HNil]
   val foreignKey = ForeignKey(childTable, parentTable, classOf[ChildToParent])
 
   override def afterAll() {
@@ -946,7 +945,6 @@ case class ForeignKeyTests(
     val parent = Parent(nextId, "parent1")
     val childOfSome = OptChild(nextId, Some(parent.id),1)
     val childOfNone = OptChild(nextId, None, 2)
-    implicit val flattenedOptChildToParent = Flattened[OptChildToParent, Int::HNil]
     val fkey = ForeignKey(optChildTable, parentTable, classOf[OptChildToParent])
     run(for {
       _ <- parentTable.insert(parent)
@@ -958,16 +956,15 @@ case class ForeignKeyTests(
   }
 
   test("A foreign key must be a subset of the from table") {
-    implicit val flattened = Flattened[WrongKeyName, Int::HNil]
     assertDoesNotCompile(
       "val badKey = ForeignKey(childTable, parentTable, classOf[WrongKeyName])"
     )
   }
 
   test("A foreign key must line up with the primary key") {
-    implicit val flattened = Flattened[WrongKeyType, String::HNil]
-    implicit val eq = StructurallyEqual[WrongKeyType,Id]
-    val badKey = ForeignKey(childTable, parentTable, classOf[WrongKeyType])
+    assertDoesNotCompile(
+      "val badKey = ForeignKey(childTable, parentTable, classOf[WrongKeyType])"
+    )
   }
 }
 
@@ -986,7 +983,6 @@ case class NestedForeignKeyTests(
   val parentTable = Table[Id,ParentOfNested]("parentOfNested")
   val childTable = Table[Id,NestedChild]("nestedChild")
   override val allTables = Seq(parentTable,childTable)
-  implicit val flattenedChildToParent = Flattened[NestedToParent, Int::HNil]
   val foreignKey = ForeignKey(childTable, parentTable, classOf[NestedToParent])
 
   override def afterAll() {
@@ -1014,9 +1010,10 @@ case class NestedForeignKeyTests(
 
 case class CompositeId(x: Int, y: Int)
 case class CompositeParent(id: CompositeId, name: String)
-case class CompositeChild(id: Id, y: Int)
-case class CompositeComponent(id: Int)
-case class CompositeToParent(id: CompositeComponent, y: Int)
+case class CompositeChildId(parentId: CompositeId, c: Int)
+case class CompositeChild(id: CompositeChildId, name: String)
+case class CompositeComponent(parentId: CompositeId)
+case class CompositeToParent(id: CompositeComponent)
 
 
 case class CompositeForeignKeyTests(
@@ -1025,10 +1022,10 @@ case class CompositeForeignKeyTests(
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
 ) extends FunSuite with DSLTestBase  {
 
+  implicit val idIsSubset = Subset[CompositeComponent,CompositeChildId]
   val parentTable = Table[CompositeId,CompositeParent]("compositeParent")
-  val childTable = Table[Id,CompositeChild]("compositeChild")
+  val childTable = Table[CompositeChildId,CompositeChild]("compositeChild")
   override val allTables = Seq(parentTable,childTable)
-  implicit val flattenedChildToParent = Flattened[CompositeToParent, Int::Int::HNil]
   val foreignKey = ForeignKey(childTable, parentTable, classOf[CompositeToParent])
 
   override def afterAll() {
@@ -1039,8 +1036,8 @@ case class CompositeForeignKeyTests(
   test("Composite foreign key can be a field of a nested object") {
     val parent1 = CompositeParent(CompositeId(1,2), "parent1")
     val parent2 = CompositeParent(CompositeId(2,3), "parent2")
-    val child1 = CompositeChild(Id(parent1.id.x), parent1.id.y)
-    val child2 = CompositeChild(Id(parent2.id.x), parent2.id.y)
+    val child1 = CompositeChild(CompositeChildId(parent1.id, 1), randomString)
+    val child2 = CompositeChild(CompositeChildId(parent2.id, 1), randomString)
     val parent3 = CompositeParent(CompositeId(3,4), "parent3")
     run(for {
       _ <- parentTable.insertBatch(parent1, parent2, parent3)

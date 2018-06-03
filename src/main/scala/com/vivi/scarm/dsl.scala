@@ -614,7 +614,7 @@ case class ForeignKey[FPK, FROM, TPK, TO](
 object ForeignKey {
   def apply[FPK,FROM,FK,FKRepr,TPK,TO](from: Table[FPK,FROM], to:Table[TPK,TO])
     (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
-      structuralEquality: StructurallyEqual[FK,TPK],
+      foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
       fkmap: FieldMap[FK]
     ): ForeignKey[FPK,FROM,TPK,TO] = {
     val fknames = fkmap.names
@@ -626,10 +626,10 @@ object ForeignKey {
   def apply[FPK,FROM,FK,FKRepr,TPK,TO]
     (from: Table[FPK,FROM], to:Table[TPK,TO], clazz: Class[FK])
     (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
-      structuralEquality: StructurallyEqual[FK,TPK],
+      foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
       fkmap: FieldMap[FK]
     ): ForeignKey[FPK,FROM,TPK,TO] =
-    apply(from, to)(foreignKeyIsSubsetOfChildEntity,structuralEquality,fkmap)
+    apply(from, to)(foreignKeyIsSubsetOfChildEntity,foreignKeyStructureMatchesPrimaryKey,fkmap)
 }
 
 

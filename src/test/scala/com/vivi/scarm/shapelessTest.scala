@@ -1,6 +1,6 @@
 package com.vivi.scarm.subsetTest
 
-import com.vivi.scarm.{Catenation,Flattened,Subset,StructurallyEqual}
+import com.vivi.scarm.{Catenation,Flattened,Subset,StructurallyEqual,SimilarStructure}
 
 import org.scalatest._
 import shapeless._
@@ -41,21 +41,23 @@ class ShapelessTest extends FunSuite {
     val d = Subset[Projection1,Projection4]
     val e = Subset[WrappedProjection, WrappedProjection2]
   }
-
-  test("Structural Equality") {
-    val a = StructurallyEqual[Projection1, Projection1]
-    implicit val flat1 = Flattened[Projection1, Int::Int::HNil]
-//    implicit val flat2 = Flattened[Projection2, Int::Int::HNil]
-    val b = StructurallyEqual[Projection1, Projection2]
-    val c = StructurallyEqual[Projection1, Int::Int::HNil]
-    implicit val flat3 = Flattened[WrappedProjection, Int::Int::HNil]
-    val d = StructurallyEqual[WrappedProjection, Projection1]
-    val e = StructurallyEqual[WrappedProjection, Projection2]
-    implicit val flat4 = Flattened[DeeplyWrappedProjection, Int::Int::HNil]
-    val f = StructurallyEqual[DeeplyWrappedProjection, Projection2]
-    val g = StructurallyEqual[Int::Int::HNil, Projection1]
-    val h = StructurallyEqual[Int::Int::HNil, Int::Int::HNil]
+/*
+  test("Structural Similarity") {
+    val a = SimilarStructure[Projection1, Projection1]
+    val b = SimilarStructure[Projection1, Projection2]
+    val c = SimilarStructure[Projection1, Int::Int::HNil]
+    val d = SimilarStructure[WrappedProjection, Projection1]
+    val e = SimilarStructure[WrappedProjection, Projection2]
+    val f = SimilarStructure[DeeplyWrappedProjection, Projection2]
+    val g = SimilarStructure[Int::Int::HNil, Projection1]
+    val h = SimilarStructure[Int::Int::HNil, Int::Int::HNil]
+    val i = SimilarStructure[Int::HNil, Int::Int::HNil]
+    val j = SimilarStructure[Int::String::HNil, Int::Int::HNil]
+    val k = SimilarStructure[Int::Int::String::HNil, Int::HNil]
+    val l = SimilarStructure[Int::String::HNil, Int::Int::HNil]
+    val m = SimilarStructure[WrappedProjection2, WrappedProjection]
   }
+ */
 
   test("Flattened") {
     val a = Flattened[Projection1, Projection1]

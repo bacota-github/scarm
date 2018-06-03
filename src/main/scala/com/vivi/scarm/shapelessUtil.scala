@@ -23,10 +23,8 @@ trait LowerPrioritySubset extends LowestPrioritySubset {
 
   implicit def fieldTypes[K <: Symbol, A, B](implicit isSubset: Lazy[Subset[A,B]]) =
     new Subset[FieldType[K,A],FieldType[K,B]] {}
-
-  implicit def optionTypes[K <: Symbol, A] =
-    new Subset[FieldType[K,Option[A]],FieldType[K,A]] {}
 }
+
 
 object Subset extends LowerPrioritySubset {
   def apply[A,SET](implicit subset: Subset[A,SET]) = subset
@@ -143,3 +141,36 @@ object StructurallyEqual {
   ) = new StructurallyEqual[A,B] {}
 }
 
+
+trait SimilarStructure[A,B]
+
+
+trait NotReflexiveSimilarStructure  extends{
+/*
+  implicit def sameHead[HD, TAIL1<:HList, TAIL2<:HList](implicit
+    similarTail: SimilarStructure[TAIL1,TAIL2]
+  ) = new SimilarStructure[HD::TAIL1, HD::TAIL2] {}
+
+  implicit def optionHead[HD, TAIL1<:HList, TAIL2<:HList](implicit
+    similarTail: SimilarStructure[TAIL1,TAIL2]
+  ) = new SimilarStructure[Option[HD]::TAIL1, HD::TAIL2] {}
+*/
+  implicit def reflexive[A] = new SimilarStructure[A,A] {}
+  implicit def option[A] = new SimilarStructure[Option[A],A] {}
+}
+
+
+object SimilarStructure extends NotReflexiveSimilarStructure {
+  def apply[A,B](implicit eq: SimilarStructure[A,B]) = eq
+
+  implicit def similarHead[HD1, TAIL1<:HList, HD2, TAIL2<:HList](implicit
+    similarHead: SimilarStructure[HD1, HD2],
+    similarTail: SimilarStructure[TAIL1,TAIL2]
+    ) = new SimilarStructure[HD1::TAIL1, HD2::TAIL2] {}
+
+  implicit def caseClass[A,Repr,B](implicit
+    gen: Generic.Aux[A,Repr],
+    similarity: SimilarStructure[Repr, B::HNil]
+  ) = new SimilarStructure[A, B] {}
+
+}
