@@ -145,22 +145,13 @@ object StructurallyEqual {
 trait SimilarStructure[A,B]
 
 
-trait NotReflexiveSimilarStructure  extends{
-/*
-  implicit def sameHead[HD, TAIL1<:HList, TAIL2<:HList](implicit
-    similarTail: SimilarStructure[TAIL1,TAIL2]
-  ) = new SimilarStructure[HD::TAIL1, HD::TAIL2] {}
-
-  implicit def optionHead[HD, TAIL1<:HList, TAIL2<:HList](implicit
-    similarTail: SimilarStructure[TAIL1,TAIL2]
-  ) = new SimilarStructure[Option[HD]::TAIL1, HD::TAIL2] {}
-*/
+trait LowPrioritySimilarStructure  extends{
   implicit def reflexive[A] = new SimilarStructure[A,A] {}
   implicit def option[A] = new SimilarStructure[Option[A],A] {}
 }
 
 
-object SimilarStructure extends NotReflexiveSimilarStructure {
+object SimilarStructure extends LowPrioritySimilarStructure {
   def apply[A,B](implicit eq: SimilarStructure[A,B]) = eq
 
   implicit def similarHead[HD1, TAIL1<:HList, HD2, TAIL2<:HList](implicit
