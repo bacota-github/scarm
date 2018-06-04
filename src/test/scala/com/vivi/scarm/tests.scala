@@ -951,8 +951,17 @@ case class ForeignKeyTests(
     assert(result == Some((parent, children)))
   }
 
-  test("Many-to-one joins in the wrong direction don't compile") (pending)
-  test("One-to-Many joins in the wrong direction don't compile") (pending)
+  test("Many-to-one joins in the wrong direction don't compile") {
+    assertDoesNotCompile(
+      "val query = parentTable :: foreignKey.manyToOne"
+    )
+  }
+
+  test("One-to-Many joins in the wrong direction don't compile") {
+    assertDoesNotCompile(
+      "val query = childTable :: foreignKey.oneToMany"
+    )
+  }
 
   test("Indexed query with a many-to-one join")  (pending)
 
@@ -1116,6 +1125,7 @@ class PendingTests extends FunSuite {
 
   test("select by in clause (new feature)") (pending)
 
+  //Mandatory Foreign Keys:  Return type without Some(), and Structural Equality required
   //creating an Autogen with a non-integral primary key shouldn't compile
   //Primitive primary key is called "id"
   //Name of primitive primary key can be overridden
