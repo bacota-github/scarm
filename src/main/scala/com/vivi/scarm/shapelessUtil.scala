@@ -67,5 +67,4 @@ object SimilarStructure extends LowPrioritySimilarStructure {
     gen: Generic.Aux[A,Repr],
     similarity: SimilarStructure[Repr, B::HNil]
   ) = new SimilarStructure[A, B] {}
-
 }

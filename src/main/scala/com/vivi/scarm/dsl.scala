@@ -562,7 +562,7 @@ case class ManyToOne[FPK,FROM,TPK,TO](
   to: Table[TPK,TO],
   override val keyNames: Seq[String]
 ) extends Queryable[FROM, Option, TO, TO] {
-  override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
+  override private[scarm] def joinKeyNames: Seq[String] = from.keyNames
   override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
   override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
 
@@ -576,9 +576,9 @@ case class ManyToOne[FPK,FROM,TPK,TO](
 case class OneToMany[FPK,ONE,TPK,MANY](
   one: Table[FPK,ONE],
   many: Table[TPK,MANY],
-  override val keyNames: Seq[String]
+  override val joinKeyNames: Seq[String]
 ) extends Queryable[ONE, Set, MANY, MANY] {
-  override private[scarm] def joinKeyNames: Seq[String] = many.keyNames
+  override def keyNames: Seq[String] = one.keyNames
   override private[scarm] def selectList(ct: Int): String = many.selectList(ct)
   override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(many.name, ct))
 

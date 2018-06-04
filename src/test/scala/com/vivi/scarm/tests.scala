@@ -68,7 +68,9 @@ case class DSLTest(driver: String,
   TestNullableFields(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   TestIndex(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   TestUniqueIndex(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
-  ForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
+  ForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  NestedForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  CompositeForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
 )
 
 
@@ -909,30 +911,52 @@ case class ForeignKeyTests(
   override val allTables = Seq(parentTable,childTable,optChildTable)
   val foreignKey = ForeignKey(childTable, parentTable, classOf[ChildToParent])
 
+  val parent1 = Parent(nextId, "parent1")
+  val childOf1a = Child(nextId, parent1.id, 1, randomString)
+  val childOf1b = Child(nextId, parent1.id, 2, randomString)
+  val parent2 = Parent(nextId, "parent2")
+  val childOf2 = Child(nextId, parent2.id, 3, randomString)
+  val parent3 = Parent(nextId, "parent3")
+
+  override def beforeAll() {
+    super.beforeAll()
+    run(parentTable.insertBatch(parent1, parent2, parent3))
+    run(childTable.insertBatch(childOf1a, childOf1b, childOf2))
+  }
+
   override def afterAll() {
     run(childTable.drop)
     super.afterAll()
   }
 
-  test("Query by Foreign Key") {
-    val parent1 = Parent(nextId, "parent1")
-    val childOf1a = Child(nextId, parent1.id, 1, randomString)
-    val childOf1b = Child(nextId, parent1.id, 2, randomString)
-    val parent2 = Parent(nextId, "parent2")
-    val childOf2 = Child(nextId, parent2.id, 3, randomString)
-    val parent3 = Parent(nextId, "parent3")
-    run(for {
-      _ <- parentTable.insertBatch(parent1, parent2, parent3)
-      _ <- childTable.insertBatch(childOf1a, childOf1b, childOf2)
-      childrenOf1 <- foreignKey.index(parent1.id)
-      childrenOf2 <- foreignKey.index(parent2.id)
-      childrenOf3 <- foreignKey.index(parent3.id)
-    } yield {
-      assert(childrenOf1 == Set(childOf1a, childOf1b))
-      assert(childrenOf2 == Set(childOf2))
-      assert(childrenOf3 == Set())
-    })
+  test("Query by foreign key") {
+    assert(run(foreignKey.index(parent1.id)) == Set(childOf1a, childOf1b))
+    assert(run(foreignKey.index(parent2.id)) == Set(childOf2))
+    assert(run(foreignKey.index(parent3.id)) == Set())
   }
+
+  test("Many-to-one join on foreign key")  {
+    val query = childTable :: foreignKey.manyToOne
+    val child = run(childTable(childOf2.id)).get
+    val parent = run(parentTable(child.parentId)).get
+    val result = run(query(child.id))
+    assert(result == Some((child, Some(parent))))
+  }
+
+  test("One-to-many join on foreign key")  {
+    val query = parentTable :: foreignKey.oneToMany
+    val parent = run(parentTable(parent1.id)).get
+    val children = run(foreignKey.index(parent1.id))
+    val result = run(query(parent.id))
+    assert(result == Some((parent, children)))
+  }
+
+  test("Many-to-one joins in the wrong direction don't compile") (pending)
+  test("One-to-Many joins in the wrong direction don't compile") (pending)
+
+  test("Indexed query with a many-to-one join")  (pending)
+
+  test("Indexed query with a one-to-many join ")  (pending)
 
   test("A foreign key is a constraint") {
     run(foreignKey.create)
@@ -1022,7 +1046,6 @@ case class CompositeForeignKeyTests(
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
 ) extends FunSuite with DSLTestBase  {
 
-  implicit val idIsSubset = Subset[CompositeComponent,CompositeChildId]
   val parentTable = Table[CompositeId,CompositeParent]("compositeParent")
   val childTable = Table[CompositeChildId,CompositeChild]("compositeChild")
   override val allTables = Seq(parentTable,childTable)
@@ -1054,8 +1077,6 @@ case class CompositeForeignKeyTests(
 
 
 class PendingTests extends FunSuite {
-
-  test("Query a Many to One Join on Mandatory Foreign Key") (pending)
 
   test("Many to One Join on Mandatory Foreign Key is Inner") (pending)
 
