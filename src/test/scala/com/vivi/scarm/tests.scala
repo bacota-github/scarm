@@ -918,10 +918,13 @@ case class ForeignKeyTests(
   val childOf2 = Child(nextId, parent2.id, 3, randomString)
   val parent3 = Parent(nextId, "parent3")
 
+  val children = Seq(childOf1a, childOf1b, childOf2)
+  val parents = Seq(parent1, parent2, parent3)
+
   override def beforeAll() {
     super.beforeAll()
-    run(parentTable.insertBatch(parent1, parent2, parent3))
-    run(childTable.insertBatch(childOf1a, childOf1b, childOf2))
+    run(parentTable.insertBatch(parents:_*))
+    run(childTable.insertBatch(children:_*))
   }
 
   override def afterAll() {
@@ -936,19 +939,23 @@ case class ForeignKeyTests(
   }
 
   test("Many-to-one join on foreign key")  {
-    val query = childTable :: foreignKey.manyToOne
-    val child = run(childTable(childOf2.id)).get
-    val parent = run(parentTable(child.parentId)).get
-    val result = run(query(child.id))
-    assert(result == Some((child, Some(parent))))
+    for (c <- children) {
+      val child = run(childTable(c.id)).get
+      val parent = run(parentTable(child.parentId)).get
+      val query = childTable :: foreignKey.manyToOne
+      val result = run(query(child.id))
+      assert(result == Some((child, Some(parent))))
+    }
   }
 
   test("One-to-many join on foreign key")  {
-    val query = parentTable :: foreignKey.oneToMany
-    val parent = run(parentTable(parent1.id)).get
-    val children = run(foreignKey.index(parent1.id))
-    val result = run(query(parent.id))
-    assert(result == Some((parent, children)))
+    for (p <- parents) {
+      val parent = run(parentTable(p.id)).get
+      val children = run(foreignKey.index(parent.id))
+      val query = parentTable :: foreignKey.oneToMany
+      val result = run(query(parent.id))
+      assert(result == Some((parent, children)))
+    }
   }
 
   test("Many-to-one joins in the wrong direction don't compile") {
@@ -1062,10 +1069,13 @@ case class CompositeForeignKeyTests(
   val child2 = CompositeChild(CompositeChildId(parent2.id, 1), randomString)
   val parent3 = CompositeParent(CompositeId(3,4), "parent3")
 
+  val parents = Seq(parent1, parent2, parent3)
+  val children = Seq(child1,child2)
+
   override def beforeAll() {
     super.beforeAll()
-    run(parentTable.insertBatch(parent1, parent2, parent3))
-    run(childTable.insertBatch(child1, child2))
+    run(parentTable.insertBatch(parents:_*))
+    run(childTable.insertBatch(children:_*))
   }
 
   override def afterAll() {
@@ -1084,19 +1094,23 @@ case class CompositeForeignKeyTests(
   }
 
   test("Many-to-one join on composite foreign key")  {
-    val query = childTable :: foreignKey.manyToOne
-    val child = run(childTable(child2.id)).get
+    for (c <- children) {
+    val child = run(childTable(c.id)).get
     val parent = run(parentTable(child.id.parentId)).get
-    val result = run(query(child.id))
-    assert(result == Some((child, Some(parent))))
+      val query = childTable :: foreignKey.manyToOne
+      val result = run(query(child.id))
+      assert(result == Some((child, Some(parent))))
+    }
   }
 
   test("One-to-many join on composite foreign key")  {
-    val query = parentTable :: foreignKey.oneToMany
-    val parent = run(parentTable(parent1.id)).get
-    val children = run(foreignKey.index(parent1.id))
-    val result = run(query(parent.id))
-    assert(result == Some((parent, children)))
+    for (p <- parents) {
+      val parent = run(parentTable(p.id)).get
+      val children = run(foreignKey.index(parent.id))
+      val query = parentTable :: foreignKey.oneToMany
+      val result = run(query(parent.id))
+      assert(result == Some((parent, children)))
+    }
   }
 
 }
@@ -1104,15 +1118,9 @@ case class CompositeForeignKeyTests(
 
 class PendingTests extends FunSuite {
 
-  test("Many to One Join on Mandatory Foreign Key is Inner") (pending)
-
   test("Query a Many to One Join on Optional Foreign Key") (pending)
 
   test("Many to One Join on Optional Foreign Key is Outer") (pending)
-
-  test("Query a One to Many Join") (pending)
-
-  test("One to Many Join is Outer") (pending)
 
   test("Query three queries joined by many to one") (pending)
 
