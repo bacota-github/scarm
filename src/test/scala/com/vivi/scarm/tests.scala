@@ -203,7 +203,5 @@ class PendingTests extends FunSuite {
   //Select by sets of key values
   //Naming conversions
   //tuples to Case Classes for index queries
-  //error messags on implicit failures?
   //Define foreign keys and indexes by explicitly passing column names
-  //alias for foreign key index
 }

@@ -160,4 +160,26 @@ case class ForeignKeyTests(
       assert(result == Some((parent, descendants)))
     }
   }
+
+  test("Join a many-to-one and a one-to-many") {
+    for (c <- children) {
+      val child = run(childTable(c.id)).get
+      val parent = run(parentTable(child.parentId)).get
+      val siblings = run(foreignKey.fetchBy(child.parentId))
+      val query = childTable :: foreignKey.manyToOne :: foreignKey.oneToMany
+      val result = run(query(child.id))
+      assert(result == Some((child, Some((parent,siblings)))))
+    }
+  }
+
+
+  test("Join a one-to-many and a many-to-one") {
+    for (p <- parents) {
+      val parent = run(parentTable(p.id)).get
+      val children = run(foreignKey.fetchBy(parent.id))
+        .map(child => (child,Some(parent)))
+      val query = parentTable :: foreignKey.oneToMany :: foreignKey.manyToOne
+      val result = run(query(parent.id))
+      assert(result == Some((parent, children)))
+    }  }
 }
