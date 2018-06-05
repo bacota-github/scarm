@@ -147,4 +147,17 @@ case class ForeignKeyTests(
       assert(result == Some((grandchild, Some((child, Some(parent))))))
     }
   }
+
+  test("Three table join by one-to-many's") {
+    for (p <- parents) {
+      val parent = run(parentTable(p.id)).get
+      val children = run(foreignKey.index(parent.id))
+      val descendants = children.map(child =>
+        (child, run(grandFKey.index(child.id)))
+      )
+      val query = parentTable :: foreignKey.oneToMany :: grandFKey.oneToMany
+      val result = run(query(parent.id))
+      assert(result == Some((parent, descendants)))
+    }
+  }
 }

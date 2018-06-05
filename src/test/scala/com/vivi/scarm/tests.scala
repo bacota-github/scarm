@@ -172,8 +172,6 @@ case class TestMiscellaneous(
 
 class PendingTests extends FunSuite {
 
-  test("Query three queries joined by many to one") (pending)
-
   test("Query three queries joined by one to many") (pending)
 
   test("Query three queries joined by one to many and many to one") (pending)
@@ -183,6 +181,10 @@ class PendingTests extends FunSuite {
   test("Query with a Nested Join") (pending)
 
   test("Query with Join with compound primary key") (pending)
+
+  test("Join an index query by many-to-one") (pending)
+
+  test("Join an index query by one-to-many") (pending)
 
   test("Query a View") (pending)
 
@@ -205,4 +207,5 @@ class PendingTests extends FunSuite {
   //tuples to Case Classes for index queries
   //error messags on implicit failures?
   //Define foreign keys and indexes by explicitly passing column names
+  //alias for foreign key index
 }
