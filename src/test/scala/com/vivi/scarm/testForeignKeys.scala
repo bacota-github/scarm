@@ -13,6 +13,9 @@ case class Parent(id: Id, name: String)
 case class Child(id: Id, parentId: Id, x: Int, name: String)
 case class ChildToParent(parentId: Id)
 
+case class Grandchild(id: Id, parentId: Id, name: String)
+case class GrandchildToParent(parentId: Id)
+
 case class WrongKeyName(parent: Id)
 case class WrongKeyType(name: String)
 
@@ -28,8 +31,10 @@ case class ForeignKeyTests(
   val parentTable = Table[Id,Parent]("parent")
   val childTable = Table[Id,Child]("child")
   val optChildTable = Table[Id,OptChild]("optChild")
-  override val allTables = Seq(parentTable,childTable,optChildTable)
+  val grandchildTable = Table[Id,Grandchild]("grandchild")
+  override val allTables = Seq(parentTable,childTable,optChildTable,grandchildTable)
   val foreignKey = ForeignKey(childTable, parentTable, classOf[ChildToParent])
+  val grandFKey = ForeignKey(grandchildTable, childTable, classOf[GrandchildToParent])
 
   val parent1 = Parent(nextId, "parent1")
   val childOf1a = Child(nextId, parent1.id, 1, randomString)
@@ -37,14 +42,19 @@ case class ForeignKeyTests(
   val parent2 = Parent(nextId, "parent2")
   val childOf2 = Child(nextId, parent2.id, 3, randomString)
   val parent3 = Parent(nextId, "parent3")
+  val grandchild1 = Grandchild(nextId, childOf1b.id, randomString)
+  val grandchild2 = Grandchild(nextId, childOf1b.id, randomString)
+  val grandchild3 = Grandchild(nextId, childOf2.id, randomString)
 
-  val children = Seq(childOf1a, childOf1b, childOf2)
   val parents = Seq(parent1, parent2, parent3)
+  val children = Seq(childOf1a, childOf1b, childOf2)
+  val grandchildren = Seq(grandchild1, grandchild2, grandchild3)
 
   override def beforeAll() {
     super.beforeAll()
     run(parentTable.insertBatch(parents:_*))
     run(childTable.insertBatch(children:_*))
+    run(grandchildTable.insertBatch(grandchildren:_*))
   }
 
   override def afterAll() {
@@ -125,5 +135,16 @@ case class ForeignKeyTests(
     assertDoesNotCompile(
       "val badKey = ForeignKey(childTable, parentTable, classOf[WrongKeyType])"
     )
+  }
+
+  test("Three table join by many-to-ones") {
+    for (c <- grandchildren) {
+      val grandchild = run(grandchildTable(c.id)).get
+      val child = run(childTable(grandchild.parentId)).get
+      val parent = run(parentTable(child.parentId)).get
+      val query = grandchildTable :: grandFKey.manyToOne :: foreignKey.manyToOne
+      val result = run(query(c.id))
+      assert(result == Some((grandchild, Some((child, Some(parent))))))
+    }
   }
 }
