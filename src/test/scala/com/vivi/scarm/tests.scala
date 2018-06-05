@@ -963,10 +963,6 @@ case class ForeignKeyTests(
     )
   }
 
-  test("Indexed query with a many-to-one join")  (pending)
-
-  test("Indexed query with a one-to-many join ")  (pending)
-
   test("A foreign key is a constraint") {
     run(foreignKey.create)
     assertThrows[Exception] {
@@ -1060,26 +1056,47 @@ case class CompositeForeignKeyTests(
   override val allTables = Seq(parentTable,childTable)
   val foreignKey = ForeignKey(childTable, parentTable, classOf[CompositeToParent])
 
+  val parent1 = CompositeParent(CompositeId(1,2), "parent1")
+  val parent2 = CompositeParent(CompositeId(2,3), "parent2")
+  val child1 = CompositeChild(CompositeChildId(parent1.id, 1), randomString)
+  val child2 = CompositeChild(CompositeChildId(parent2.id, 1), randomString)
+  val parent3 = CompositeParent(CompositeId(3,4), "parent3")
+
+  override def beforeAll() {
+    super.beforeAll()
+    run(parentTable.insertBatch(parent1, parent2, parent3))
+    run(childTable.insertBatch(child1, child2))
+  }
+
   override def afterAll() {
     run(childTable.drop)
     super.afterAll()
   }
 
   test("Composite foreign key can be a field of a nested object") {
-    val parent1 = CompositeParent(CompositeId(1,2), "parent1")
-    val parent2 = CompositeParent(CompositeId(2,3), "parent2")
-    val child1 = CompositeChild(CompositeChildId(parent1.id, 1), randomString)
-    val child2 = CompositeChild(CompositeChildId(parent2.id, 1), randomString)
-    val parent3 = CompositeParent(CompositeId(3,4), "parent3")
     run(for {
-      _ <- parentTable.insertBatch(parent1, parent2, parent3)
-      _ <- childTable.insertBatch(child1, child2)
       childrenOf1 <- foreignKey.index(parent1.id)
       childrenOf2 <- foreignKey.index(parent2.id)
     } yield {
       assert(childrenOf1 == Set(child1))
       assert(childrenOf2 == Set(child2))
     })
+  }
+
+  test("Many-to-one join on composite foreign key")  {
+    val query = childTable :: foreignKey.manyToOne
+    val child = run(childTable(child2.id)).get
+    val parent = run(parentTable(child.id.parentId)).get
+    val result = run(query(child.id))
+    assert(result == Some((child, Some(parent))))
+  }
+
+  test("One-to-many join on composite foreign key")  {
+    val query = parentTable :: foreignKey.oneToMany
+    val parent = run(parentTable(parent1.id)).get
+    val children = run(foreignKey.index(parent1.id))
+    val result = run(query(parent.id))
+    assert(result == Some((parent, children)))
   }
 
 }
