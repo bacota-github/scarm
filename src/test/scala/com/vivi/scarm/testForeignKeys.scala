@@ -13,6 +13,8 @@ case class Parent(id: Id, name: String)
 case class Child(id: Id, parentId: Id, x: Int, name: String)
 case class ChildToParent(parentId: Id)
 
+case class ChildKey(name: String)
+
 case class Grandchild(id: Id, parentId: Id, name: String)
 case class GrandchildToParent(parentId: Id)
 
@@ -138,35 +140,35 @@ case class ForeignKeyTests(
   }
 
   test("Three table join by many-to-ones") {
+    val query = grandchildTable :: grandFKey.manyToOne :: foreignKey.manyToOne
     for (c <- grandchildren) {
       val grandchild = run(grandchildTable(c.id)).get
       val child = run(childTable(grandchild.parentId)).get
       val parent = run(parentTable(child.parentId)).get
-      val query = grandchildTable :: grandFKey.manyToOne :: foreignKey.manyToOne
       val result = run(query(c.id))
       assert(result == Some((grandchild, Some((child, Some(parent))))))
     }
   }
 
   test("Three table join by one-to-many's") {
+    val query = parentTable :: foreignKey.oneToMany :: grandFKey.oneToMany
     for (p <- parents) {
       val parent = run(parentTable(p.id)).get
       val children = run(foreignKey.fetchBy(parent.id))
       val descendants = children.map(child =>
         (child, run(grandFKey.fetchBy(child.id)))
       )
-      val query = parentTable :: foreignKey.oneToMany :: grandFKey.oneToMany
       val result = run(query(parent.id))
       assert(result == Some((parent, descendants)))
     }
   }
 
   test("Join a many-to-one and a one-to-many") {
+    val query = childTable :: foreignKey.manyToOne :: foreignKey.oneToMany
     for (c <- children) {
       val child = run(childTable(c.id)).get
       val parent = run(parentTable(child.parentId)).get
       val siblings = run(foreignKey.fetchBy(child.parentId))
-      val query = childTable :: foreignKey.manyToOne :: foreignKey.oneToMany
       val result = run(query(child.id))
       assert(result == Some((child, Some((parent,siblings)))))
     }
@@ -174,24 +176,46 @@ case class ForeignKeyTests(
 
 
   test("Join a one-to-many and a many-to-one") {
+    val query = parentTable :: foreignKey.oneToMany :: foreignKey.manyToOne
     for (p <- parents) {
       val parent = run(parentTable(p.id)).get
       val children = run(foreignKey.fetchBy(parent.id))
         .map(child => (child,Some(parent)))
-      val query = parentTable :: foreignKey.oneToMany :: foreignKey.manyToOne
       val result = run(query(parent.id))
       assert(result == Some((parent, children)))
     }
   }
 
   test("Nested Join") {
+    val query = (childTable :: foreignKey.manyToOne) ::: grandFKey.oneToMany
     for (c <- children) {
       val child = run(childTable(c.id)).get
       val parent = run(parentTable(child.parentId)).get
       val grandchildren = run(grandFKey.fetchBy(c.id))
-      val query = (childTable :: foreignKey.manyToOne) ::: grandFKey.oneToMany
       val result = run(query(child.id))
       assert(result == Some((child, Some(parent), grandchildren)))
+    }
+  }
+
+  test("Join an index to a many-to-one") {
+    val index: Index[ChildKey,Id,Child] = Index(childTable)
+    val query = index :: foreignKey.manyToOne
+    for (c <- children) {
+      val child = run(childTable(c.id)).get
+      val parent = run(parentTable(child.parentId)).get
+      val result = run(query(ChildKey(child.name)))
+      assert(result == Set((child, Some(parent))))
+    }
+  }
+
+  test("Join an index to a one-to-many") {
+    val index: Index[ChildKey,Id,Child] = Index(childTable)
+    val query = index :: grandFKey.oneToMany
+    for (c <- children) {
+      val child = run(childTable(c.id)).get
+      val grandchildren = run(grandFKey.fetchBy(child.id))
+      val result = run(query(ChildKey(child.name)))
+      assert(result == Set((child, grandchildren)))
     }
   }
 }

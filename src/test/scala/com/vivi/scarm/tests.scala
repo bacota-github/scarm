@@ -172,10 +172,6 @@ case class TestMiscellaneous(
 
 class PendingTests extends FunSuite {
 
-  test("Query with a Nested Join") (pending)
-
-  test("Query with Join with compound primary key") (pending)
-
   test("Join an index query by many-to-one") (pending)
 
   test("Join an index query by one-to-many") (pending)
