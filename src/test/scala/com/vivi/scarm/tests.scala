@@ -989,6 +989,10 @@ case class ForeignKeyTests(
     } yield {
       assert(children == Set(childOfSome))
     })
+
+    val join = optChildTable :: fkey.manyToOne
+    assert(run(join(childOfSome.id)) == Some(childOfSome, Some(parent)))
+    assert(run(join(childOfNone.id)) == Some(childOfNone, None))
   }
 
   test("A foreign key must be a subset of the from table") {
