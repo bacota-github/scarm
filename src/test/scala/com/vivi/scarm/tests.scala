@@ -102,7 +102,7 @@ trait DSLTestBase extends Suite with BeforeAndAfterAll {
       }
     }
 
-   override def beforeAll() {
+  override def beforeAll() {
     createAll
   }
 
@@ -172,10 +172,6 @@ case class TestMiscellaneous(
 
 class PendingTests extends FunSuite {
 
-  test("Query a Many to One Join on Optional Foreign Key") (pending)
-
-  test("Many to One Join on Optional Foreign Key is Outer") (pending)
-
   test("Query three queries joined by many to one") (pending)
 
   test("Query three queries joined by one to many") (pending)
@@ -187,12 +183,6 @@ class PendingTests extends FunSuite {
   test("Query with a Nested Join") (pending)
 
   test("Query with Join with compound primary key") (pending)
-
-  test("Query with Join with primary key containing date") (pending)
-
-  test("Query with Join with primitive primary key") (pending)
-
-  test("Query with Join with compound primary key containing nested object") (pending)
 
   test("Query a View") (pending)
 
@@ -207,6 +197,7 @@ class PendingTests extends FunSuite {
   //Mandatory Foreign Keys:  Return type without Some(), and Structural Equality required
   //creating an Autogen with a non-integral primary key shouldn't compile
   //Primitive primary key is called "id"
+  //Join on primitive primary key
   //Name of primitive primary key can be overridden
   //uuid primary key
   //Select by sets of key values
