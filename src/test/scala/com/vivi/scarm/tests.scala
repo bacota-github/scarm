@@ -172,8 +172,6 @@ case class TestMiscellaneous(
 
 class PendingTests extends FunSuite {
 
-  test("Query three queries joined by one to many") (pending)
-
   test("Query three queries joined by one to many and many to one") (pending)
 
   test("Query three queries joined by many to one and one to many") (pending)

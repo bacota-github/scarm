@@ -63,9 +63,9 @@ case class ForeignKeyTests(
   }
 
   test("Query by foreign key") {
-    assert(run(foreignKey.index(parent1.id)) == Set(childOf1a, childOf1b))
-    assert(run(foreignKey.index(parent2.id)) == Set(childOf2))
-    assert(run(foreignKey.index(parent3.id)) == Set())
+    assert(run(foreignKey.fetchBy(parent1.id)) == Set(childOf1a, childOf1b))
+    assert(run(foreignKey.fetchBy(parent2.id)) == Set(childOf2))
+    assert(run(foreignKey.fetchBy(parent3.id)) == Set())
   }
 
   test("Many-to-one join on foreign key")  {
@@ -81,7 +81,7 @@ case class ForeignKeyTests(
   test("One-to-many join on foreign key")  {
     for (p <- parents) {
       val parent = run(parentTable(p.id)).get
-      val children = run(foreignKey.index(parent.id))
+      val children = run(foreignKey.fetchBy(parent.id))
       val query = parentTable :: foreignKey.oneToMany
       val result = run(query(parent.id))
       assert(result == Some((parent, children)))
@@ -115,7 +115,7 @@ case class ForeignKeyTests(
     run(for {
       _ <- parentTable.insert(parent)
       _ <- optChildTable.insertBatch(childOfSome, childOfNone)
-      children <- fkey.index(parent.id)
+      children <- fkey.fetchBy(parent.id)
     } yield {
       assert(children == Set(childOfSome))
     })
@@ -151,9 +151,9 @@ case class ForeignKeyTests(
   test("Three table join by one-to-many's") {
     for (p <- parents) {
       val parent = run(parentTable(p.id)).get
-      val children = run(foreignKey.index(parent.id))
+      val children = run(foreignKey.fetchBy(parent.id))
       val descendants = children.map(child =>
-        (child, run(grandFKey.index(child.id)))
+        (child, run(grandFKey.fetchBy(child.id)))
       )
       val query = parentTable :: foreignKey.oneToMany :: grandFKey.oneToMany
       val result = run(query(parent.id))

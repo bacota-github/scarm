@@ -606,6 +606,7 @@ case class ForeignKey[FPK, FROM, TPK, TO](
   }
 
   lazy val index = Index[TPK,FPK,FROM](name + "_idx", from, keyNames)
+  def fetchBy = index
   lazy val manyToOne: ManyToOne[FPK,FROM,TPK,TO] = ManyToOne(from,to,keyNames)
   lazy val oneToMany: OneToMany[TPK,TO,FPK,FROM] = OneToMany(to,from,keyNames)
 }
