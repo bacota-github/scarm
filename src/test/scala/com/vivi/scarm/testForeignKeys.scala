@@ -181,5 +181,17 @@ case class ForeignKeyTests(
       val query = parentTable :: foreignKey.oneToMany :: foreignKey.manyToOne
       val result = run(query(parent.id))
       assert(result == Some((parent, children)))
-    }  }
+    }
+  }
+
+  test("Nested Join") {
+    for (c <- children) {
+      val child = run(childTable(c.id)).get
+      val parent = run(parentTable(child.parentId)).get
+      val grandchildren = run(grandFKey.fetchBy(c.id))
+      val query = (childTable :: foreignKey.manyToOne) ::: grandFKey.oneToMany
+      val result = run(query(child.id))
+      assert(result == Some((child, Some(parent), grandchildren)))
+    }
+  }
 }
