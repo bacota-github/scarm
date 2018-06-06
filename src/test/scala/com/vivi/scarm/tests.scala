@@ -175,7 +175,7 @@ case class TestMiscellaneous(
   //Mandatory Foreign Keys:  Return type without Some(), and Structural Equality required
   //select by in clause (new feature)
   //creating an Autogen with a non-integral primary key shouldn't compile
-  //Primitive primary key is called "id"
+  //Primitive primarys
   //Join on primitive primary key
   //Name of primitive primary key can be overridden
   //tuples to Case Classes for index queries

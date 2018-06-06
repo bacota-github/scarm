@@ -21,6 +21,9 @@ package object scarm {
       java.sql.Date.valueOf
     )
 
+  import java.util.UUID
+  implicit lazy val UUIDMeta: Meta[UUID] = Meta[String].xmap(UUID.fromString(_), _.toString)
+
   trait SqlDialect
   object Postgresql extends SqlDialect
   object Mysql extends SqlDialect
