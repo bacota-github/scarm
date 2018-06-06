@@ -171,7 +171,6 @@ case class TestMiscellaneous(
 }
 
 
-  //Mandatory Foreign Keys:  Return type without Some(), and Structural Equality required
   //select by in clause (new feature)
   //creating an Autogen with a non-integral primary key shouldn't compile
   //Primitive primarys

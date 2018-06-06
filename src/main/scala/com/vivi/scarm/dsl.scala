@@ -568,35 +568,32 @@ object UniqueIndex {
 }
 
 
+trait ManyToOne[FPK,FROM,TPK,TO,F[_]] extends Queryable[FROM, F, TO, TO] {
+  def from: Table[FPK,FROM]
+  def to: Table[TPK,TO]
+  override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
+  override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
+  override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
+  override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
+  override def tablect: Int = 1
+}
+
 case class OptionalManyToOne[FPK,FROM,TPK,TO](
   from: Table[FPK,FROM],
   to: Table[TPK,TO],
   override val keyNames: Seq[String]
-) extends Queryable[FROM, Option, TO, TO] {
-  override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
-  override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
-  override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
-
-  override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
+) extends ManyToOne[FPK,FROM,TPK,TO,Option] {
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
-  override def tablect: Int = 1
 }
 
 case class MandatoryManyToOne[FPK,FROM,TPK,TO](
   from: Table[FPK,FROM],
   to: Table[TPK,TO],
   override val keyNames: Seq[String]
-) extends Queryable[FROM, Id, TO, TO] {
-  override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
-  override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
-  override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
-
-  override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
+) extends ManyToOne[FPK,FROM,TPK,TO,Id] {
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
-  override def tablect: Int = 1
 }
-
 
 case class OneToMany[FPK,ONE,TPK,MANY](
   one: Table[FPK,ONE],
@@ -606,7 +603,6 @@ case class OneToMany[FPK,ONE,TPK,MANY](
   override def keyNames: Seq[String] = one.keyNames
   override private[scarm] def selectList(ct: Int): String = many.selectList(ct)
   override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(many.name, ct))
-
   override private[scarm] def reduceResults(rows: Traversable[MANY]): Traversable[MANY] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Set[T] =
     reduced.toSet
