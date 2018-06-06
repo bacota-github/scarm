@@ -170,30 +170,15 @@ case class TestMiscellaneous(
 }
 
 
-class PendingTests extends FunSuite {
-
-  test("Join an index query by many-to-one") (pending)
-
-  test("Join an index query by one-to-many") (pending)
-
-  test("Query a View") (pending)
-
-  test("Join with a View") (pending)
-
-  test("field name overrides work") (pending)
-
-  test("sql type overrides work") (pending)
-
-  test("select by in clause (new feature)") (pending)
-
+  //uuid primary key
   //Mandatory Foreign Keys:  Return type without Some(), and Structural Equality required
+  //select by in clause (new feature)
   //creating an Autogen with a non-integral primary key shouldn't compile
   //Primitive primary key is called "id"
   //Join on primitive primary key
   //Name of primitive primary key can be overridden
-  //uuid primary key
-  //Select by sets of key values
-  //Naming conversions
   //tuples to Case Classes for index queries
+  //field name overrides work
+  //sql type overrides
   //Define foreign keys and indexes by explicitly passing column names
-}
+  //Naming conversions

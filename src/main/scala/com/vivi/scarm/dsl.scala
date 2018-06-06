@@ -376,7 +376,7 @@ object Table {
     val auto =
       if (!table.autogen || item.name != table.autogenField) ""
       else autogenModifier(dialect, table.name, item.name)
-    overrides.getOrElse(item.tpe, sqlTypeMap.get(item.tpe.typeSymbol)) match {
+    overrides.getOrElse(item.tpe, sqlTypeMap(dialect).get(item.tpe.typeSymbol)) match {
       case None => throw new RuntimeException(s"Could not find sql type for type ${item.tpe.companion}")
       case Some(typeString) => s"${typeString} ${nullable} ${auto}"
     }
@@ -401,7 +401,7 @@ object Table {
     s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
   }
 
-  private[scarm] val sqlTypeMap: Map[RSymbol, String] = Map(
+  private[scarm] val defaultSqlTypeMap: Map[RSymbol, String] = Map(
     typeOf[String].typeSymbol -> "VARCHAR(255)",
     typeOf[Boolean].typeSymbol -> "BOOLEAN",
     typeOf[Short].typeSymbol -> "SMALLINT",
@@ -412,7 +412,17 @@ object Table {
     typeOf[java.time.Instant].typeSymbol -> "TIMESTAMP",
     typeOf[java.time.LocalDate].typeSymbol -> "DATE", 
     typeOf[java.time.LocalDateTime].typeSymbol -> "TIMESTAMP",
-    typeOf[java.time.LocalTime].typeSymbol -> "TIME"
+    typeOf[java.time.LocalTime].typeSymbol -> "TIME",
+    typeOf[java.util.UUID].typeSymbol -> "CHAR(36)"
+  )
+
+  private[scarm] val sqlTypeMap: Map[SqlDialect, Map[RSymbol, String]] = Map(
+    Postgresql -> (defaultSqlTypeMap ++ Map(
+      typeOf[String].typeSymbol -> "TEXT",
+      typeOf[java.util.UUID].typeSymbol -> "UUID"
+    )),
+    Mysql -> defaultSqlTypeMap,
+    Hsqldb -> defaultSqlTypeMap
   )
 }
 
@@ -483,8 +493,8 @@ case class View[K,E](
 
 object View {
   def apply[K,E](name: String, definition: String)
-    (implicit fieldList: FieldList[E], keyList: FieldList[K]): View[K,E] = 
-    View(name, definition, fieldList.names, keyList.names)
+    (implicit fmap: FieldMap[E], kmap: FieldMap[K]): View[K,E] = 
+    View(name, definition, kmap.names, fmap.names)
 }
 
 
