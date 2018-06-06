@@ -54,6 +54,13 @@ sealed trait Queryable[K, F[_], E, RT] {
   def apply(k: K)(implicit kComp: Composite[K], rtComp: Composite[RT])
       :ConnectionIO[F[E]] = query(k)(kComp, rtComp)
 
+  def find[T,Repr<:HList](t: T)(implicit
+    kgen: Generic.Aux[K,Repr],
+    tgen: Generic.Aux[T,Repr],
+    kcomp: Composite[K],
+    rtcomp: Composite[RT]
+  ): ConnectionIO[F[E]] = apply(kgen.from(tgen.to(t)))(kcomp, rtcomp)
+
   private[scarm] def innerJoinKeyNames: Seq[String] = joinKeyNames
   private[scarm] def joinKeyNames: Seq[String] = keyNames
   private[scarm] def selectList(ct: Int): String
@@ -344,20 +351,6 @@ object Table {
     Table[K,E](name, fmap, kNames, false, dialect, kcomp,
       ecomp, primaryKey)
 
-  def apply[K,E](name: String, key: Witness.Aux[K])
-    (implicit dialect: SqlDialect,
-      kmap: FieldMap[K],
-      fmap: FieldMap[E],
-      mkFieldLens: MkFieldLens.Aux[E,K,K],
-      kcomp: Composite[K],
-      ecomp: Composite[E],
-      primaryKey: PrimaryKey[K,E]
-    ): Table[K,E] = {
-    val keyLens: Lens[E,K] = lens[E] >> key
-    Table(name, fmap, pkeyColumns(kmap,fmap), false, dialect, kcomp,
-      ecomp, primaryKey)
-  }
-
   private def sequenceName(tableName: String, fieldName: String) =
     s"${tableName}_${fieldName}_sequence"
 
@@ -446,16 +439,6 @@ object Autogen {
       ecomp: Composite[E],
       primaryKey: PrimaryKey[K,E],
     ): Table[K,E] = Table[K,E](name,kNames).copy(autogen=true)
-
-  def apply[K,E](name: String, key: Witness.Aux[K])
-    (implicit dialect: SqlDialect,
-      kmap: FieldMap[K],
-      fmap: FieldMap[E],
-      mkFieldLens: MkFieldLens.Aux[E,K,K],
-      kcomp: Composite[K],
-      ecomp: Composite[E],
-      primaryKey: PrimaryKey[K,E]
-    ): Table[K,E] = Table[K,E](name,key).copy(autogen=true)
 }
 
 
