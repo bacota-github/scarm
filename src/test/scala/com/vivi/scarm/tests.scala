@@ -25,6 +25,7 @@ object DSLSuite {
   }
 }
 
+case class Id(id: Int) extends AnyVal
 
 
 class DSLSuite extends Suites(
