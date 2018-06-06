@@ -35,8 +35,8 @@ case class ForeignKeyTests(
   val optChildTable = Table[Id,OptChild]("optChild")
   val grandchildTable = Table[Id,Grandchild]("grandchild")
   override val allTables = Seq(parentTable,childTable,optChildTable,grandchildTable)
-  val foreignKey = ForeignKey(childTable, parentTable, classOf[ChildToParent])
-  val grandFKey = ForeignKey(grandchildTable, childTable, classOf[GrandchildToParent])
+  val foreignKey = MandatoryForeignKey(childTable, parentTable, classOf[ChildToParent])
+  val grandFKey = MandatoryForeignKey(grandchildTable, childTable, classOf[GrandchildToParent])
 
   val parent1 = Parent(nextId, "parent1")
   val childOf1a = Child(nextId, parent1.id, 1, randomString)
@@ -76,7 +76,7 @@ case class ForeignKeyTests(
       val parent = run(parentTable(child.parentId)).get
       val query = childTable :: foreignKey.manyToOne
       val result = run(query(child.id))
-      assert(result == Some((child, Some(parent))))
+      assert(result == Some((child, parent)))
     }
   }
 
@@ -113,7 +113,7 @@ case class ForeignKeyTests(
     val parent = Parent(nextId, "parent1")
     val childOfSome = OptChild(nextId, Some(parent.id),1)
     val childOfNone = OptChild(nextId, None, 2)
-    val fkey = ForeignKey(optChildTable, parentTable, classOf[OptChildToParent])
+    val fkey = OptionalForeignKey(optChildTable, parentTable, classOf[OptChildToParent])
     run(for {
       _ <- parentTable.insert(parent)
       _ <- optChildTable.insertBatch(childOfSome, childOfNone)
@@ -129,13 +129,13 @@ case class ForeignKeyTests(
 
   test("A foreign key must be a subset of the from table") {
     assertDoesNotCompile(
-      "val badKey = ForeignKey(childTable, parentTable, classOf[WrongKeyName])"
+      "val badKey = MandatoryForeignKey(childTable, parentTable, classOf[WrongKeyName])"
     )
   }
 
   test("A foreign key must line up with the primary key") {
     assertDoesNotCompile(
-      "val badKey = ForeignKey(childTable, parentTable, classOf[WrongKeyType])"
+      "val badKey = MandatoryForeignKey(childTable, parentTable, classOf[WrongKeyType])"
     )
   }
 
@@ -146,7 +146,7 @@ case class ForeignKeyTests(
       val child = run(childTable(grandchild.parentId)).get
       val parent = run(parentTable(child.parentId)).get
       val result = run(query(c.id))
-      assert(result == Some((grandchild, Some((child, Some(parent))))))
+      assert(result == Some((grandchild, (child, parent))))
     }
   }
 
@@ -170,7 +170,7 @@ case class ForeignKeyTests(
       val parent = run(parentTable(child.parentId)).get
       val siblings = run(foreignKey.fetchBy(child.parentId))
       val result = run(query(child.id))
-      assert(result == Some((child, Some((parent,siblings)))))
+      assert(result == Some((child, (parent,siblings))))
     }
   }
 
@@ -180,7 +180,7 @@ case class ForeignKeyTests(
     for (p <- parents) {
       val parent = run(parentTable(p.id)).get
       val children = run(foreignKey.fetchBy(parent.id))
-        .map(child => (child,Some(parent)))
+        .map(child => (child,parent))
       val result = run(query(parent.id))
       assert(result == Some((parent, children)))
     }
@@ -193,7 +193,7 @@ case class ForeignKeyTests(
       val parent = run(parentTable(child.parentId)).get
       val grandchildren = run(grandFKey.fetchBy(c.id))
       val result = run(query(child.id))
-      assert(result == Some((child, Some(parent), grandchildren)))
+      assert(result == Some((child, parent, grandchildren)))
     }
   }
 
@@ -204,7 +204,7 @@ case class ForeignKeyTests(
       val child = run(childTable(c.id)).get
       val parent = run(parentTable(child.parentId)).get
       val result = run(query(ChildKey(child.name)))
-      assert(result == Set((child, Some(parent))))
+      assert(result == Set((child,parent)))
     }
   }
 

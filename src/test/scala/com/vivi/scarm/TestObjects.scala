@@ -57,11 +57,11 @@ case class TestObjects(dialect: SqlDialect) {
   val sectionsBySemester =
     Index[String,SectionId,Section]("sectionsBySemester", sections, Seq("semester"))
 
-  val instructor = ForeignKey(sections, teachers, classOf[SectionTeacher])
-  val prerequisite = ForeignKey(courses, courses, classOf[CoursePrerequisite])
-  val sectionCourse = ForeignKey(sections, courses, classOf[SectionCourse])
-  val enrollmentSection = ForeignKey(enrollments, sections, classOf[EnrollmentSection])
-  val enrollmentStudent = ForeignKey(enrollments, students, classOf[EnrollmentStudent])
+  val instructor = OptionalForeignKey(sections, teachers, classOf[SectionTeacher])
+  val prerequisite = OptionalForeignKey(courses, courses, classOf[CoursePrerequisite])
+  val sectionCourse = OptionalForeignKey(sections, courses, classOf[SectionCourse])
+  val enrollmentSection = OptionalForeignKey(enrollments, sections, classOf[EnrollmentSection])
+  val enrollmentStudent = OptionalForeignKey(enrollments, students, classOf[EnrollmentStudent])
 
   val courseWithTeacher = sections :: instructor.manyToOne
   val teacherWithSections = (teachers :: instructor.oneToMany)

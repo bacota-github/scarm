@@ -9,7 +9,6 @@ import org.scalatest._
 
 import com.vivi.scarm._
 
-
 case class ParentOfNested(id: Id, name: String)
 case class NestedId(parentId: Id, x: Int)
 case class NestedNestedId(parentId: Id)
@@ -25,7 +24,7 @@ case class NestedForeignKeyTests(
   val parentTable = Table[Id,ParentOfNested]("parentOfNested")
   val childTable = Table[Id,NestedChild]("nestedChild")
   override val allTables = Seq(parentTable,childTable)
-  val foreignKey = ForeignKey(childTable, parentTable, classOf[NestedToParent])
+  val foreignKey = MandatoryForeignKey(childTable, parentTable, classOf[NestedToParent])
 
   override def afterAll() {
     run(childTable.drop)

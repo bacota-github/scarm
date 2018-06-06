@@ -46,14 +46,34 @@ object Subset extends LowerPrioritySubset {
 }
 
 
-trait SimilarStructure[A,B]
+trait EqualStructure[A,B]
 
+trait LowPriorityEqualStructure  extends{
+  implicit def reflexive[A] = new EqualStructure[A,A] {}
+}
+
+object EqualStructure extends LowPriorityEqualStructure {
+  def apply[A,B](implicit eq: EqualStructure[A,B]) = eq
+
+  implicit def similarHead[HD1, TAIL1<:HList, HD2, TAIL2<:HList](implicit
+    similarHead: EqualStructure[HD1, HD2],
+    similarTail: EqualStructure[TAIL1,TAIL2]
+    ) = new EqualStructure[HD1::TAIL1, HD2::TAIL2] {}
+
+  implicit def caseClass[A,Repr,B](implicit
+    gen: Generic.Aux[A,Repr],
+    similarity: EqualStructure[Repr, B::HNil]
+  ) = new EqualStructure[A, B] {}
+}
+
+
+
+trait SimilarStructure[A,B]
 
 trait LowPrioritySimilarStructure  extends{
   implicit def reflexive[A] = new SimilarStructure[A,A] {}
   implicit def option[A] = new SimilarStructure[Option[A],A] {}
 }
-
 
 object SimilarStructure extends LowPrioritySimilarStructure {
   def apply[A,B](implicit eq: SimilarStructure[A,B]) = eq

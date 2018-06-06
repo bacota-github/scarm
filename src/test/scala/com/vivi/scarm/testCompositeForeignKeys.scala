@@ -9,14 +9,12 @@ import org.scalatest._
 
 import com.vivi.scarm._
 
-
 case class CompositeId(x: Int, y: Int)
 case class CompositeParent(id: CompositeId, name: String)
 case class CompositeChildId(parentId: CompositeId, c: Int)
 case class CompositeChild(id: CompositeChildId, name: String)
 case class CompositeComponent(parentId: CompositeId)
 case class CompositeToParent(id: CompositeComponent)
-
 
 case class CompositeForeignKeyTests(
   override val xa: Transactor[IO],
@@ -27,7 +25,7 @@ case class CompositeForeignKeyTests(
   val parentTable = Table[CompositeId,CompositeParent]("compositeParent")
   val childTable = Table[CompositeChildId,CompositeChild]("compositeChild")
   override val allTables = Seq(parentTable,childTable)
-  val foreignKey = ForeignKey(childTable, parentTable, classOf[CompositeToParent])
+  val foreignKey = MandatoryForeignKey(childTable, parentTable, classOf[CompositeToParent])
 
   val parent1 = CompositeParent(CompositeId(1,2), "parent1")
   val parent2 = CompositeParent(CompositeId(2,3), "parent2")
@@ -65,7 +63,7 @@ case class CompositeForeignKeyTests(
     val parent = run(parentTable(child.id.parentId)).get
       val query = childTable :: foreignKey.manyToOne
       val result = run(query(child.id))
-      assert(result == Some((child, Some(parent))))
+      assert(result == Some((child,parent)))
     }
   }
 

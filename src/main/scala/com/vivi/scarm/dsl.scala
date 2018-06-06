@@ -6,6 +6,7 @@ import doobie.util.update.Update0
 import doobie.ConnectionIO
 import fs2.Stream
 import cats.effect.IO
+import cats.Id
 
 import scala.reflect.runtime.universe.{Type,TypeTag,typeOf,Symbol=>RSymbol}
 import scala.language.higherKinds
@@ -567,7 +568,7 @@ object UniqueIndex {
 }
 
 
-case class ManyToOne[FPK,FROM,TPK,TO](
+case class OptionalManyToOne[FPK,FROM,TPK,TO](
   from: Table[FPK,FROM],
   to: Table[TPK,TO],
   override val keyNames: Seq[String]
@@ -579,6 +580,20 @@ case class ManyToOne[FPK,FROM,TPK,TO](
   override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     if (reduced.isEmpty) None else Some(reduced.head)
+  override def tablect: Int = 1
+}
+
+case class MandatoryManyToOne[FPK,FROM,TPK,TO](
+  from: Table[FPK,FROM],
+  to: Table[TPK,TO],
+  override val keyNames: Seq[String]
+) extends Queryable[FROM, Id, TO, TO] {
+  override private[scarm] def joinKeyNames: Seq[String] = to.keyNames
+  override private[scarm] def selectList(ct: Int): String = to.selectList(ct)
+  override private[scarm] def tableList(ct: Int): Seq[String] = Seq(alias(to.name, ct))
+
+  override private[scarm] def reduceResults(rows: Traversable[TO]): Traversable[TO] = rows
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Id[T] = reduced.head
   override def tablect: Int = 1
 }
 
@@ -599,13 +614,12 @@ case class OneToMany[FPK,ONE,TPK,MANY](
 }
 
 
-case class ForeignKey[FPK, FROM, TPK, TO](
-  from: Table[FPK,FROM],
-  to: Table[TPK,TO],
-  val keyMapping: Seq[(String,String)]
-) extends DatabaseObject {
-  override lazy val name: String = s"${from.name}_${to.name}_fk"
 
+trait ForeignKey[FPK, FROM, TPK, TO] extends DatabaseObject {
+  def from: Table[FPK,FROM]
+  def to: Table[TPK,TO]
+  def keyMapping: Seq[(String,String)]
+  override lazy val name: String = s"${from.name}_${to.name}_fk"
   lazy val keyNames = keyMapping.map(_._1)
 
   def create: ConnectionIO[Int] = {
@@ -617,21 +631,29 @@ case class ForeignKey[FPK, FROM, TPK, TO](
 
   lazy val index = Index[TPK,FPK,FROM](name + "_idx", from, keyNames)
   def fetchBy = index
-  lazy val manyToOne: ManyToOne[FPK,FROM,TPK,TO] = ManyToOne(from,to,keyNames)
   lazy val oneToMany: OneToMany[TPK,TO,FPK,FROM] = OneToMany(to,from,keyNames)
 }
 
 
-object ForeignKey {
+case class MandatoryForeignKey[FPK, FROM, TPK, TO](
+  from: Table[FPK,FROM],
+  to: Table[TPK,TO],
+  val keyMapping: Seq[(String,String)]
+) extends ForeignKey[FPK,FROM,TPK,TO] {
+  lazy val manyToOne: MandatoryManyToOne[FPK,FROM,TPK,TO] = MandatoryManyToOne(from,to,keyNames)
+}
+
+
+object MandatoryForeignKey {
   def apply[FPK,FROM,FK,FKRepr,TPK,TO](from: Table[FPK,FROM], to:Table[TPK,TO])
     (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
       foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
       fkmap: FieldMap[FK]
-    ): ForeignKey[FPK,FROM,TPK,TO] = {
+    ): MandatoryForeignKey[FPK,FROM,TPK,TO] = {
     val fknames = fkmap.names
     if (to.keyNames.size != fknames.size)
       throw new RuntimeException(s"Foreign key ${fknames.mkString} from ${from.name} to ${to.name} does not match primary key ${to.keyNames.mkString}")
-    ForeignKey(from,to, fknames.zip(to.keyNames))
+    MandatoryForeignKey(from,to, fknames.zip(to.keyNames))
   }
 
   def apply[FPK,FROM,FK,FKRepr,TPK,TO]
@@ -639,9 +661,41 @@ object ForeignKey {
     (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
       foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
       fkmap: FieldMap[FK]
-    ): ForeignKey[FPK,FROM,TPK,TO] =
+    ): MandatoryForeignKey[FPK,FROM,TPK,TO] =
     apply(from, to)(foreignKeyIsSubsetOfChildEntity,foreignKeyStructureMatchesPrimaryKey,fkmap)
 }
+
+
+case class OptionalForeignKey[FPK, FROM, TPK, TO](
+  from: Table[FPK,FROM],
+  to: Table[TPK,TO],
+  val keyMapping: Seq[(String,String)]
+) extends ForeignKey[FPK,FROM,TPK,TO] {
+  lazy val manyToOne: OptionalManyToOne[FPK,FROM,TPK,TO] = OptionalManyToOne(from,to,keyNames)
+}
+
+
+object OptionalForeignKey {
+  def apply[FPK,FROM,FK,FKRepr,TPK,TO](from: Table[FPK,FROM], to:Table[TPK,TO])
+    (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
+      foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
+      fkmap: FieldMap[FK]
+    ): OptionalForeignKey[FPK,FROM,TPK,TO] = {
+    val fknames = fkmap.names
+    if (to.keyNames.size != fknames.size)
+      throw new RuntimeException(s"Foreign key ${fknames.mkString} from ${from.name} to ${to.name} does not match primary key ${to.keyNames.mkString}")
+    OptionalForeignKey(from,to, fknames.zip(to.keyNames))
+  }
+
+  def apply[FPK,FROM,FK,FKRepr,TPK,TO]
+    (from: Table[FPK,FROM], to:Table[TPK,TO], clazz: Class[FK])
+    (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
+      foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
+      fkmap: FieldMap[FK]
+    ): OptionalForeignKey[FPK,FROM,TPK,TO] =
+    apply(from, to)(foreignKeyIsSubsetOfChildEntity,foreignKeyStructureMatchesPrimaryKey,fkmap)
+}
+
 
 
 case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
