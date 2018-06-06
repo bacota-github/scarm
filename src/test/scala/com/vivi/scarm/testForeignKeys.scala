@@ -20,6 +20,7 @@ case class GrandchildToParent(parentId: Id)
 
 case class WrongKeyName(parent: Id)
 case class WrongKeyType(name: String)
+case class OptionalChildToParent(parentId: Option[Id])
 
 case class OptChild(id: Id, parentId: Option[Id], x: Int)
 case class OptChildToParent(parentId: Option[Id])
@@ -136,6 +137,12 @@ case class ForeignKeyTests(
   test("A foreign key must line up with the primary key") {
     assertDoesNotCompile(
       "val badKey = MandatoryForeignKey(childTable, parentTable, classOf[WrongKeyType])"
+    )
+  }
+
+  test("A mandatory foreign key must line up exactly with the primary key") {
+    assertDoesNotCompile(
+      "val badKey = MandatoryForeignKey(childTable, parentTable, classOf[OptionalChildToParent])"
     )
   }
 

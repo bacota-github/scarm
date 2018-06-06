@@ -647,7 +647,7 @@ case class MandatoryForeignKey[FPK, FROM, TPK, TO](
 object MandatoryForeignKey {
   def apply[FPK,FROM,FK,FKRepr,TPK,TO](from: Table[FPK,FROM], to:Table[TPK,TO])
     (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
-      foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
+      foreignKeyStructureMatchesPrimaryKey: EqualStructure[FK,TPK],
       fkmap: FieldMap[FK]
     ): MandatoryForeignKey[FPK,FROM,TPK,TO] = {
     val fknames = fkmap.names
@@ -659,7 +659,7 @@ object MandatoryForeignKey {
   def apply[FPK,FROM,FK,FKRepr,TPK,TO]
     (from: Table[FPK,FROM], to:Table[TPK,TO], clazz: Class[FK])
     (implicit foreignKeyIsSubsetOfChildEntity: Subset[FK,FROM],
-      foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
+      foreignKeyStructureMatchesPrimaryKey: EqualStructure[FK,TPK],
       fkmap: FieldMap[FK]
     ): MandatoryForeignKey[FPK,FROM,TPK,TO] =
     apply(from, to)(foreignKeyIsSubsetOfChildEntity,foreignKeyStructureMatchesPrimaryKey,fkmap)
