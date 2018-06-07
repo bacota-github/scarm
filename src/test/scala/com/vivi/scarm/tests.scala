@@ -169,15 +169,3 @@ case class TestMiscellaneous(
     }
   }
 }
-
-
-  //select by in clause (new feature)
-  //creating an Autogen with a non-integral primary key shouldn't compile
-  //Primitive primarys
-  //Join on primitive primary key
-  //Name of primitive primary key can be overridden
-  //tuples to Case Classes for index queries
-  //field name overrides work
-  //sql type overrides
-  //Define foreign keys and indexes by explicitly passing column names
-  //Naming conversions

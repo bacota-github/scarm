@@ -16,7 +16,7 @@ import doobie.implicits._
 import shapeless.ops.record.Keys
 import shapeless.{ Generic, HList, LabelledGeneric, Lazy, Lens,MkFieldLens, Nat, Witness, lens }
 import shapeless.ops.hlist
-import shapeless.ops.hlist.{Length, Prepend}
+import shapeless.ops.hlist.{Length, Prepend, Tupler}
 
 import FieldMap._
 
@@ -54,12 +54,14 @@ sealed trait Queryable[K, F[_], E, RT] {
   def apply(k: K)(implicit kComp: Composite[K], rtComp: Composite[RT])
       :ConnectionIO[F[E]] = query(k)(kComp, rtComp)
 
+  /*
   def find[T,Repr<:HList](t: T)(implicit
     kgen: Generic.Aux[K,Repr],
     tgen: Generic.Aux[T,Repr],
     kcomp: Composite[K],
     rtcomp: Composite[RT]
   ): ConnectionIO[F[E]] = apply(kgen.from(tgen.to(t)))(kcomp, rtcomp)
+   */
 
   private[scarm] def innerJoinKeyNames: Seq[String] = joinKeyNames
   private[scarm] def joinKeyNames: Seq[String] = keyNames
@@ -514,13 +516,21 @@ object Index {
   private[scarm] def indexName(table: Table[_,_], ttag: TypeTag[_]) =
     table.name + "_" + ttag.tpe.typeSymbol.name + "_idx"
 
-  def apply[K,PK,E,KList<:HList,EList<:HList](table: Table[PK,E])
-  (implicit isProjection: Subset[K,E], kmap: FieldMap[K],ktag: TypeTag[K])
+  def apply[K,PK,E](table: Table[PK,E])
+    (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
       : Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
 
-  def apply[K,PK,E,KList<:HList,EList<:HList](name: String, table: Table[PK,E])
-    (implicit isProjection: Subset[K,E],  kmap: FieldMap[K])
+  def apply[K,PK,E](name: String, table: Table[PK,E])
+    (implicit  isProjection: Subset[K,E], kmap: FieldMap[K])
       : Index[K,PK,E] = Index(name, table, kmap.names)
+
+  def tupled[K,PK,E,KList<:HList, T<:Product](table: Table[PK,E], keyClass: Class[K])(implicit
+    isProjection: Subset[K,E],
+    kmap: FieldMap[K],
+    ktag: TypeTag[K],
+    kgen: Generic.Aux[K,KList],
+    tupled: Tupler.Aux[KList,T]
+  ): Index[T,PK,E] = Index(indexName(table,ktag), table, kmap.names)
 }
 
 
@@ -548,6 +558,14 @@ object UniqueIndex {
   def apply[K,PK,E,KList<:HList,EList<:HList](name: String,  table: Table[PK,E])
     (implicit isProjection: Subset[K,E], kmap: FieldMap[K])
       : UniqueIndex[K,PK,E] = UniqueIndex(name, table, kmap.names)
+
+  def tupled[K,PK,E,KList<:HList, T<:Product](table: Table[PK,E], keyClass: Class[K])(implicit
+    isProjection: Subset[K,E],
+    kmap: FieldMap[K],
+    ktag: TypeTag[K],
+    kgen: Generic.Aux[K,KList],
+    tupled: Tupler.Aux[KList,T]
+  ): UniqueIndex[T,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
 }
 
 

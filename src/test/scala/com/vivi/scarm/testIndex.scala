@@ -46,6 +46,22 @@ case class TestIndex(
     })
   }
 
+  test("Tupled query by multi-column Index") {
+    val index = Index.tupled(multiTable, classOf[MultiIndexKey])
+    val name = randomString
+    val e1 = MultiEntity(nextId, name, Some(1))
+    val e2 = MultiEntity(nextId, randomString, Some(2))
+    val e3 = MultiEntity(nextId, name, Some(1))
+    val e4 = MultiEntity(nextId, name, None)
+    run(for {
+      _ <- multiTable.insertBatch(e1,e2,e3,e4)
+      results <- index(Some(1), name)
+    } yield {
+      assert(results == Set(e1,e3))
+    })
+  }
+
+
   test("An index doesn't compile unless the fields are subset of the table") {
     assertDoesNotCompile(
       "val index2: Index[MultiIndexKeyNotQuiteRight,Id,MultiEntity] = Index(multiTable)"
