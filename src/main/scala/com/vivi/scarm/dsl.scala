@@ -53,12 +53,13 @@ sealed trait Queryable[K, F[_], E, RT] {
   def apply(k: K)(implicit kComp: Composite[K], rtComp: Composite[RT])
       :ConnectionIO[F[E]] = query(k)(kComp, rtComp)
 
-  def find[T,Repr<:HList](t: T)(implicit
+  def byTuple[T<:Product,Repr<:HList](t: T)(implicit
     kgen: Generic.Aux[K,Repr],
-    tgen: Generic.Aux[T,Repr],
+    tupler: hlist.Tupler.Aux[Repr,T],
+    detupler: Generic.Aux[T,Repr],
     kcomp: Composite[K],
     rtcomp: Composite[RT]
-  ): ConnectionIO[F[E]] = apply(kgen.from(tgen.to(t)))(kcomp, rtcomp)
+  ): ConnectionIO[F[E]] = apply(kgen.from(detupler.to(t)))(kcomp, rtcomp)
 
   private[scarm] def innerJoinKeyNames: Seq[String] = joinKeyNames
   private[scarm] def joinKeyNames: Seq[String] = keyNames
@@ -517,6 +518,10 @@ object Index {
     (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
       : Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
 
+  def apply[K,PK,E](table: Table[PK,E], keyClass: Class[K])
+    (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
+      : Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
+
   def apply[K,PK,E](name: String, table: Table[PK,E])
     (implicit  isProjection: Subset[K,E], kmap: FieldMap[K])
       : Index[K,PK,E] = Index(name, table, kmap.names)
@@ -549,6 +554,10 @@ case class UniqueIndex[K,PK,E](
 object UniqueIndex {
 
   def apply[K,PK,E,KList<:HList,EList<:HList](table: Table[PK,E])
+    (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
+      : UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
+
+  def apply[K,PK,E](table: Table[PK,E], keyClass: Class[K])
     (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
       : UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
 
