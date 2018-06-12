@@ -9,16 +9,18 @@ import org.scalatest._
 
 import com.vivi.scarm._
 
+case class AutogenEntity(id: Id, name: String)
+
 case class TestAutogen(
   override val xa: Transactor[IO],
   override val dialect: SqlDialect,
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
 ) extends FunSuite with DSLTestBase  {
-  val autogenTable = Autogen[Id,IntEntity]("autogen")
+  val autogenTable = Autogen[Id,AutogenEntity]("autogen")
   override val  allTables = Seq(autogenTable)
 
   test("insertReturningKey of an entity with autogen primary key returns the correct Key and the entity can be selected") {
-    val e = IntEntity(Id(0), randomString)
+    val e = AutogenEntity(Id(0), randomString)
     run(for {
       k <- autogenTable.insertReturningKey(e)
       eNew <- autogenTable(k)
@@ -29,9 +31,9 @@ case class TestAutogen(
 
 
   test("insertBatchReturningKey on entities with autogen primary key returns the correct Keys and the entities can be selected") {
-    val e1 = IntEntity(Id(0), randomString)
-    val e2 = IntEntity(Id(0), randomString)
-    val e3 = IntEntity(Id(0), randomString)
+    val e1 = AutogenEntity(Id(0), randomString)
+    val e2 = AutogenEntity(Id(0), randomString)
+    val e3 = AutogenEntity(Id(0), randomString)
     val entities = Seq(e1,e2,e3)
     val keys = run(autogenTable.insertBatchReturningKeys(e1,e2,e3))
     val zipped = keys zip entities
@@ -42,7 +44,7 @@ case class TestAutogen(
   }
 
   test("insertReturning an entity with autogen primary key returns the entity and the entity can be selected") {
-    val e = IntEntity(Id(0), randomString)
+    val e = AutogenEntity(Id(0), randomString)
     run(for {
       returned <- autogenTable.insertReturning(e)
       selected <- autogenTable(returned.id)
@@ -53,9 +55,9 @@ case class TestAutogen(
   }
 
   test("insertBatchReturning entities with autogen primary key returns the entities and the entities can be selected") {
-    val e1 = IntEntity(Id(0), randomString)
-    val e2 = IntEntity(Id(0), randomString)
-    val e3 = IntEntity(Id(0), randomString)
+    val e1 = AutogenEntity(Id(0), randomString)
+    val e2 = AutogenEntity(Id(0), randomString)
+    val e3 = AutogenEntity(Id(0), randomString)
     val entities = Seq(e1,e2,e3)
     val returned = run(autogenTable.insertBatchReturning(e1,e2,e3))
     val zipped = returned zip entities
@@ -66,9 +68,9 @@ case class TestAutogen(
   }
 
   test("after deleting by autogen primary key, selecting on those keys returns None") {
-    val e1 = IntEntity(Id(0), randomString)
-    val e2 = IntEntity(Id(0), randomString)
-    val e3 = IntEntity(Id(0), randomString)
+    val e1 = AutogenEntity(Id(0), randomString)
+    val e2 = AutogenEntity(Id(0), randomString)
+    val e3 = AutogenEntity(Id(0), randomString)
     val keys = run(autogenTable.insertBatchReturningKeys(e1,e2,e3))
     assert(run(autogenTable.delete(keys(0), keys(1))) == 2)
     assert(run(autogenTable(keys(0))) == None)
@@ -79,9 +81,9 @@ case class TestAutogen(
 
   test("updates of entities with autogen primary key are reflected in future selects") {
     val entities = Seq(
-      IntEntity(Id(0), randomString),
-      IntEntity(Id(0), randomString),
-      IntEntity(Id(0), randomString)
+      AutogenEntity(Id(0), randomString),
+      AutogenEntity(Id(0), randomString),
+      AutogenEntity(Id(0), randomString)
     )
     val Seq(e1,e2,e3) = run(autogenTable.insertBatchReturning(entities:_*))
     val update1 = e1.copy(name=randomString)

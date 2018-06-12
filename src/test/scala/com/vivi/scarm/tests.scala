@@ -27,6 +27,8 @@ object DSLSuite {
 
 case class Id(id: Int) extends AnyVal
 
+case class IdEntity(id: Id, name: String)
+
 
 class DSLSuite extends Suites(
   DSLTest("org.hsqldb.jdbc.JDBCDriver",
@@ -127,15 +129,15 @@ case class TestMiscellaneous(
   override val dialect: SqlDialect,
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
 ) extends FunSuite with DSLTestBase  {
-  val intTable = Table[Id,IntEntity]("misc_test")
+  val intTable = Table[Id,IdEntity]("misc_test")
   override val  allTables = Seq(intTable)
 
   test("A table scan returns all the entities in the table") {
-    val table = Table[Id,IntEntity]("scan_test")
+    val table = Table[Id,IdEntity]("scan_test")
     try {
-      val entities = Set(IntEntity(nextId,randomString),
-        IntEntity(nextId, randomString),
-        IntEntity(nextId, randomString)
+      val entities = Set(IdEntity(nextId,randomString),
+        IdEntity(nextId, randomString),
+        IdEntity(nextId, randomString)
       )
       val op = for {
         _ <- table.create()
@@ -156,16 +158,16 @@ case class TestMiscellaneous(
   }
 
   test("updating a nonexistent entity affects nothing") {
-    val t = IntEntity(Id(-1), randomString)
+    val t = IdEntity(Id(-1), randomString)
     assert(0 == run(intTable.update(t)))
   }
 
   test("a dropped table cannot be used") { 
-    val table = Table[Id,IntEntity]("drop_test")
+    val table = Table[Id,IdEntity]("drop_test")
     run(table.create())
     runQuietly(table.drop)
     assertThrows[SQLException] {
-      run(table.insert(IntEntity(Id(1),"foo")))
+      run(table.insert(IdEntity(Id(1),"foo")))
     }
   }
 }

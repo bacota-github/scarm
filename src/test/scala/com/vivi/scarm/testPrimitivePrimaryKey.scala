@@ -9,20 +9,20 @@ import org.scalatest._
 
 import com.vivi.scarm._
 
-case class IntEntity(id: Id, name: String)
+case class IntEntity(id: Int, name: String)
 
 case class TestWithPrimitivePrimaryKey(
   override val xa: Transactor[IO],
   override val dialect: SqlDialect,
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
 ) extends FunSuite with DSLTestBase  {
-  val intTable = Table[Id,IntEntity]("int_table")
+  val intTable = Table[Int,IntEntity]("int_table")
   override val  allTables = Seq(intTable)
 
   test("After inserting an entity into a table with primitive primary key, the entity can be selected")  {
-    val e1 = IntEntity(nextId, randomString)
-    val e2 = IntEntity(nextId, randomString)
-    val e3 = IntEntity(nextId, randomString)
+    val e1 = IntEntity(nextId.id, randomString)
+    val e2 = IntEntity(nextId.id, randomString)
+    val e3 = IntEntity(nextId.id, randomString)
     run(for {
       i1 <- intTable.insert(e1)
       i2 <- intTable.insert(e2)
@@ -41,9 +41,9 @@ case class TestWithPrimitivePrimaryKey(
   }
 
   test("After inserting a batch of entities into a table with primitive primary key, every entity can be selected") {
-    val e1 = IntEntity(nextId, randomString)
-    val e2 = IntEntity(nextId, randomString)
-    val e3 = IntEntity(nextId, randomString)
+    val e1 = IntEntity(nextId.id, randomString)
+    val e2 = IntEntity(nextId.id, randomString)
+    val e3 = IntEntity(nextId.id, randomString)
     run(for {
       i <- intTable.insertBatch(e1,e2,e3)
       e2New <- intTable(e2.id)
@@ -58,7 +58,7 @@ case class TestWithPrimitivePrimaryKey(
   }
 
   test("insertReturningKey of an entity with primitive primary key returns the correct Key and the entity can be selected") {
-    val e = IntEntity(nextId, randomString)
+    val e = IntEntity(nextId.id, randomString)
     run(for {
       k <- intTable.insertReturningKey(e)
       eNew <- intTable(k)
@@ -70,9 +70,9 @@ case class TestWithPrimitivePrimaryKey(
 
 
   test("insertBatchReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") {
-    val e1 = IntEntity(nextId, randomString)
-    val e2 = IntEntity(nextId, randomString)
-    val e3 = IntEntity(nextId, randomString)
+    val e1 = IntEntity(nextId.id, randomString)
+    val e2 = IntEntity(nextId.id, randomString)
+    val e3 = IntEntity(nextId.id, randomString)
     val entities = Seq(e1,e2,e3)
     val keys = run(intTable.insertBatchReturningKeys(e1,e2,e3))
     assert(keys == entities.map(_.id))
@@ -82,7 +82,7 @@ case class TestWithPrimitivePrimaryKey(
   }
 
   test("insertReturning an entity with primitive primary key returns the entity and the entity can be selected") {
-    val e = IntEntity(nextId, randomString)
+    val e = IntEntity(nextId.id, randomString)
     run(for {
       returned <- intTable.insertReturning(e)
       selected <- intTable(e.id)
@@ -93,9 +93,9 @@ case class TestWithPrimitivePrimaryKey(
   }
 
   test("insertBatchReturning entities with primitive primary key returns the entities and the entities can be selected") {
-    val e1 = IntEntity(nextId, randomString)
-    val e2 = IntEntity(nextId, randomString)
-    val e3 = IntEntity(nextId, randomString)
+    val e1 = IntEntity(nextId.id, randomString)
+    val e2 = IntEntity(nextId.id, randomString)
+    val e3 = IntEntity(nextId.id, randomString)
     val entities = Seq(e1,e2,e3)
     val returned = run(intTable.insertBatchReturning(e1,e2,e3))
     assert(returned == entities)
@@ -105,9 +105,9 @@ case class TestWithPrimitivePrimaryKey(
   }
 
   test("after deleting by primitive primary key, selecting on those keys returns None") {
-    val e1 = IntEntity(nextId, randomString)
-    val e2 = IntEntity(nextId, randomString)
-    val e3 = IntEntity(nextId, randomString)
+    val e1 = IntEntity(nextId.id, randomString)
+    val e2 = IntEntity(nextId.id, randomString)
+    val e3 = IntEntity(nextId.id, randomString)
     assert(run(intTable.insertBatch(e1,e2,e3)) == 3)
     assert(run(intTable.delete(e1.id,e2.id)) == 2)
     assert(run(intTable(e1.id)) == None)
@@ -117,9 +117,9 @@ case class TestWithPrimitivePrimaryKey(
   }
 
   test("updates of entities with primitive primary key are reflected in future selects") {
-    val e1 = IntEntity(nextId, randomString)
-    val e2 = IntEntity(nextId, randomString)
-    val e3 = IntEntity(nextId, randomString)
+    val e1 = IntEntity(nextId.id, randomString)
+    val e2 = IntEntity(nextId.id, randomString)
+    val e3 = IntEntity(nextId.id, randomString)
     assert(run(intTable.insertBatch(e1,e2,e3)) == 3)
     val update1 = e1.copy(name=randomString)
     assert(e1 != update1)

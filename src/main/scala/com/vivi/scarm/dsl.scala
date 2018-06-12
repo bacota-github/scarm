@@ -285,16 +285,8 @@ case class Table[K, E](
   lazy val scan = TableScan(this)
 
   def update[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList]
-    (entities: E*)(implicit
-      kGeneric: LabelledGeneric.Aux[K,KList],
-      eGeneric: LabelledGeneric.Aux[E,EList],
-      remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
-      revList: hlist.Prepend.Aux[REMList,KList,REVList],
-      revComposite: Composite[REVList],
-      revTupler: hlist.Tupler.Aux[REVList, REV]
-  ): ConnectionIO[Int] = {
-    def f(e: E) = updateOne(e,kGeneric, eGeneric, remList, revList,
-      revComposite, revTupler)
+    (entities: E*)(implicit  updater: Updater[K,E]): ConnectionIO[Int] = {
+    def f(e: E) = updater.update(this,e)
     val first = f(entities.head)
     if (entities.tail.size == 0) first
     else entities.tail.foldLeft(first)( (io,e) =>
@@ -302,21 +294,7 @@ case class Table[K, E](
     )
   }
 
-  private def updateOne[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList](entity: E,
-    kGeneric: LabelledGeneric.Aux[K,KList],
-    eGeneric: LabelledGeneric.Aux[E,EList],
-    remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
-    revList: hlist.Prepend.Aux[REMList,KList,REVList],
-    revComposite: Composite[REVList],
-    revTupler: hlist.Tupler.Aux[REVList, REV]
-  ): ConnectionIO[Int] = {
-    val key: KList = kGeneric.to(primaryKey(entity))
-    val remainder: REMList = remList(eGeneric.to(entity))
-    val reversed: REVList = revList(remainder, key)
-    Fragment(updateSql, reversed)(revComposite).update.run
-  }
-
-  private lazy val updateSql: String = {
+  private[scarm] lazy val updateSql: String = {
     val updatedCols = nonKeyFieldNames.map(f => s"${f}=?").mkString(",")
     s"UPDATE ${name} SET ${updatedCols} WHERE ${whereClauseNoAlias}"
   }
@@ -327,7 +305,10 @@ case class Table[K, E](
 object Table {
 
   private def pkeyColumns[K,E](kmap: FieldMap[K], fmap: FieldMap[E]) =
-    kmap.names.map(fmap.firstFieldName + "_" + _)
+    kmap.names.map(name => fmap.firstFieldName +
+      //if the name is empty, the key is atomic.  Otherwise it's a case class.
+      (if (name == "") "" else "_" + name)
+    )
 
   def apply[K,E](name: String)
     (implicit dialect: SqlDialect,
@@ -461,7 +442,7 @@ case class View[K,E](
   val definition: String,
   override val keyNames: Seq[String],
   val fieldNames: Seq[String]
-) extends DatabaseObject with Queryable[K,Option,E,E] {
+) extends DatabaseObject with Queryable[K,Set,E,E] {
 
   override private[scarm] def selectList(ct: Int): String = 
     fieldNames.map(f => s"${tname(ct)}.${f}").mkString(",")
@@ -471,8 +452,8 @@ case class View[K,E](
 
   override private[scarm] def reduceResults(rows: Traversable[E]): Traversable[E] = rows
 
-  override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
-    if (reduced.isEmpty) None else Some(reduced.head)
+  override private[scarm] def collectResults[T](reduced: Traversable[T]): Set[T] =
+    reduced.toSet
 }
 
 object View {
