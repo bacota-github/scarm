@@ -71,7 +71,8 @@ case class DSLTest(driver: String,
   TestUniqueIndex(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   ForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   NestedForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
-  CompositeForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
+  CompositeForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestView(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
 )
 
 

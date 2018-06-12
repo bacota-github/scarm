@@ -438,14 +438,15 @@ case class TableScan[K,E](table: Table[K,E])
 }
 
 case class View[K,E](
-  override val name: String,
   val definition: String,
   override val keyNames: Seq[String],
   val fieldNames: Seq[String]
-) extends DatabaseObject with Queryable[K,Set,E,E] {
+) extends Queryable[K,Set,E,E] {
 
   override private[scarm] def selectList(ct: Int): String = 
     fieldNames.map(f => s"${tname(ct)}.${f}").mkString(",")
+
+  override private[scarm] def tablect: Int = 1
 
   override private[scarm] def tableList(ct: Int = 0): Seq[String] =
     Seq(alias(s"(${definition})", ct))
@@ -457,9 +458,9 @@ case class View[K,E](
 }
 
 object View {
-  def apply[K,E](name: String, definition: String)
+  def apply[K,E](definition: String)
     (implicit fmap: FieldMap[E], kmap: FieldMap[K]): View[K,E] = 
-    View(name, definition, kmap.names, fmap.names)
+    View(definition, kmap.names, fmap.names)
 }
 
 
