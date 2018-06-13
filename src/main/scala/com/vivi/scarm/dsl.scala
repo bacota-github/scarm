@@ -81,10 +81,10 @@ sealed trait Queryable[K, F[_], E, RT] {
 
   private def selectSql = {
     val tables = tableList(1).mkString(" ")
-    s"SELECT ${selectList(1)} FROM ${tables}"
+    s"SELECT ${selectList(1)} FROM ${tables} WHERE "
   }
 
-  lazy val sql: String =  s"${selectSql} WHERE ${whereClause}"
+  lazy val sql: String =  s"${selectSql} ${whereClause}"
 
   private def runFragment(frag: Fragment, rtComp: Composite[RT]): ConnectionIO[Traversable[E]] =
     frag.query[RT](rtComp).to[List].map(reduceResults(_))
@@ -710,6 +710,9 @@ case class Join[K,LF[_], JK, LRT, RF[_],E, RRT](
   override private[scarm] def collectResults[T](reduced: Traversable[T]): LF[T] =
     left.collectResults(reduced)
 
+  override private[scarm] def collectResultsToSet[T](reduced: Traversable[T]): Set[T] =
+    left.collectResultsToSet(reduced)
+
   override private[scarm] def selectList(ct: Int): String =
     left.selectList(ct) +","+ right.selectList(ct+1)
 
@@ -750,6 +753,9 @@ case class NestedJoin[K,LF[_], LRT,JK,X, RF[_],E,RRT](
 
   override private[scarm] def collectResults[T](reduced: Traversable[T]): LF[T] =
     left.collectResults(reduced)
+
+  override private[scarm] def collectResultsToSet[T](reduced: Traversable[T]): Set[T] =
+    left.collectResultsToSet(reduced)
 
   override private[scarm] def selectList(ct: Int): String =
     left.selectList(ct) +","+ right.selectList(ct+left.tablect)

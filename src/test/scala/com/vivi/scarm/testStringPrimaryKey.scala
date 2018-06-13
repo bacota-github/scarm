@@ -9,6 +9,8 @@ import org.scalatest._
 
 import com.vivi.scarm._
 
+import cats.data.NonEmptyList
+
 
 case class StringId(id: String) extends AnyVal
 case class StringKeyEntity(id: StringId, name: String)
@@ -18,20 +20,20 @@ case class TestWithStringPrimaryKey(
   override val dialect: SqlDialect,
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
 ) extends FunSuite with DSLTestBase  {
-  val stringTable = Table[StringId,StringKeyEntity]("string")
-  override val  allTables = Seq(stringTable)
+  val table = Table[StringId,StringKeyEntity]("string")
+  override val  allTables = Seq(table)
 
   test("After inserting an entity into a table with String primary key, the entity can be selected")  {
     val e1 = StringKeyEntity(StringId(randomString), randomString)
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
     run(for {
-      i1 <- stringTable.insert(e1)
-      i2 <- stringTable.insert(e2)
-      i3 <- stringTable.insert(e3)
-      e2New <- stringTable(e2.id)
-      e1New <- stringTable(e1.id)
-      e3New <- stringTable(e3.id)
+      i1 <- table.insert(e1)
+      i2 <- table.insert(e2)
+      i3 <- table.insert(e3)
+      e2New <- table(e2.id)
+      e1New <- table(e1.id)
+      e3New <- table(e3.id)
     } yield {
       assert (i1 == 1)
       assert (i2 == 1)
@@ -47,10 +49,10 @@ case class TestWithStringPrimaryKey(
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
     run(for {
-      i <- stringTable.insertBatch(e1,e2,e3)
-      e2New <- stringTable(e2.id)
-      e1New <- stringTable(e1.id)
-      e3New <- stringTable(e3.id)
+      i <- table.insertBatch(e1,e2,e3)
+      e2New <- table(e2.id)
+      e1New <- table(e1.id)
+      e3New <- table(e3.id)
     } yield {
       assert (i == 3)
       assert(e1New == Some(e1))
@@ -62,8 +64,8 @@ case class TestWithStringPrimaryKey(
   test("insertReturningKey of an entity with String primary key returns the correct Key and the entity can be selected") {
     val e = StringKeyEntity(StringId(randomString), randomString)
     run(for {
-      k <- stringTable.insertReturningKey(e)
-      eNew <- stringTable(k)
+      k <- table.insertReturningKey(e)
+      eNew <- table(k)
     } yield {
       assert (k == e.id)
       assert(eNew == Some(e))
@@ -75,18 +77,18 @@ case class TestWithStringPrimaryKey(
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
     val entities = Seq(e1,e2,e3)
-    val keys = run(stringTable.insertBatchReturningKeys(e1,e2,e3))
+    val keys = run(table.insertBatchReturningKeys(e1,e2,e3))
     assert(keys == entities.map(_.id))
     for (e <- entities) {
-      assert(run(stringTable(e.id)) == Some(e))
+      assert(run(table(e.id)) == Some(e))
     }
   }
 
   test("insertReturning an entity with String primary key returns the entity and the entity can be selected") {
     val e = StringKeyEntity(StringId(randomString), randomString)
     run(for {
-      returned <- stringTable.insertReturning(e)
-      selected <- stringTable(e.id)
+      returned <- table.insertReturning(e)
+      selected <- table(e.id)
     } yield {
       assert(returned == e)
       assert(selected == Some(e))
@@ -98,10 +100,10 @@ case class TestWithStringPrimaryKey(
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
     val entities = Seq(e1,e2,e3)
-    val returned = run(stringTable.insertBatchReturning(e1,e2,e3))
+    val returned = run(table.insertBatchReturning(e1,e2,e3))
     assert(returned == entities)
     for (e <- entities) {
-      assert(run(stringTable(e.id)) == Some(e))
+      assert(run(table(e.id)) == Some(e))
     }
   }
 
@@ -109,27 +111,37 @@ case class TestWithStringPrimaryKey(
     val e1 = StringKeyEntity(StringId(randomString), randomString)
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
-    assert(run(stringTable.insertBatch(e1,e2,e3)) == 3)
-    assert(run(stringTable.delete(e1.id,e2.id)) == 2)
-    assert(run(stringTable(e1.id)) == None)
-    assert(run(stringTable(e2.id)) == None)
+    assert(run(table.insertBatch(e1,e2,e3)) == 3)
+    assert(run(table.delete(e1.id,e2.id)) == 2)
+    assert(run(table(e1.id)) == None)
+    assert(run(table(e2.id)) == None)
     //sneak in a test for accidental deletion
-    assert(run(stringTable(e3.id)) == Some(e3))
+    assert(run(table(e3.id)) == Some(e3))
   }
 
   test("updates of entities with String primary key are reflected in future selects") {
     val e1 = StringKeyEntity(StringId(randomString), randomString)
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
-    assert(run(stringTable.insertBatch(e1,e2,e3)) == 3)
+    assert(run(table.insertBatch(e1,e2,e3)) == 3)
     val update1 = e1.copy(name=randomString)
     assert(e1 != update1)
     val update2 = e2.copy(name=randomString)
     assert(e2 != update2)
-    assert(run(stringTable.update(update1, update2)) == 2)
-    assert(run(stringTable(e1.id)) == Some(update1))
-    assert(run(stringTable(e2.id)) == Some(update2))
+    assert(run(table.update(update1, update2)) == 2)
+    assert(run(table(e1.id)) == Some(update1))
+    assert(run(table(e2.id)) == Some(update2))
     //sneak in a test for accidental update
-    assert(run(stringTable(e3.id)) == Some(e3))
+    assert(run(table(e3.id)) == Some(e3))
+  }
+
+  test("selecting with in clause") {
+    val e1 = StringKeyEntity(StringId(randomString), randomString)
+    val e2 = StringKeyEntity(StringId(randomString), randomString)
+    val e3 = StringKeyEntity(StringId(randomString), randomString)
+    run(table.insertBatch(e1,e2,e3))
+    val keys = NonEmptyList.of(e1.id, e3.id)
+    val returned = run(table.where(Fragments.in(fr"id_id", keys)))
+    assert(returned == Set(e1,e3))
   }
 }
