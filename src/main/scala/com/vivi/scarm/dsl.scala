@@ -61,21 +61,28 @@ sealed trait Queryable[K, F[_], E, RT] {
     rtcomp: Composite[RT]
   ): ConnectionIO[F[E]] = apply(kgen.from(detupler.to(t)))(kcomp, rtcomp)
 
+//  def in(keys: K*)(implicit kComp: Composite[K], rtComp: Composite[RT])
+//      :ConnectionIO[F[E]] = query(k)(kComp, rtComp)
+
   private[scarm] def innerJoinKeyNames: Seq[String] = joinKeyNames
   private[scarm] def joinKeyNames: Seq[String] = keyNames
   private[scarm] def selectList(ct: Int): String
   private[scarm] def tableList(ct: Int): Seq[String]
   private[scarm] def tablect: Int
 
-  private[scarm] def whereClause: String = keyNames.map(k =>
-    s"${tname(1)}.${k}=?").mkString(" AND ")
+  private[scarm] def whereClause(repetitions: Int): String = {
+    val keys = keyNames.map(k => s"${tname(1)}.${k}").mkString(",")
+    val values = "(" + List.fill(keyNames.size)("?").mkString(",") + ")"
+    val valueList = List.fill(repetitions)(values).mkString(",")
+    s"(${keys}) in ( (${valueList}) )"
+  }
 
   private[scarm] def whereClauseNoAlias: String = keyNames.map(k =>
     s"${k}=?").mkString(" AND ")
 
   lazy val sql: String = {
     val tables = tableList(1).mkString(" ")
-    s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
+    s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause(1)}"
   }
 
   private[scarm] def reduceResults(rows: Traversable[RT]): Traversable[E]
