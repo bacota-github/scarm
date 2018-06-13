@@ -67,28 +67,37 @@ sealed trait Queryable[K, F[_], E, RT] {
   private[scarm] def tableList(ct: Int): Seq[String]
   private[scarm] def tablect: Int
 
+  private[scarm] def reduceResults(rows: Traversable[RT]): Traversable[E]
+  private[scarm] def collectResults[T](reduced: Traversable[T]): F[T]
+  private[scarm] def collectResultsToSet[T](reduced: Traversable[T]): Set[T] =
+    reduced.toSet
+
+
   private[scarm] def whereClause: String = keyNames.map(k =>
     s"${tname(1)}.${k}=?").mkString(" AND ")
 
   private[scarm] def whereClauseNoAlias: String = keyNames.map(k =>
     s"${k}=?").mkString(" AND ")
 
-  lazy val sql: String = {
+  private def selectSql = {
     val tables = tableList(1).mkString(" ")
-    s"SELECT ${selectList(1)} FROM ${tables} WHERE ${whereClause}"
+    s"SELECT ${selectList(1)} FROM ${tables}"
   }
 
-  private[scarm] def reduceResults(rows: Traversable[RT]): Traversable[E]
-  private[scarm] def collectResults[T](reduced: Traversable[T]): F[T]
+  lazy val sql: String =  s"${selectSql} WHERE ${whereClause}"
 
-  def doobieQuery(key: K)(implicit kComp: Composite[K], rtComp: Composite[RT]): Query0[RT] =
-    Fragment(sql, key)(kComp).query[RT](rtComp)
+  private def runFragment(frag: Fragment, rtComp: Composite[RT]): ConnectionIO[Traversable[E]] =
+    frag.query[RT](rtComp).to[List].map(reduceResults(_))
 
-  def query(key: K)
-    (implicit kComp: Composite[K], rtComp: Composite[RT]): ConnectionIO[F[E]] = {
-    val dquery = doobieQuery(key)(kComp, rtComp)
-    dquery.to[List].map(reduceResults(_)).map(collectResults(_))
-  }
+  private[scarm] def doobieQuery(key: K, kComp: Composite[K]) = Fragment(sql,key)(kComp)
+
+  def query(key: K)(implicit kComp: Composite[K], rtComp: Composite[RT]): ConnectionIO[F[E]] =
+    runFragment(doobieQuery(key, kComp), rtComp).map(collectResults(_))
+
+  private lazy val selectFrag = Fragment.const(selectSql)
+
+  def where(whereFrag: Fragment)(implicit rtComp: Composite[RT]): ConnectionIO[Set[E]] =
+    runFragment(selectFrag ++ whereFrag, rtComp).map(collectResultsToSet(_))
 
   def join[LK,LF[_]](query: Queryable[LK,LF,K,_])
       :Queryable[LK,LF, (K,F[E]), (K,Option[RT])] =
@@ -224,7 +233,7 @@ case class Table[K, E](
   ): ConnectionIO[E] = {
     val dml = insertFragment(entity)
     def fetchEntity(k: K) =
-      this.doobieQuery(k)(keyComposite, entityComposite).unique
+      doobieQuery(k,keyComposite).query[E](entityComposite).unique
     dialect match {
       case Postgresql =>
         dml.withUniqueGeneratedKeys[E](fieldNames:_*)(entityComposite)
