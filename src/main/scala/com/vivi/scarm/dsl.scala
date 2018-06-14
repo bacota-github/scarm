@@ -7,6 +7,7 @@ import doobie.ConnectionIO
 import fs2.Stream
 import cats.effect.IO
 import cats.Id
+import cats.data.NonEmptyList
 
 import scala.reflect.runtime.universe.{Type,TypeTag,typeOf,Symbol=>RSymbol}
 import scala.language.higherKinds
@@ -16,6 +17,7 @@ import doobie.implicits._
 import shapeless.ops.record.Keys
 import shapeless.{ Generic, HList, LabelledGeneric, Lazy, Lens,MkFieldLens, Nat, Witness, lens }
 import shapeless.ops.hlist
+
 
 import FieldMap._
 
@@ -52,6 +54,13 @@ sealed trait Queryable[K, F[_], E, RT] {
 
   def apply(k: K)(implicit kComp: Composite[K], rtComp: Composite[RT])
       :ConnectionIO[F[E]] = query(k)(kComp, rtComp)
+
+  /* ALAS, this doesn't work for composite K.  Doobie doesn't support it.*/
+  def in(k: K*)(implicit kComp: Param[K], rtComp: Composite[RT]): ConnectionIO[Set[E]] = {
+    val sql = Fragment.const(keyNames.mkString(","))
+    val keys = NonEmptyList.of(k.head, k.tail:_*)
+    where(Fragments.in(sql, keys))
+  }
 
   def byTuple[T<:Product,Repr<:HList](t: T)(implicit
     kgen: Generic.Aux[K,Repr],
@@ -98,6 +107,7 @@ sealed trait Queryable[K, F[_], E, RT] {
 
   def where(whereFrag: Fragment)(implicit rtComp: Composite[RT]): ConnectionIO[Set[E]] =
     runFragment(selectFrag ++ whereFrag, rtComp).map(collectResultsToSet(_))
+
 
   def join[LK,LF[_]](query: Queryable[LK,LF,K,_])
       :Queryable[LK,LF, (K,F[E]), (K,Option[RT])] =

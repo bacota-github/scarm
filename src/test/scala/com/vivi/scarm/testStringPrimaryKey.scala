@@ -4,13 +4,9 @@ import cats.effect.IO
 import doobie._
 import doobie.implicits._
 import doobie.util.transactor.Transactor
-
 import org.scalatest._
-
 import com.vivi.scarm._
-
 import cats.data.NonEmptyList
-
 
 case class StringId(id: String) extends AnyVal
 case class StringKeyEntity(id: StringId, name: String)
@@ -140,8 +136,7 @@ case class TestWithStringPrimaryKey(
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
     run(table.insertBatch(e1,e2,e3))
-    val keys = NonEmptyList.of(e1.id, e3.id)
-    val returned = run(table.where(Fragments.in(fr"id_id", keys)))
+    val returned = run(table.in(e1.id,e3.id))
     assert(returned == Set(e1,e3))
   }
 }
