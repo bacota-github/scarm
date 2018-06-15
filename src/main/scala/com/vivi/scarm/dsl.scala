@@ -194,12 +194,27 @@ case class Table[K, E](
   ): ConnectionIO[Int] = insertFragment(entity).run
 
 
-  def insertBatch[EList<:HList,REMList<:HList,REM](entities: E*)
+  def insertBatch[EList<:HList,ETail<:HList,REM](entities: E*)
+    (implicit eGeneric: LabelledGeneric.Aux[E,EList],
+      remList:  hlist.Drop.Aux[EList,Nat._1,ETail],
+      remComposite: Composite[ETail],
+      remTupler: hlist.Tupler.Aux[ETail,REM]
+  ): ConnectionIO[Int] = {
+    if (autogen) {
+      insertAll(entities:_*)
+    } else {
+      val nel: NonEmptyList[E] = NonEmptyList.of(entities.head, entities.tail:_*)
+      Update[E](insertSql)(entityComposite).updateMany(nel)
+    }
+  }
+
+  def insertAll[EList<:HList,REMList<:HList,REM](entities: E*)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
     remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
     remComposite: Composite[REMList],
     remTupler: hlist.Tupler.Aux[REMList,REM]
   ): ConnectionIO[Int] = chainDml(entities, (e: E) => insert(e))
+
 
   def insertReturningKey[EList<:HList,REMList<:HList,REM](entity: E)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
@@ -222,7 +237,7 @@ case class Table[K, E](
   }
 
 
-  def insertBatchReturningKeys[EList<:HList,REMList<:HList,REM](entities: E*)
+  def insertAllReturningKeys[EList<:HList,REMList<:HList,REM](entities: E*)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
     remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
     remComposite: Composite[REMList],
@@ -263,7 +278,7 @@ case class Table[K, E](
     }
   }
 
-  def insertBatchReturning[EList<:HList,REMList<:HList,REM](entities: E*)
+  def insertAllReturning[EList<:HList,REMList<:HList,REM](entities: E*)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
     remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
     remComposite: Composite[REMList],
@@ -274,7 +289,6 @@ case class Table[K, E](
       io.flatMap(seq => insertReturning(e).map(e => seq :+ e))
     )
   }
-
 
   private def insertFragment[EList<:HList,REMList<:HList,REM](entity: E)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
@@ -287,7 +301,6 @@ case class Table[K, E](
       val truncated: REMList = remList(eGeneric.to(entity))
       Fragment(insertSqlWithAutogen, truncated)(remComposite).update
     }
-
 
   private[scarm] lazy val insertSql: String = {
     val names = fieldNames.mkString(",")

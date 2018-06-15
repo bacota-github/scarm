@@ -69,12 +69,12 @@ case class TestWithPrimitivePrimaryKey(
   }
 
 
-  test("insertBatchReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") {
+  test("insertAllReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") {
     val e1 = IntEntity(nextId.id, randomString)
     val e2 = IntEntity(nextId.id, randomString)
     val e3 = IntEntity(nextId.id, randomString)
     val entities = Seq(e1,e2,e3)
-    val keys = run(intTable.insertBatchReturningKeys(e1,e2,e3))
+    val keys = run(intTable.insertAllReturningKeys(e1,e2,e3))
     assert(keys == entities.map(_.id))
     for (e <- entities) {
       assert(run(intTable(e.id)) == Some(e))
@@ -92,12 +92,12 @@ case class TestWithPrimitivePrimaryKey(
     })
   }
 
-  test("insertBatchReturning entities with primitive primary key returns the entities and the entities can be selected") {
+  test("insertAllReturning entities with primitive primary key returns the entities and the entities can be selected") {
     val e1 = IntEntity(nextId.id, randomString)
     val e2 = IntEntity(nextId.id, randomString)
     val e3 = IntEntity(nextId.id, randomString)
     val entities = Seq(e1,e2,e3)
-    val returned = run(intTable.insertBatchReturning(e1,e2,e3))
+    val returned = run(intTable.insertAllReturning(e1,e2,e3))
     assert(returned == entities)
     for (e <- entities) {
       assert(run(intTable(e.id)) == Some(e))

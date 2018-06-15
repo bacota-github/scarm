@@ -39,7 +39,7 @@ case class TestIndex(
     val e4 = MultiEntity(nextId, name, None)
     run(for {
       _ <- index.create
-      _ <- multiTable.insertBatch(e1,e2,e3,e4)
+      _ <- multiTable.insertAll(e1,e2,e3,e4)
       results <- index(MultiIndexKey(Some(1), name))
     } yield {
       assert(results == Set(e1,e3))
@@ -54,7 +54,7 @@ case class TestIndex(
     val e3 = MultiEntity(nextId, name, Some(1))
     val e4 = MultiEntity(nextId, name, None)
     run(for {
-      _ <- multiTable.insertBatch(e1,e2,e3,e4)
+      _ <- multiTable.insertAll(e1,e2,e3,e4)
       results <- index(Some(1), name)
     } yield {
       assert(results == Set(e1,e3))

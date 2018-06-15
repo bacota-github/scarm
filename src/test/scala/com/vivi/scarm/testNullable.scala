@@ -27,7 +27,7 @@ case class TestNullableFields(
   test("entities with nullable (Option) fields can be inserted, selected, and updated")  {
     val e1 = NullableEntity(nextId, Some(randomString))
     val e2 = NullableEntity(nextId, None)
-    assert(run(nullableTable.insertBatch(e1,e2)) == 2)
+    assert(run(nullableTable.insertAll(e1,e2)) == 2)
     assert(run(nullableTable(e1.id)) == Some(e1))
     assert(run(nullableTable(e2.id)) == Some(e2))
     val updated1 = NullableEntity(e1.id, None)
@@ -40,7 +40,7 @@ case class TestNullableFields(
   test("entities with nullable (Option) nested fields can be inserted, selected, and updated") {
     val e1 = NullableNestedEntity(nextId, Some(Level1(1,2,Level2(3,"4"))))
     val e2 = NullableNestedEntity(nextId, None)
-    assert(run(nullableNestedTable.insertBatch(e1,e2)) == 2)
+    assert(run(nullableNestedTable.insertAll(e1,e2)) == 2)
     assert(run(nullableNestedTable(e1.id)) == Some(e1))
     assert(run(nullableNestedTable(e2.id)) == Some(e2))
     val updated1 = NullableNestedEntity(e1.id, None)

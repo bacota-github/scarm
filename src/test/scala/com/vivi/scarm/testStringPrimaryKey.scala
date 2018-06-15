@@ -68,12 +68,12 @@ case class TestWithStringPrimaryKey(
     })
   }
 
-  test("insertBatchReturningKey on entities with String primary key returns the correct Keys and the entities can be selected") {
+  test("insertAllReturningKey on entities with String primary key returns the correct Keys and the entities can be selected") {
     val e1 = StringKeyEntity(StringId(randomString), randomString)
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
     val entities = Seq(e1,e2,e3)
-    val keys = run(table.insertBatchReturningKeys(e1,e2,e3))
+    val keys = run(table.insertAllReturningKeys(e1,e2,e3))
     assert(keys == entities.map(_.id))
     for (e <- entities) {
       assert(run(table(e.id)) == Some(e))
@@ -91,12 +91,12 @@ case class TestWithStringPrimaryKey(
     })
   }
 
-  test("insertBatchReturning entities with String primary key returns the entities and the entities can be selected") {
+  test("insertAllReturning entities with String primary key returns the entities and the entities can be selected") {
     val e1 = StringKeyEntity(StringId(randomString), randomString)
     val e2 = StringKeyEntity(StringId(randomString), randomString)
     val e3 = StringKeyEntity(StringId(randomString), randomString)
     val entities = Seq(e1,e2,e3)
-    val returned = run(table.insertBatchReturning(e1,e2,e3))
+    val returned = run(table.insertAllReturning(e1,e2,e3))
     assert(returned == entities)
     for (e <- entities) {
       assert(run(table(e.id)) == Some(e))
