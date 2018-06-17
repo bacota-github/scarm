@@ -17,7 +17,7 @@ libraryDependencies ++= Seq(
   "ai.x" %% "typeless" % "0.5.0",
   "org.hsqldb" % "hsqldb" % "2.4.0" % "test",
   "org.tpolecat" %% "doobie-postgres"  % doobieVersion % "test",
-  "mysql" % "mysql-connector-java" % "6.0.6" % "test"
+  "mysql" % "mysql-connector-java" % "5.1.46" % "test"
 )
 
 //testOptions in Test += Tests.Argument("-oDF")
