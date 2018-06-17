@@ -136,8 +136,9 @@ case class Table[K, E](
   primaryKey: PrimaryKey[K,E]
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
 
-  lazy val autogenField = fieldMap.fields.head.name
-  lazy val fieldNames: Seq[String] = fieldMap.names
+  def autogenField = fieldMap.fields.head
+  lazy val autogenFieldName = autogenField.name(config)
+  lazy val fieldNames: Seq[String] = fieldMap.names(config)
   lazy val nonKeyFieldNames = fieldNames.filter(!keyNames.contains(_))
   lazy val primaryKeyIndex = UniqueIndex[K,K,E](name+"_pk", this, keyNames)
 
@@ -148,15 +149,12 @@ case class Table[K, E](
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     primaryKeyIndex.collectResults(reduced)
 
-  def create(
-    fieldOverrides: Map[String, String] = Map(),
-    typeOverrides: Map[Type, String] = Map()
-  ): ConnectionIO[Int] = {
-    val sql = Table.createSql(config.dialect, this,fieldOverrides,typeOverrides)
+  def create: ConnectionIO[Int] = {
+    val sql = Table.createSql(config.dialect, this)
     val create = Fragment(sql, ()).update.run
     if (config.dialect != Postgresql || !autogen) create
     else {
-      val sql =  "CREATE SEQUENCE IF NOT EXISTS " + Table.sequenceName(name, autogenField)
+      val sql =  "CREATE SEQUENCE IF NOT EXISTS " + Table.sequenceName(name, autogenFieldName)
       val fragment = Fragment(sql, ()).update.run
       chainDdl(fragment, create)
     }
@@ -175,7 +173,7 @@ case class Table[K, E](
     val drop = Fragment(sql, ()).update.run
     if (config.dialect != Postgresql || !autogen) drop
     else {
-      val sql = "DROP SEQUENCE " + Table.sequenceName(name, autogenField)
+      val sql = "DROP SEQUENCE " + Table.sequenceName(name, autogenFieldName)
       val fragment = Fragment(sql, ()).update.run
       chainDdl(drop, fragment)
     }
@@ -323,22 +321,17 @@ case class Table[K, E](
 
 object Table {
 
-  private def pkeyColumns[K,E](kmap: FieldMap[K], fmap: FieldMap[E]) =
-    kmap.names.map(name => fmap.firstFieldName +
-      //if the name is empty, the key is atomic.  Otherwise it's a case class.
-      (if (name == "") "" else "_" + name)
-    )
-
-  def apply[K,E](name: String)
-    (implicit config: ScarmConfig,
-      kmap: FieldMap[K],
-      fmap: FieldMap[E],
-      kcomp: Composite[K],
-      ecomp: Composite[E],
-      primaryKey: PrimaryKey[K,E]
-    ): Table[K,E] = {
-    Table[K,E](name, fmap, pkeyColumns(kmap,fmap), false, config, kcomp,
-      ecomp, primaryKey)
+  def apply[K,E](name: String)(implicit
+    config: ScarmConfig,
+    kmap: FieldMap[K],
+    fmap: FieldMap[E],
+    kcomp: Composite[K],
+    ecomp: Composite[E],
+    primaryKey: PrimaryKey[K,E]
+  ): Table[K,E] = {
+    val prefixedKey = kmap.prefix(fmap.firstFieldName)
+    val pkeyNames = prefixedKey.names(config)
+    Table[K,E](name, fmap, pkeyNames, false, config, kcomp,   ecomp, primaryKey)
   }
 
   def apply[K,E](name: String, kNames: Seq[String])
@@ -364,33 +357,21 @@ object Table {
       }
     }
 
-  private def typeName(dialect: SqlDialect, table: Table[_,_],
-    item: FieldMap.Item, overrides: Map[Type,String]) =  {
+  private def typeName(dialect: SqlDialect, table: Table[_,_], item: FieldMap.Item) = {
     val nullable = if (item.optional) "" else "not null"
     val auto =
-      if (!table.autogen || item.name != table.autogenField) ""
-      else autogenModifier(dialect, table.name, item.name)
-    overrides.getOrElse(item.tpe, sqlTypeMap(dialect).get(item.tpe.typeSymbol)) match {
+      if (!table.autogen || item != table.autogenField) ""
+      else autogenModifier(dialect, table.name, item.name(table.config))
+    sqlTypeMap(dialect).get(item.tpe.typeSymbol) match {
       case None => throw new RuntimeException(s"Could not find sql type for type ${item.tpe.companion}")
       case Some(typeString) => s"${typeString} ${nullable} ${auto}"
     }
   }
 
-  def createSql[K,E](
-    dialect: SqlDialect,
-    table: Table[K,E],
-    fieldOverrides: Map[String, String] = Map(),
-    typeOverrides: Map[Type, String] = Map()
-  ): String = {
-    val columns = table.fieldNames.map(f => 
-      fieldOverrides.get(f) match {
-        case Some(typeString) => f+ " " + typeString
-        case None => table.fieldMap.mapping.get(f) match {
-          case None => throw new RuntimeException(s"Could not find type for ${f}")
-          case Some(item: FieldMap.Item) =>
-             f + " " + typeName(dialect, table, item, typeOverrides)
-        }
-      }).mkString(", ")
+  def createSql[K,E](dialect: SqlDialect, table: Table[K,E]): String = {
+    val columns = table.fieldMap.fields.map(item => 
+             item.name(table.config) + " " + typeName(dialect, table, item)
+    ).mkString(", ")
     val pkeyColumns = table.keyNames.mkString(",")
     s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
   }
@@ -478,8 +459,8 @@ case class View[K,E](
 
 object View {
   def apply[K,E](definition: String)
-    (implicit fmap: FieldMap[E], kmap: FieldMap[K]): View[K,E] = 
-    View(definition, kmap.names, fmap.names)
+    (implicit fmap: FieldMap[E], kmap: FieldMap[K], config: ScarmConfig): View[K,E] = 
+    View(definition, kmap.names(config), fmap.names(config))
 }
 
 
@@ -515,25 +496,31 @@ object Index {
   private[scarm] def indexName(table: Table[_,_], ttag: TypeTag[_]) =
     table.name + "_" + ttag.tpe.typeSymbol.name + "_idx"
 
-  def apply[K,PK,E](table: Table[PK,E])
-    (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
-      : Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
+  def apply[K,PK,E](table: Table[PK,E])(implicit
+    isProjection: Subset[K,E],
+    kmap: FieldMap[K],
+    ktag: TypeTag[K]
+  ): Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names(table.config))
 
-  def apply[K,PK,E](table: Table[PK,E], keyClass: Class[K])
-    (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
-      : Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names)
+  def apply[K,PK,E](table: Table[PK,E], keyClass: Class[K])(implicit
+    isProjection: Subset[K,E],
+    kmap: FieldMap[K],
+    ktag: TypeTag[K]
+  ): Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names(table.config))
 
-  def apply[K,PK,E](name: String, table: Table[PK,E])
-    (implicit  isProjection: Subset[K,E], kmap: FieldMap[K])
-      : Index[K,PK,E] = Index(name, table, kmap.names)
+  def apply[K,PK,E](name: String, table: Table[PK,E])(implicit
+    isProjection: Subset[K,E],
+    kmap: FieldMap[K]
+  ): Index[K,PK,E] = Index(name, table, kmap.names(table.config))
 
   def tupled[K,PK,E,KList<:HList, T<:Product](table: Table[PK,E], keyClass: Class[K])(implicit
     isProjection: Subset[K,E],
     kmap: FieldMap[K],
     ktag: TypeTag[K],
     kgen: Generic.Aux[K,KList],
-    tupled: hlist.Tupler.Aux[KList,T]
-  ): Index[T,PK,E] = Index(indexName(table,ktag), table, kmap.names)
+    tupled: hlist.Tupler.Aux[KList,T],
+    config: ScarmConfig
+  ): Index[T,PK,E] = Index(indexName(table,ktag), table, kmap.names(config))
 }
 
 
@@ -554,17 +541,21 @@ case class UniqueIndex[K,PK,E](
 
 object UniqueIndex {
 
-  def apply[K,PK,E,KList<:HList,EList<:HList](table: Table[PK,E])
-    (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
-      : UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
+  def apply[K,PK,E,KList<:HList,EList<:HList](table: Table[PK,E])(implicit
+    isProjection: Subset[K,E],
+    kmap: FieldMap[K],
+    ktag: TypeTag[K]
+  ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names(table.config))
 
-  def apply[K,PK,E](table: Table[PK,E], keyClass: Class[K])
-    (implicit isProjection: Subset[K,E], kmap: FieldMap[K], ktag: TypeTag[K])
-      : UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
+  def apply[K,PK,E](table: Table[PK,E], keyClass: Class[K])(implicit
+    isProjection: Subset[K,E],
+    kmap: FieldMap[K],
+    ktag: TypeTag[K]
+  ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names(table.config))
 
   def apply[K,PK,E,KList<:HList,EList<:HList](name: String,  table: Table[PK,E])
     (implicit isProjection: Subset[K,E], kmap: FieldMap[K])
-      : UniqueIndex[K,PK,E] = UniqueIndex(name, table, kmap.names)
+      : UniqueIndex[K,PK,E] = UniqueIndex(name, table, kmap.names(table.config))
 
   def tupled[K,PK,E,KList<:HList, T<:Product](table: Table[PK,E], keyClass: Class[K])(implicit
     isProjection: Subset[K,E],
@@ -572,7 +563,7 @@ object UniqueIndex {
     ktag: TypeTag[K],
     kgen: Generic.Aux[K,KList],
     tupled: hlist.Tupler.Aux[KList,T]
-  ): UniqueIndex[T,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names)
+  ): UniqueIndex[T,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names(table.config))
 }
 
 
@@ -654,7 +645,7 @@ object MandatoryForeignKey {
       foreignKeyStructureMatchesPrimaryKey: EqualStructure[FK,TPK],
       fkmap: FieldMap[FK]
     ): MandatoryForeignKey[FPK,FROM,TPK,TO] = {
-    val fknames = fkmap.names
+    val fknames = fkmap.names(from.config)
     if (to.keyNames.size != fknames.size)
       throw new RuntimeException(s"Foreign key ${fknames.mkString} from ${from.name} to ${to.name} does not match primary key ${to.keyNames.mkString}")
     MandatoryForeignKey(from,to, fknames.zip(to.keyNames))
@@ -685,7 +676,7 @@ object OptionalForeignKey {
       foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
       fkmap: FieldMap[FK]
     ): OptionalForeignKey[FPK,FROM,TPK,TO] = {
-    val fknames = fkmap.names
+    val fknames = fkmap.names(from.config)
     if (to.keyNames.size != fknames.size)
       throw new RuntimeException(s"Foreign key ${fknames.mkString} from ${from.name} to ${to.name} does not match primary key ${to.keyNames.mkString}")
     OptionalForeignKey(from,to, fknames.zip(to.keyNames))

@@ -94,7 +94,7 @@ trait DSLTestBase extends Suite with BeforeAndAfterAll {
 
   def createAll: Unit =  
     for (t <- allTables) {
-      t.create().transact(xa).unsafeRunSync()
+      t.create.transact(xa).unsafeRunSync()
     }
 
   def dropAll: Unit = 
@@ -141,7 +141,7 @@ case class TestMiscellaneous(
         IdEntity(nextId, randomString)
       )
       val op = for {
-        _ <- table.create()
+        _ <- table.create
         _ <- table.insert(entities.toSeq: _*)
         results <- table.scan(Unit)
       } yield {
@@ -165,7 +165,7 @@ case class TestMiscellaneous(
 
   test("a dropped table cannot be used") { 
     val table = Table[Id,IdEntity]("drop_test")
-    run(table.create())
+    run(table.create)
     runQuietly(table.drop)
     assertThrows[SQLException] {
       run(table.insert(IdEntity(Id(1),"foo")))
