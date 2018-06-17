@@ -310,12 +310,7 @@ case class Table[K, E](
 
   def update[KList<:HList,EList<:HList, REMList<:HList, REV,REVList<:HList]
     (entities: E*)(implicit  updater: Updater[K,E]): ConnectionIO[Int] = {
-    def f(e: E) = updater.update(this,e)
-    val first = f(entities.head)
-    if (entities.tail.size == 0) first
-    else entities.tail.foldLeft(first)( (io,e) =>
-        io.flatMap(i => f(e).map(_+i))
-    )
+    updater.updateBatch(this, entities:_*)
   }
 
   private[scarm] lazy val updateSql: String = {

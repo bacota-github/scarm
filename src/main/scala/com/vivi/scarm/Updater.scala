@@ -1,5 +1,6 @@
 package com.vivi.scarm
 
+import cats.data.NonEmptyList
 import doobie._
 import doobie.implicits._
 
@@ -12,7 +13,8 @@ import shapeless.ops.hlist
  */
 
 trait Updater[K,E] {
-  def update(table: Table[K,E], entity: E): ConnectionIO[Int] 
+  def update(table: Table[K,E], entity: E): ConnectionIO[Int]
+  def updateBatch(table: Table[K,E], entities: E*): ConnectionIO[Int]
 }
 
 trait LowPriorityUpdater {
@@ -24,12 +26,24 @@ trait LowPriorityUpdater {
     revComposite: Composite[REVList],
     revTupler: hlist.Tupler.Aux[REVList, REV]
   ) = new Updater[K,E] {
+
     def update(table: Table[K,E], entity: E) = {
       val key: K = table.primaryKey(entity)
       val remainder: REMList = remList(eGeneric.to(entity))
       val reversed: REVList = revList(remainder, key::HNil)
       Fragment(table.updateSql, reversed)(revComposite).update.run
     }
+
+    def updateBatch(table: Table[K,E], entities: E*) = {
+      val reversed: Seq[REVList] = entities.map(entity => {
+        val key: K = table.primaryKey(entity)
+        val remainder: REMList = remList(eGeneric.to(entity))
+        revList(remainder, key::HNil)
+      })
+      val nel: NonEmptyList[REVList] = NonEmptyList.of(reversed.head, reversed.tail:_*)
+      Update[REVList](table.updateSql)(revComposite).updateMany(nel)
+    }
+
   }
 
 }
@@ -46,11 +60,22 @@ object Updater extends LowPriorityUpdater {
     revComposite: Composite[REVList],
     revTupler: hlist.Tupler.Aux[REVList, REV]
   ) = new Updater[K,E] {
+
     def update(table: Table[K,E], entity: E) = {
       val key: KList = kGeneric.to(table.primaryKey(entity))
       val remainder: REMList = remList(eGeneric.to(entity))
       val reversed: REVList = revList(remainder, key)
       Fragment(table.updateSql, reversed)(revComposite).update.run
+    }
+
+    def updateBatch(table: Table[K,E], entities: E*) = {
+      val reversed: Seq[REVList] = entities.map(entity => {
+        val key: KList = kGeneric.to(table.primaryKey(entity))
+        val remainder: REMList = remList(eGeneric.to(entity))
+        revList(remainder, key)
+      })
+      val nel: NonEmptyList[REVList] = NonEmptyList.of(reversed.head, reversed.tail:_*)
+      Update[REVList](table.updateSql)(revComposite).updateMany(nel)
     }
   }
 }
