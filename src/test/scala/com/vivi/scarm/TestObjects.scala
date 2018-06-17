@@ -43,7 +43,7 @@ case class Assignment(id: AssignmentId, name: String,
 
 case class TestObjects(dialect: SqlDialect) {
 
-  implicit val theDialect = dialect
+  implicit val config = ScarmConfig(dialect)
 
   val teachers = Autogen[TeacherId,Teacher]("teachers")
   val courses = Table[CourseId,Course]("courses")

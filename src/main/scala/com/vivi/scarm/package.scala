@@ -28,4 +28,11 @@ package object scarm {
   object Postgresql extends SqlDialect
   object Mysql extends SqlDialect
   object Hsqldb extends SqlDialect
+
+  case class ScarmConfig(
+    dialect: SqlDialect,
+    snakeCase: Boolean = true,
+    fieldNameSeparator: String = "_"
+  )
 }
+

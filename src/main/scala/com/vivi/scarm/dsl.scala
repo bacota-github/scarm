@@ -130,7 +130,7 @@ case class Table[K, E](
   fieldMap: FieldMap[E],
   keyNames: Seq[String],
   autogen: Boolean,
-  dialect: SqlDialect,
+  config: ScarmConfig,
   keyComposite: Composite[K],
   entityComposite: Composite[E],
   primaryKey: PrimaryKey[K,E]
@@ -152,9 +152,9 @@ case class Table[K, E](
     fieldOverrides: Map[String, String] = Map(),
     typeOverrides: Map[Type, String] = Map()
   ): ConnectionIO[Int] = {
-    val sql = Table.createSql(dialect, this,fieldOverrides,typeOverrides)
+    val sql = Table.createSql(config.dialect, this,fieldOverrides,typeOverrides)
     val create = Fragment(sql, ()).update.run
-    if (dialect != Postgresql || !autogen) create
+    if (config.dialect != Postgresql || !autogen) create
     else {
       val sql =  "CREATE SEQUENCE IF NOT EXISTS " + Table.sequenceName(name, autogenField)
       val fragment = Fragment(sql, ()).update.run
@@ -173,7 +173,7 @@ case class Table[K, E](
   def drop: ConnectionIO[Int] = {
     val sql = s"DROP TABLE IF EXISTS ${name}"
     val drop = Fragment(sql, ()).update.run
-    if (dialect != Postgresql || !autogen) drop
+    if (config.dialect != Postgresql || !autogen) drop
     else {
       val sql = "DROP SEQUENCE " + Table.sequenceName(name, autogenField)
       val fragment = Fragment(sql, ()).update.run
@@ -217,7 +217,7 @@ case class Table[K, E](
     val frag = insertFragment(entity)
     if (!autogen) frag.run.map(_ => primaryKey(entity))
     else {
-      dialect match {
+      config.dialect match {
         case Hsqldb|Postgresql => 
           frag.withUniqueGeneratedKeys[K](keyNames.head)(keyComposite)
         case Mysql => {
@@ -251,7 +251,7 @@ case class Table[K, E](
     val dml = insertFragment(entity)
     def fetchEntity(k: K) =
       doobieQuery(k,keyComposite).query[E](entityComposite).unique
-    dialect match {
+    config.dialect match {
       case Postgresql =>
         dml.withUniqueGeneratedKeys[E](fieldNames:_*)(entityComposite)
       case Hsqldb|Mysql if !autogen => 
@@ -330,25 +330,25 @@ object Table {
     )
 
   def apply[K,E](name: String)
-    (implicit dialect: SqlDialect,
+    (implicit config: ScarmConfig,
       kmap: FieldMap[K],
       fmap: FieldMap[E],
       kcomp: Composite[K],
       ecomp: Composite[E],
       primaryKey: PrimaryKey[K,E]
     ): Table[K,E] = {
-    Table[K,E](name, fmap, pkeyColumns(kmap,fmap), false, dialect, kcomp,
+    Table[K,E](name, fmap, pkeyColumns(kmap,fmap), false, config, kcomp,
       ecomp, primaryKey)
   }
 
   def apply[K,E](name: String, kNames: Seq[String])
-    (implicit dialect: SqlDialect,
+    (implicit config: ScarmConfig,
       fmap: FieldMap[E],
       kcomp: Composite[K],
       ecomp: Composite[E],
       primaryKey: PrimaryKey[K,E]
     ): Table[K,E] =
-    Table[K,E](name, fmap, kNames, false, dialect, kcomp,
+    Table[K,E](name, fmap, kNames, false, config, kcomp,
       ecomp, primaryKey)
 
   private def sequenceName(tableName: String, fieldName: String) =
@@ -424,7 +424,7 @@ object Table {
 object Autogen {
 
   def apply[K,E](name: String)
-    (implicit dialect: SqlDialect,
+    (implicit config: ScarmConfig,
       kmap: FieldMap[K],
       fmap: FieldMap[E],
       kcomp: Composite[K],
@@ -433,7 +433,7 @@ object Autogen {
     ): Table[K,E] = Table[K,E](name).copy(autogen=true)
 
   def apply[K,E](name: String, kNames: Seq[String])
-    (implicit dialect: SqlDialect,
+    (implicit config: ScarmConfig,
       fmap: FieldMap[E],
       kcomp: Composite[K],
       ecomp: Composite[E],

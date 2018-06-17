@@ -78,7 +78,7 @@ case class DSLTest(driver: String,
 
 trait DSLTestBase extends Suite with BeforeAndAfterAll {
   def dialect: SqlDialect
-  implicit def implicitDialect = dialect
+  implicit def config = ScarmConfig(dialect)
 
   def xa: Transactor[IO]
   implicit def implicitXA = xa
