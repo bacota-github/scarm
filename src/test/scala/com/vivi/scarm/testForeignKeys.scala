@@ -55,9 +55,9 @@ case class ForeignKeyTests(
 
   override def beforeAll() {
     super.beforeAll()
-    run(parentTable.insertBatch(parents:_*))
-    run(childTable.insertBatch(children:_*))
-    run(grandchildTable.insertBatch(grandchildren:_*))
+    run(parentTable.insert(parents:_*))
+    run(childTable.insert(children:_*))
+    run(grandchildTable.insert(grandchildren:_*))
   }
 
   override def afterAll() {
@@ -117,7 +117,7 @@ case class ForeignKeyTests(
     val fkey = OptionalForeignKey(optChildTable, parentTable, classOf[OptChildToParent])
     run(for {
       _ <- parentTable.insert(parent)
-      _ <- optChildTable.insertBatch(childOfSome, childOfNone)
+      _ <- optChildTable.insert(childOfSome, childOfNone)
       children <- fkey.fetchBy(parent.id)
     } yield {
       assert(children == Set(childOfSome))

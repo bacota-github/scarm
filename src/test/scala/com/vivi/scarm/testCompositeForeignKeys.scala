@@ -38,8 +38,8 @@ case class CompositeForeignKeyTests(
 
   override def beforeAll() {
     super.beforeAll()
-    run(parentTable.insertBatch(parents:_*))
-    run(childTable.insertBatch(children:_*))
+    run(parentTable.insert(parents:_*))
+    run(childTable.insert(children:_*))
   }
 
   override def afterAll() {

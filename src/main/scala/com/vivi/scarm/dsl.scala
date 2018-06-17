@@ -186,27 +186,27 @@ case class Table[K, E](
     Fragment(sql, ()).update.run
   }
 
-  def insert[EList<:HList,REMList<:HList,REM](entity: E)
-  (implicit eGeneric: LabelledGeneric.Aux[E,EList],
-    remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
-    remComposite: Composite[REMList],
-    remTupler: hlist.Tupler.Aux[REMList,REM]
-  ): ConnectionIO[Int] = insertFragment(entity).run
 
-
-  def insertBatch[EList<:HList,ETail<:HList,REM](entities: E*)
+  def insert[EList<:HList,ETail<:HList,REM](entities: E*)
     (implicit eGeneric: LabelledGeneric.Aux[E,EList],
       remList:  hlist.Drop.Aux[EList,Nat._1,ETail],
       remComposite: Composite[ETail],
       remTupler: hlist.Tupler.Aux[ETail,REM]
   ): ConnectionIO[Int] = {
     if (autogen) {
-      chainDml(entities, (e: E) => insert(e))
+      chainDml(entities, (e: E) => insertOne(e))
     } else {
       val nel: NonEmptyList[E] = NonEmptyList.of(entities.head, entities.tail:_*)
       Update[E](insertSql)(entityComposite).updateMany(nel)
     }
   }
+
+  private[scarm] def insertOne[EList<:HList,REMList<:HList,REM](entity: E)
+  (implicit eGeneric: LabelledGeneric.Aux[E,EList],
+    remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
+    remComposite: Composite[REMList],
+    remTupler: hlist.Tupler.Aux[REMList,REM]
+  ): ConnectionIO[Int] = insertFragment(entity).run
 
   def insertReturningKey[EList<:HList,REMList<:HList,REM](entity: E)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],

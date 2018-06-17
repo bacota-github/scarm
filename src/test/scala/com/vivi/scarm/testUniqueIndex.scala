@@ -29,21 +29,15 @@ case class TestUniqueIndex(
     val name = randomString
     run(table.insert(UniqueIndexEntity(nextId, name)))
     val violation = table.insert(UniqueIndexEntity(nextId, name))
-    if (dialect == Postgresql) {
-      assertThrows[Exception] { 
-        run(violation)
-      }
-    } else {
-      assertThrows[java.sql.SQLIntegrityConstraintViolationException] {
-        run(violation)
-      }
+    assertThrows[Exception] {
+      run(violation)
     }
   }
 
   test("Query by unique Index") {
     val e1 = UniqueIndexEntity(nextId, randomString)
     val e2 = UniqueIndexEntity(nextId, randomString)
-    run(table.insertBatch(e1,e2))
+    run(table.insert(e1,e2))
     assert(run(index(UniqueKey(e2.name))) == Some(e2))
     assert(run(index(UniqueKey(e1.name))) == Some(e1))
   }
@@ -52,7 +46,7 @@ case class TestUniqueIndex(
     val index = UniqueIndex.tupled(table, classOf[UniqueKey])
     val e1 = UniqueIndexEntity(nextId, randomString)
     val e2 = UniqueIndexEntity(nextId, randomString)
-    run(table.insertBatch(e1,e2))
+    run(table.insert(e1,e2))
     assert(run(index(Tuple1(e2.name))) == Some(e2))
     assert(run(index(Tuple1(e1.name))) == Some(e1))
   }

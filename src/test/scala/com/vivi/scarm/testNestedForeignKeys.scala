@@ -38,8 +38,8 @@ case class NestedForeignKeyTests(
     val child2 = NestedChild(nextId, NestedId(parent2.id, 2), "2")
     val parent3 = Parent(nextId, "parent3")
     run(for {
-      _ <- parentTable.insertBatch(parent1, parent2)
-      _ <- childTable.insertBatch(child1, child2)
+      _ <- parentTable.insert(parent1, parent2)
+      _ <- childTable.insert(child1, child2)
       childrenOf1 <- foreignKey.index(parent1.id)
       childrenOf2 <- foreignKey.index(parent2.id)
     } yield {
