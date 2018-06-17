@@ -43,7 +43,7 @@ case class TestUniqueIndex(
   test("Query by unique Index") {
     val e1 = UniqueIndexEntity(nextId, randomString)
     val e2 = UniqueIndexEntity(nextId, randomString)
-    run(table.insertAll(e1,e2))
+    run(table.insertBatch(e1,e2))
     assert(run(index(UniqueKey(e2.name))) == Some(e2))
     assert(run(index(UniqueKey(e1.name))) == Some(e1))
   }
@@ -52,7 +52,7 @@ case class TestUniqueIndex(
     val index = UniqueIndex.tupled(table, classOf[UniqueKey])
     val e1 = UniqueIndexEntity(nextId, randomString)
     val e2 = UniqueIndexEntity(nextId, randomString)
-    run(table.insertAll(e1,e2))
+    run(table.insertBatch(e1,e2))
     assert(run(index(Tuple1(e2.name))) == Some(e2))
     assert(run(index(Tuple1(e1.name))) == Some(e1))
   }

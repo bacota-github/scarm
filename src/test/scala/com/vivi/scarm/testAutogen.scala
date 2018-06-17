@@ -30,12 +30,12 @@ case class TestAutogen(
   }
 
 
-  test("insertAllReturningKey on entities with autogen primary key returns the correct Keys and the entities can be selected") {
+  test("insertBatchReturningKey on entities with autogen primary key returns the correct Keys and the entities can be selected") {
     val e1 = AutogenEntity(Id(0), randomString)
     val e2 = AutogenEntity(Id(0), randomString)
     val e3 = AutogenEntity(Id(0), randomString)
     val entities = Seq(e1,e2,e3)
-    val keys = run(autogenTable.insertAllReturningKeys(e1,e2,e3))
+    val keys = run(autogenTable.insertBatchReturningKeys(e1,e2,e3))
     val zipped = keys zip entities
     for ((k,e) <- zipped) {
       val readName = run(autogenTable(k)).get.name
@@ -54,12 +54,12 @@ case class TestAutogen(
     })
   }
 
-  test("insertAllReturning entities with autogen primary key returns the entities and the entities can be selected") {
+  test("insertBatchReturning entities with autogen primary key returns the entities and the entities can be selected") {
     val e1 = AutogenEntity(Id(0), randomString)
     val e2 = AutogenEntity(Id(0), randomString)
     val e3 = AutogenEntity(Id(0), randomString)
     val entities = Seq(e1,e2,e3)
-    val returned = run(autogenTable.insertAllReturning(e1,e2,e3))
+    val returned = run(autogenTable.insertBatchReturning(e1,e2,e3))
     val zipped = returned zip entities
     for ((ret, e) <- zipped) {
       assert(ret.name == e.name)
@@ -71,7 +71,7 @@ case class TestAutogen(
     val e1 = AutogenEntity(Id(0), randomString)
     val e2 = AutogenEntity(Id(0), randomString)
     val e3 = AutogenEntity(Id(0), randomString)
-    val keys = run(autogenTable.insertAllReturningKeys(e1,e2,e3))
+    val keys = run(autogenTable.insertBatchReturningKeys(e1,e2,e3))
     assert(run(autogenTable.delete(keys(0), keys(1))) == 2)
     assert(run(autogenTable(keys(0))) == None)
     assert(run(autogenTable(keys(1))) == None)
@@ -85,7 +85,7 @@ case class TestAutogen(
       AutogenEntity(Id(0), randomString),
       AutogenEntity(Id(0), randomString)
     )
-    val Seq(e1,e2,e3) = run(autogenTable.insertAllReturning(entities:_*))
+    val Seq(e1,e2,e3) = run(autogenTable.insertBatchReturning(entities:_*))
     val update1 = e1.copy(name=randomString)
     assert(e1 != update1)
     val update2 = e2.copy(name=randomString)

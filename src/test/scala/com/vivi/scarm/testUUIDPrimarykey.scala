@@ -52,7 +52,7 @@ case class TestWithUUIDPrimaryKey(
     val e2 = UUIDEntity(nextUuid, randomString)
     val e3 = UUIDEntity(nextUuid, randomString)
     run(for {
-      i <- table.insertAll(e1,e2,e3)
+      i <- table.insertBatch(e1,e2,e3)
       e2New <- table(e2.id)
       e1New <- table(e1.id)
       e3New <- table(e3.id)
@@ -76,12 +76,12 @@ case class TestWithUUIDPrimaryKey(
   }
 
 
-  test("insertAllReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") {
+  test("insertBatchReturningKey on entities with primitive primary key returns the correct Keys and the entities can be selected") {
     val e1 = UUIDEntity(nextUuid, randomString)
     val e2 = UUIDEntity(nextUuid, randomString)
     val e3 = UUIDEntity(nextUuid, randomString)
     val entities = Seq(e1,e2,e3)
-    val keys = run(table.insertAllReturningKeys(e1,e2,e3))
+    val keys = run(table.insertBatchReturningKeys(e1,e2,e3))
     assert(keys == entities.map(_.id))
     for (e <- entities) {
       assert(run(table(e.id)) == Some(e))
@@ -99,12 +99,12 @@ case class TestWithUUIDPrimaryKey(
     })
   }
 
-  test("insertAllReturning entities with primitive primary key returns the entities and the entities can be selected") {
+  test("insertBatchReturning entities with primitive primary key returns the entities and the entities can be selected") {
     val e1 = UUIDEntity(nextUuid, randomString)
     val e2 = UUIDEntity(nextUuid, randomString)
     val e3 = UUIDEntity(nextUuid, randomString)
     val entities = Seq(e1,e2,e3)
-    val returned = run(table.insertAllReturning(e1,e2,e3))
+    val returned = run(table.insertBatchReturning(e1,e2,e3))
     assert(returned == entities)
     for (e <- entities) {
       assert(run(table(e.id)) == Some(e))
@@ -115,7 +115,7 @@ case class TestWithUUIDPrimaryKey(
     val e1 = UUIDEntity(nextUuid, randomString)
     val e2 = UUIDEntity(nextUuid, randomString)
     val e3 = UUIDEntity(nextUuid, randomString)
-    assert(run(table.insertAll(e1,e2,e3)) == 3)
+    assert(run(table.insertBatch(e1,e2,e3)) == 3)
     assert(run(table.delete(e1.id,e2.id)) == 2)
     assert(run(table(e1.id)) == None)
     assert(run(table(e2.id)) == None)
@@ -127,7 +127,7 @@ case class TestWithUUIDPrimaryKey(
     val e1 = UUIDEntity(nextUuid, randomString)
     val e2 = UUIDEntity(nextUuid, randomString)
     val e3 = UUIDEntity(nextUuid, randomString)
-    assert(run(table.insertAll(e1,e2,e3)) == 3)
+    assert(run(table.insertBatch(e1,e2,e3)) == 3)
     val update1 = e1.copy(name=randomString)
     assert(e1 != update1)
     val update2 = e2.copy(name=randomString)

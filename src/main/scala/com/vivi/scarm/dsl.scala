@@ -201,20 +201,12 @@ case class Table[K, E](
       remTupler: hlist.Tupler.Aux[ETail,REM]
   ): ConnectionIO[Int] = {
     if (autogen) {
-      insertAll(entities:_*)
+      chainDml(entities, (e: E) => insert(e))
     } else {
       val nel: NonEmptyList[E] = NonEmptyList.of(entities.head, entities.tail:_*)
       Update[E](insertSql)(entityComposite).updateMany(nel)
     }
   }
-
-  def insertAll[EList<:HList,REMList<:HList,REM](entities: E*)
-  (implicit eGeneric: LabelledGeneric.Aux[E,EList],
-    remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
-    remComposite: Composite[REMList],
-    remTupler: hlist.Tupler.Aux[REMList,REM]
-  ): ConnectionIO[Int] = chainDml(entities, (e: E) => insert(e))
-
 
   def insertReturningKey[EList<:HList,REMList<:HList,REM](entity: E)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
@@ -237,7 +229,7 @@ case class Table[K, E](
   }
 
 
-  def insertAllReturningKeys[EList<:HList,REMList<:HList,REM](entities: E*)
+  def insertBatchReturningKeys[EList<:HList,REMList<:HList,REM](entities: E*)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
     remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
     remComposite: Composite[REMList],
@@ -278,7 +270,7 @@ case class Table[K, E](
     }
   }
 
-  def insertAllReturning[EList<:HList,REMList<:HList,REM](entities: E*)
+  def insertBatchReturning[EList<:HList,REMList<:HList,REM](entities: E*)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
     remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
     remComposite: Composite[REMList],

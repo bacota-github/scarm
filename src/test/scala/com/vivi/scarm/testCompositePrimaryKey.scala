@@ -77,12 +77,12 @@ case class TestWithCompositePrimaryKey(
   }
 
 
-  test("insertAllReturningKey on entities with composite key returns the correct Keys and the entities can be selected") {
+  test("insertBatchReturningKey on entities with composite key returns the correct Keys and the entities can be selected") {
     val e1 = CompositeKeyEntity(randomCompositeKey, randomString)
     val e2 = CompositeKeyEntity(randomCompositeKey, randomString)
     val e3 = CompositeKeyEntity(randomCompositeKey, randomString)
     val entities = Seq(e1,e2,e3)
-    val keys = run(table.insertAllReturningKeys(e1,e2,e3))
+    val keys = run(table.insertBatchReturningKeys(e1,e2,e3))
     assert(keys == entities.map(_.id))
     for (e <- entities) {
       assert(run(table(e.id)) == Some(e))
@@ -100,12 +100,12 @@ case class TestWithCompositePrimaryKey(
     })
   }
 
-  test("insertAllReturning entities with composite key returns the entities and the entities can be selected") {
+  test("insertBatchReturning entities with composite key returns the entities and the entities can be selected") {
     val e1 = CompositeKeyEntity(randomCompositeKey, randomString)
     val e2 = CompositeKeyEntity(randomCompositeKey, randomString)
     val e3 = CompositeKeyEntity(randomCompositeKey, randomString)
     val entities = Seq(e1,e2,e3)
-    val returned = run(table.insertAllReturning(e1,e2,e3))
+    val returned = run(table.insertBatchReturning(e1,e2,e3))
     assert(returned == entities)
     for (e <- entities) {
       assert(run(table(e.id)) == Some(e))

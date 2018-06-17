@@ -142,7 +142,7 @@ case class TestMiscellaneous(
       )
       val op = for {
         _ <- table.create()
-        _ <- table.insertAll(entities.toSeq: _*)
+        _ <- table.insertBatch(entities.toSeq: _*)
         results <- table.scan(Unit)
       } yield {
         assert(results == entities)

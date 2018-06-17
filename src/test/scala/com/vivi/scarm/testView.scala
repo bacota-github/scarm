@@ -26,7 +26,7 @@ case class TestView(
   )
 
   test("querying a view") {
-    run(table.insertAll(
+    run(table.insertBatch(
       ViewEntity(1,"a",1,1),
       ViewEntity(2,"a",2,2),
       ViewEntity(3,"b",1,4),
