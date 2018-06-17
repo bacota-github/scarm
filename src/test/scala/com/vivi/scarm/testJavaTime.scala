@@ -25,7 +25,7 @@ case class TestJavaTime(
   override val dialect: SqlDialect,
   override val cleanup: (Transactor[IO] => Boolean) = (_ => true )
 ) extends FunSuite with DSLTestBase  {
-  val dateTable = Table[Id,DateEntity]("date")
+  val dateTable = Table[Id,DateEntity]("dateTest")
   override val  allTables = Seq(dateTable)
 
   test("java.time fields are supported") {

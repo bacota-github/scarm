@@ -40,7 +40,7 @@ class DSLSuite extends Suites(
     "jdbc:postgresql:scarm", "scarm", "scarm", Postgresql,
   ),
 
-  DSLTest("com.mysql.cj.jdbc.Driver",
+  DSLTest("com.mysql.jdbc.Driver",
     "jdbc:mysql://localhost:3306/scarm?serverTimezone=UTC&useSSL=false&sql_mode=",
     "scarm", "scarm", Mysql
   )

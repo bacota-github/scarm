@@ -16,10 +16,7 @@ package object scarm {
     Meta[java.sql.Timestamp].xmap(_.toLocalDateTime, java.sql.Timestamp.valueOf)
 
   implicit def JavaTimeLocalDateMeta(implicit dialect: SqlDialect): Meta[java.time.LocalDate] =
-    Meta[java.sql.Date].xmap(
-      d => { if (dialect == Mysql) d.toLocalDate.plusDays(1) else d.toLocalDate },
-      java.sql.Date.valueOf
-    )
+    Meta[java.sql.Date].xmap(_.toLocalDate,  java.sql.Date.valueOf)
 
   import java.util.UUID
   implicit lazy val UUIDMeta: Meta[UUID] = Meta[String].xmap(UUID.fromString(_), _.toString)
