@@ -78,7 +78,7 @@ case class DSLTest(driver: String,
 
 trait DSLTestBase extends Suite with BeforeAndAfterAll {
   def dialect: SqlDialect
-  implicit def config = ScarmConfig(dialect)
+  implicit def config = ScarmConfig(dialect, false, "_")
 
   def xa: Transactor[IO]
   implicit def implicitXA = xa
@@ -111,7 +111,7 @@ trait DSLTestBase extends Suite with BeforeAndAfterAll {
   }
 
    override def afterAll() {
-    if (cleanup(xa)) dropAll else ()
+//    if (cleanup(xa)) dropAll else ()
    }
 
   val rand = new java.util.Random()

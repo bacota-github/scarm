@@ -16,7 +16,8 @@ case class FieldMap[A](firstFieldName: String, fields: Seq[FieldMap.Item]) {
   def ++[B<:HList](other: FieldMap[B]):FieldMap[A::B] = FieldMap.concat(this,other)
   def isOptional(field: Seq[String]): Boolean =
     mapping.get(field).map(_.optional).getOrElse(false)
-  def names(config: ScarmConfig) = fields.map(_.names.mkString(config.fieldNameSeparator))
+
+  def names(config: ScarmConfig) = fields.map(_.name(config))
 
   def prefix(pre: String) = FieldMap(firstFieldName, 
     fields.map(item => item.copy(names = pre +: item.names))
@@ -31,8 +32,15 @@ case class FieldMap[A](firstFieldName: String, fields: Seq[FieldMap.Item]) {
 object FieldMap {
 
   case class Item(names: Seq[String], tpe: Type, optional: Boolean) {
-    def name(config: ScarmConfig) = names.mkString(config.fieldNameSeparator)
+    def name(config: ScarmConfig) = {
+      val nms = if (config.snakeCase) names.map(snakeCase(_)) else names
+      nms.mkString(config.fieldNameSeparator)
+    }
   }
+
+  private lazy val snakeCaseRegex = """([A-Z])""".r
+  def snakeCase(name: String): String =
+    snakeCaseRegex.replaceAllIn(name, "_" + _.matched.toLowerCase())
 
   implicit def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = FieldMap[A](
     firstFieldNameOfType(ttag.tpe),
