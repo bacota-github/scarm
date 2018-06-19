@@ -42,8 +42,10 @@ case class Table[K, E](
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     primaryKeyIndex.collectResults(reduced)
 
-  def create: ConnectionIO[Int] = {
-    val sql = Table.createSql(config.dialect, this)
+  def create: ConnectionIO[Int] = createWithTypeOverrides(Map())
+
+  def createWithTypeOverrides(overrides: PartialFunction[String,String]): ConnectionIO[Int] = {
+    val sql = Table.createSql(this, overrides)
     val create = Fragment(sql, ()).update.run
     if (config.dialect != Postgresql || !autogen) create
     else {
@@ -119,7 +121,6 @@ case class Table[K, E](
     }
   }
 
-
   def insertBatchReturningKeys[EList<:HList,REMList<:HList,REM](entities: E*)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
     remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
@@ -132,7 +133,6 @@ case class Table[K, E](
     )
   }
   
-
   def insertReturning[EList<:HList,REMList<:HList,REM](entity: E)
   (implicit eGeneric: LabelledGeneric.Aux[E,EList],
     remList:  hlist.Drop.Aux[EList,Nat._1,REMList],
@@ -208,7 +208,6 @@ case class Table[K, E](
     val updatedCols = nonKeyFieldNames.map(f => s"${f}=?").mkString(",")
     s"UPDATE ${name} SET ${updatedCols} WHERE ${whereClauseNoAlias}"
   }
-
 }
 
 
@@ -250,20 +249,28 @@ object Table {
       }
     }
 
-  private def typeName(dialect: SqlDialect, table: Table[_,_], item: FieldMap.Item) = {
+  private def typeName(table: Table[_,_],
+    item: FieldMap.Item,
+    overrides: PartialFunction[String,String]
+  ) = {
     val nullable = if (item.optional) "" else "not null"
+    val columnName = item.name(table.config)
+    val dialect = table.config.dialect
     val auto =
       if (!table.autogen || item != table.autogenField) ""
-      else autogenModifier(dialect, table.name, item.name(table.config))
-    sqlTypeMap(dialect).get(item.tpe.typeSymbol) match {
-      case None => throw new RuntimeException(s"Could not find sql type for type ${item.tpe.companion}")
-      case Some(typeString) => s"${typeString} ${nullable} ${auto}"
-    }
+      else autogenModifier(dialect, table.name, columnName)
+    val columnType =
+      if (overrides.isDefinedAt(columnName)) overrides(columnName)
+      else sqlTypeMap(dialect).get(item.tpe.typeSymbol) match {
+          case Some(t) => t
+          case None =>  throw new RuntimeException(s"Could not find sql type for type ${item.tpe.companion}")
+        }
+    s"${columnType} ${nullable} ${auto}"
   }
 
-  def createSql[K,E](dialect: SqlDialect, table: Table[K,E]): String = {
+  def createSql[K,E](table: Table[K,E], typeOverrides: PartialFunction[String,String]): String = {
     val columns = table.fieldMap.fields.map(item => 
-             item.name(table.config) + " " + typeName(dialect, table, item)
+             item.name(table.config) + " " + typeName(table, item, typeOverrides)
     ).mkString(", ")
     val pkeyColumns = table.keyNames.mkString(",")
     s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"

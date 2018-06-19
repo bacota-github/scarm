@@ -3,7 +3,7 @@ ensimeScalaVersion in ThisBuild := "2.12.6"
 
 scalacOptions ++= Seq("-Ypartial-unification", "-deprecation", "-feature")// "-Xlog-implicits")
 
-val doobieVersion = "0.5.2"
+val doobieVersion = "0.5.3"
 
 libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.3",
