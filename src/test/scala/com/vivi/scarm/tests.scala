@@ -111,7 +111,7 @@ trait DSLTestBase extends Suite with BeforeAndAfterAll {
   }
 
    override def afterAll() {
-//    if (cleanup(xa)) dropAll else ()
+    if (cleanup(xa)) dropAll else ()
    }
 
   val rand = new java.util.Random()
