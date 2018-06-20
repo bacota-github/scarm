@@ -47,8 +47,8 @@ class DSLSuite extends Suites(
 )
 
 object DSLTest {
-  def xa(driver: String, url: String, username: String, pass: String)
-  = Transactor.fromDriverManager[IO](driver, url, username, pass)
+  def xa(driver: String, url: String, username: String, pass: String) =
+    Transactor.fromDriverManager[IO](driver, url, username, pass)
 }
 
 case class DSLTest(driver: String,
@@ -133,6 +133,13 @@ case class TestMiscellaneous(
 ) extends FunSuite with DSLTestBase  {
   val intTable = Table[Id,IdEntity]("misc_test")
   override val  allTables = Seq(intTable)
+
+  test("tables with the wrong primary key should not compile") {
+    val name = "badTable"
+    assertDoesNotCompile(
+      "val table = Table[String,IdEntity](name)"
+    )
+  }
 
   test("A table scan returns all the entities in the table") {
     val table = Table[Id,IdEntity]("scan_test")
