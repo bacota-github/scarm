@@ -13,8 +13,6 @@ import com.vivi.scarm.FieldMap._
 
 import shapeless._
 
-import TestObjects._
-
 object DSLSuite {
   val hsqldbCleanup = (xa:Transactor[IO]) => {
     val op = for {
@@ -73,7 +71,8 @@ case class DSLTest(driver: String,
   NestedForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   CompositeForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   TestView(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
-  TestTypeOverrides(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
+  TestTypeOverrides(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
+  TestDemo(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
 )
 
 
@@ -84,10 +83,10 @@ trait DSLTestBase extends Suite with BeforeAndAfterAll {
   def xa: Transactor[IO]
   implicit def implicitXA = xa
 
+  def run[T](op: ConnectionIO[T]) =   op.transact(xa).unsafeRunSync()
+
   def allTables: Seq[Table[_,_]]
   def cleanup: (Transactor[IO] => Boolean) = (_ => true ) 
-
-  def run[T](op: ConnectionIO[T]): T = op.transact(xa).unsafeRunSync()
 
   def runQuietly(op: ConnectionIO[_]) = try {
     run(op)
@@ -177,6 +176,26 @@ case class TestMiscellaneous(
     runQuietly(table.drop)
     assertThrows[SQLException] {
       run(table.insert(IdEntity(Id(1),"foo")))
+    }
+  }
+}
+
+
+
+case class TestDemo(
+  xa: Transactor[IO],
+  dialect: SqlDialect,
+  cleanup: (Transactor[IO] => Boolean) = (_ => true )
+) extends FunSuite {
+
+  test ("The demo works" ) {
+    import com.vivi.scarm.demo._
+    val config = ScarmConfig(dialect)
+    try {
+      new Demo()(config, xa)
+    } finally {
+      new DemoCleanup()(config, xa)
+      this.cleanup(xa)
     }
   }
 }

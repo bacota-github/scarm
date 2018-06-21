@@ -3,8 +3,12 @@ package com.vivi
 import doobie._
 import doobie.implicits._
 
+import cats.effect.IO
 
 package object scarm {
+
+  def run[T](op: ConnectionIO[T])(implicit xa: Transactor[IO]): T =
+    op.transact(xa).unsafeRunSync()
 
   implicit lazy val JavaTimeLocalTimeMeta: Meta[java.time.LocalTime] =
     Meta[java.sql.Time].xmap(_.toLocalTime, java.sql.Time.valueOf)

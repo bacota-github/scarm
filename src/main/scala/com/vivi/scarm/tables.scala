@@ -42,7 +42,7 @@ case class Table[K, E](
   override private[scarm] def collectResults[T](reduced: Traversable[T]): Option[T] =
     primaryKeyIndex.collectResults(reduced)
 
-  def create: ConnectionIO[Int] = createWithTypeOverrides(Map())
+  def create: ConnectionIO[Unit] = createWithTypeOverrides(Map()).map(_ => ())
 
   def createWithTypeOverrides(overrides: PartialFunction[String,String]): ConnectionIO[Int] = {
     val sql = Table.createSql(this, overrides)
@@ -68,7 +68,7 @@ case class Table[K, E](
     val drop = Fragment(sql, ()).update.run
     if (config.dialect != Postgresql || !autogen) drop
     else {
-      val sql = "DROP SEQUENCE " + Table.sequenceName(name, autogenFieldName)
+      val sql = "DROP SEQUENCE IF EXISTS " + Table.sequenceName(name, autogenFieldName)
       val fragment = Fragment(sql, ()).update.run
       chainDdl(drop, fragment)
     }
