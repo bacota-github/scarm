@@ -72,7 +72,7 @@ case class DSLTest(driver: String,
   CompositeForeignKeyTests(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   TestView(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
   TestTypeOverrides(DSLTest.xa(driver,url,username,pass),dialect,cleanup),
-  TestDemo(DSLTest.xa(driver,url,username,pass),dialect,cleanup)
+  demo.Demo(ScarmConfig(dialect), DSLTest.xa(driver,url,username,pass))
 )
 
 
@@ -176,26 +176,6 @@ case class TestMiscellaneous(
     runQuietly(table.drop)
     assertThrows[SQLException] {
       run(table.insert(IdEntity(Id(1),"foo")))
-    }
-  }
-}
-
-
-
-case class TestDemo(
-  xa: Transactor[IO],
-  dialect: SqlDialect,
-  cleanup: (Transactor[IO] => Boolean) = (_ => true )
-) extends FunSuite {
-
-  test ("The demo works" ) {
-    import com.vivi.scarm.demo._
-    val config = ScarmConfig(dialect)
-    try {
-      new Demo()(config, xa)
-    } finally {
-      new DemoCleanup()(config, xa)
-      this.cleanup(xa)
     }
   }
 }
