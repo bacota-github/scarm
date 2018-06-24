@@ -3,7 +3,6 @@ package com.vivi.scarm.test.demo
 import cats.effect.IO
 import doobie.ConnectionIO
 import doobie.util.transactor.Transactor
-import fs2.Stream
 import org.scalatest.{ BeforeAndAfterAll, FunSuite }
 import com.vivi.scarm._
 import java.time._
