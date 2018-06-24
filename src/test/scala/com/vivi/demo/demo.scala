@@ -431,6 +431,15 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
       assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
     })
 
+    /* There is an explicit shortcut for "in" Fragments. Unfortunately
+     * this is of limited use because in queries do not work for
+     * composite primary keys.  */
+    run(for {
+      johns <- teachers.in(TeacherId(5), TeacherId(6))
+    } yield {
+      assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
+    })
+
     /* As a final "escape hatch", a View object can be defined for any query */
     val sectionCountByCourse = View[CourseId, SectionCount](
       "select section_course_id, count(*) as count from Section group by section_course_id"
