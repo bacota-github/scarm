@@ -32,7 +32,7 @@ The table definition has two type parameters -- the primary key type, and the en
 
 The lone argument to the table constructor is the name of the table in the database.  
 
-We can generate the SQL to create the table in the database.  
+SQL can be generated to create the table in the database.  
 
 ```
 val createParent: ConnectionIO[Unit] = parents.create
@@ -68,7 +68,7 @@ val dml: ConnectionIO[Unit] = for {
 
 ```
 
-We can select from the tables by primary key 
+Select from the tables by primary key 
 ```
 val parent1: Option[Parent] = parents(ParentId(1)).transact(xa).unsafeRunSync()
 ```
@@ -77,17 +77,17 @@ or read all the rows from the table
 val allParents: Set[Parent] = parents.scan(Unit).transact(xa).unsafeRunSync()
 ```
 
-To define a relationship between the two tables, we need a key class 
+To define a relationship between the two tables, define a key class 
 ```
 case class ChildToParent(parent: ParentId)
 ```
-Then we can define a relationship like this
+Then can define a relationship like this
 ```
 val childParent = MandatoryForeignKey(children, parents, classOf[ChildToParent])
 ```
 The ChildToParent class defines the names of the columns used in the foreign key.  This won't compile unless the fields of the key class actually exist in the Child class *and* the types of those fields line up with the Parent class's primary key.
 
-We can use a foreign key to construct joins with the `::`` operator
+A foreign key can be used to construct joins with the `::`` operator
 ```
 val childrenWithParents: ConnectionIO[Option[(Child, Parent)]] =  
     (children :: childParent.manyToOne)(ChildId(1))
@@ -95,6 +95,13 @@ val parentWithChildren: ConnectionIO[Option[Parent, Set[Children])]] =
     (parent :: childParent.oneToMany)(ParentId(1))
 ```
 
+Shapeless is used to prevent foreign keys from compiling with the wrong type of index class.  For example, with a key class
+```case class BadChildToParent(farent: ParentId)```
+this won't compile
+```
+val badChildParent = MandatoryForeignKey(children, parents, classOf[BadChildToParent])
+```
+because there `Child` does not have a field called `farent`.  
 
 ## Current Status
 
