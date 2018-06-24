@@ -2,9 +2,9 @@
 
 Scarm is a library for using Doobie to conveniently store and retrieve case classes in a relational database.  It's goals are
 
-1. Automatically generate all the required SQL.
-2. Do as much static type checking as possible.
-3. Generate SQL for joins to load structures of related case classes from the database.
+1. Automatic SQL generation.
+2. As much static type checking as possible.
+3. Support for joins to load structures of related case classes from the database.
 
 
 ## Quick Overview
@@ -28,16 +28,17 @@ Create a couple of tables to hold entities of the requisite type.
 val parents = Table[ParentId,Parent]("parent")
 val children = Table[ChildId,Child]("children")
 ```
-The table definition has two type parameters -- the primary key type, and the entity type.  The primary key of the table is always the type of the first field in the case class.  (It should be possible to just infer the primary key type from the HList of the entity, but I haven't managed to get that working.)  
+The table definition has two type parameters -- the primary key type, and the entity type.  The primary key of the table is *always* the type of the first field in the case class.  (It should be possible to just infer the primary key type from the HList of the entity, but I haven't managed to get that working.)  
 
 The lone argument to the table constructor is the name of the table in the database.  
 
-We can generate the SQL for the table in the database.  This is useful for unit tests but in a production environment the database structures would presumably be managed by a database migration tool like flyway.
+We can generate the SQL to create the table in the database.  
 
 ```
 val createParent: ConnectionIO[Unit] = parents.create
 val createChild: ConnectionIO[Unit] = children.create
 ```
+This is useful for unit tests but in a production environment the database structures would presumably be managed by a database migration tool like flyway.
 
 The tables will be created with the following SQL 
 ```
@@ -52,7 +53,7 @@ CREATE TABLE Child(
    bank_account int
 )
 ```
-The use of "_" to separate parts of nested fields (e.g. `parent_id`), and the conversion from camel case to snake case (`bankAccount` to `bank_account`) are defaults that can be changed in configuration.
+The use of "_" to separate parts of nested fields (e.g. `parent_id`), and the conversion from camel case to snake case (`bankAccount` to `bank_account`) are defaults that can be changed in configuration.  The column types  can also be overridden but it's probably not worth the effort if production SQL is managed outside of the application code.
 
 We can do DML on the tables
 ```
@@ -101,8 +102,6 @@ At the moment, Scarm has exactly one user, and that's me.
 
 Scarm supports Postgresql, Mysql, and Hsqldb.  I test with 9.6, 5.7, and 2.4.0 respectively.
     
-    
-    Optional Foreign Keys -- Option can be used
 
 ## Misc
     Views
