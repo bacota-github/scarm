@@ -28,5 +28,8 @@ case class View[K,E](
 object View {
   def apply[K,E](definition: String)
     (implicit fmap: FieldMap[E], kmap: FieldMap[K], config: ScarmConfig): View[K,E] = 
-    View(definition, kmap.names(config), fmap.names(config))
+    View(definition,
+      kmap.prefix(fmap.firstFieldName).names(config),
+      fmap.names(config)
+    )
 }

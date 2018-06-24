@@ -103,6 +103,7 @@ case class EnrollmentStudent(id: WrappedEnrollmentStudent)
 case class WrappedEnrollmentSection(section: SectionId)
 case class EnrollmentSection(id: WrappedEnrollmentSection)
 
+case class SectionCount(sectionCourse: CourseId, count: Int)
 
 case class Demo(config: ScarmConfig, xa: Transactor[IO])
     extends FunSuite with BeforeAndAfterAll {
@@ -419,6 +420,22 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
 
     val trigSectionJoin: (Section, Teacher, Set[(Enrollment, Student)]) =
       run(sectionWithTeacherAndStudents(trigSection1.section)).get
+
+    /* Any query can be further restricted using a doobie fragment */
+    run(for {
+      _ <- teachers.insert(Teacher(TeacherId(5), "John Smith"))
+      _ <- teachers.insert(Teacher(TeacherId(6), "John Jones"))
+      _ <- teachers.insert(Teacher(TeacherId(7), "Jim Jones"))
+      johns <- teachers.scan.where(doobie.Fragment.const("name like 'John%'"))
+    } yield {
+      assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
+    })
+
+    /* As a final "escape hatch", a View object can be defined for any query */
+    val sectionCountByCourse = View[CourseId, SectionCount](
+      "select section_course_id, count(*) as count from Section group by section_course_id"
+    )
+    assert(run(sectionCountByCourse(trigId)) == Set(SectionCount(trigId, 3)))
   }
 }
 

@@ -109,9 +109,3 @@ At the moment, Scarm has exactly one user, and that's me.
 
 Scarm supports Postgresql, Mysql, and Hsqldb.  I test with 9.6, 5.7, and 2.4.0 respectively.
     
-
-## Misc
-    Views
-    where clauses
-    in clauses
-    
