@@ -125,8 +125,12 @@ import java.time._
 import doobie.implicits._
 import shapeless._
 ```
+Many scarm methods need a `ScarmConfig` object to define the SQL dialect and column naming conventions.  This can be passed implicitly.
 ```
 implicit val scarmConfig = ScarmConfig(Postgresql)
+```
+There is also a `run` convenenience method for calling unsafeRunSync() within a transaction.  This method takes an implicit Transactor
+```
 implicit val xa =  Transactor.fromDriverManager[IO]("org.postgresql.Driver",
                    "jdbc:postgresql:scarm", "scarm", "scarm")
 ```
@@ -144,7 +148,73 @@ Case classes to represent the data model.
 case class TeacherId(id: Int) extends AnyVal
 case class Teacher(teacher: TeacherId, name: String)
 ```
+Define a table to hold teachers.
+     
+Table objects proxy for tables in the relational database.  
 
+`teachers` is an object that proxies for a table called `Teacher`
+in the database.
+
+A Table's type parameters specify the type of the primary key and
+of the entity stored in the table.
+```
+val teachers = Table[TeacherId,Teacher]("Teacher")
+```
+Create the table in the database.  Actually this should be done using a migration tool like flyway.
+But creating from the application is useful for unit/integration
+tests.
+      
+```
+val createTeachersOp: ConnectionIO[Unit] = teachers.create
+run(createTeachersOp)
+```
+Since the primary key is always the first field of the case class,
+it should be possible to use shapeless to infer the primary key
+type, so we could just used
+```
+val teachers = Table[Teacher]("Teacher")
+```
+But, alas, I haven't gotten that to work.  
+
+On the bright side, declaring the wrong primary key type results in
+a compilation error "could not find implicit value for parameter primaryKey"
+```
+val teachers = Table[CourseId,Teacher]("Teacher")
+```
+Now we can run some DML and selects on the table.
+```
+val fred = Teacher(TeacherId(1), "Fred")
+val robert = Teacher(TeacherId(2), "Robert")
+val op: ConnectionIO[Unit] = for {
+    //insert uses the BatchInsert API, as long as  the table isn't autogen
+    numInserted <- teachers.insert(fred, robert)
+    //select fred from the database.  The result is an Option type
+    shouldBeFred <- teachers(fred.teacher)
+    //a query for a nonexistent primary key should return None
+    shouldBeNone <- teachers(TeacherId(-1))
+    freddie = fred.copy(name="Freddie")
+    bob = robert.copy(name="Bob")
+    numUpdated <- teachers.update(freddie, bob) //uses batch update API
+    shouldBeFreddie <- teachers(fred.teacher) //select fred after update
+}  yield {
+      assert(numInserted == 2)
+      assert(shouldBeFred == Some(fred))
+      assert(shouldBeNone == None)
+      assert(numUpdated == 2)
+      assert(shouldBeFreddie == Some(freddie))
+}
+```
+Deletion also works.
+```
+val deleteOp = for {
+  nDeleted <- teachers.delete(fred.teacher, robert.teacher)
+  fredFound <- teachers(fred.teacher)
+} yield {
+  assert(nDeleted == 2)
+  assert(fredFound == None)
+}
+
+```
 Key class for an index teacher name
 ```
 case class TeacherName(name: String)
@@ -231,91 +301,10 @@ case class WrappedEnrollmentSection(section: SectionId)
 case class EnrollmentSection(id: WrappedEnrollmentSection)
 
 case class SectionCount(sectionCourse: CourseId, count: Int)
-```
 
-     Define a table to hold teachers.
-     
-     Table objects proxy for tables in the relational database.  
 
-     "teachers" is an object that proxies for a table called "Teacher"
-     in the database.
-
-     A Table's type parameters specify the type of the primary key and
-     of the entity stored in the table.
-
-```
-    val teachers = Table[TeacherId,Teacher]("Teacher")
-```
-      Create the table in the database.  
-
-      Actually this should be done using a migration tool like flyway.
-      But creating from the application is useful for unit/integration
-      tests.
-      
-      The create command returns a ConnectionIO[Int] where the Int value
-      is 1 on success.
-```
-    val createTeachersOp: ConnectionIO[Unit] = teachers.create
-      Run the actual create command in the doobie manner.
-```
-    createTeachersOp.transact(xa).unsafeRunSync()
-```
-     Since the primary key is always the first field of the case class,
-     it should be possible to use shapeless to infer the primary key
-     type, so we could just used
-
-     val teachers = Table[Teacher]("Teacher")
-
-     But, alas, I haven't gotten that to work.  
-
-     On the bright side, declaring the wrong primary key type results in
-     a compilation error "could not find implicit value for parameter primaryKey".
-     */
-    assertDoesNotCompile(
-      "val teachers = Table[CourseId,Teacher](\"Teacher\")"
-    )
-
-    ```*
-      Now we can run some DML and selects on the table.
-      */
-    val fred = Teacher(TeacherId(1), "Fred")
-    val robert = Teacher(TeacherId(2), "Robert")
-    val op: ConnectionIO[Unit] = for {
-      //insert uses the BatchInsert API, as long as  the table isn't autogen
-      numInserted <- teachers.insert(fred, robert)
-      //select fred from the database.  The result is an Option type
-      shouldBeFred <- teachers(fred.teacher)
-      //a query for a nonexistent primary key should return None
-      shouldBeNone <- teachers(TeacherId(-1))
-      freddie = fred.copy(name="Freddie")
-      bob = robert.copy(name="Bob")
-      numUpdated <- teachers.update(freddie, bob) //uses batch update API
-      shouldBeFreddie <- teachers(fred.teacher) //select fred after update
-    }  yield {
-      assert(numInserted == 2)
-      assert(shouldBeFred == Some(fred))
-      assert(shouldBeNone == None)
-      assert(numUpdated == 2)
-      assert(shouldBeFreddie == Some(freddie))
-    }
-
-    op.transact(xa).unsafeRunSync()
-
-    ``` We can also delete rows. At the moment, deleting by N id's results
-     * in N separate queries being issued to the database. */
-    val deleteOp = for {
-      nDeleted <- teachers.delete(fred.teacher, robert.teacher)
-      fredFound <- teachers(fred.teacher)
-    } yield {
-      assert(nDeleted == 2)
-      assert(fredFound == None)
-    }
-
-    deleteOp.transact(xa).unsafeRunSync()
-
-    ```
-     Autogen creates a Table object with an autogenerated primary key
-     using an auto_increment field in mysql or a sequence in hibernate.
+Autogen creates a Table object with an autogenerated primary key
+using an auto_increment field in mysql or a sequence in hibernate.
      */
     val courses = Autogen[CourseId,Course]("Course")
 

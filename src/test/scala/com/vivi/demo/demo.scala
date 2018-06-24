@@ -147,9 +147,6 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
       Actually this should be done using a migration tool like flyway.
       But creating from the application is useful for unit/integration
       tests.
-      
-      The create command returns a ConnectionIO[Int] where the Int value
-      is 1 on success.
       */
 
     val createTeachersOp: ConnectionIO[Unit] = teachers.create
