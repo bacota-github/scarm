@@ -101,7 +101,7 @@ this won't compile
 ```
 val badChildParent = MandatoryForeignKey(children, parents, classOf[BadChildToParent])
 ```
-because there `Child` does not have a field called `farent`.  
+because `Child` does not have a field called `farent`.  
 
 ## Current Status
 
