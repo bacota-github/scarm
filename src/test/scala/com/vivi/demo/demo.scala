@@ -188,12 +188,14 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
       bob = robert.copy(name="Bob")
       numUpdated <- teachers.update(freddie, bob) //uses batch update API
       shouldBeFreddie <- teachers(fred.teacher) //select fred after update
+      everybody <- teachers.scan(Unit) //selects all the teachers
     }  yield {
       assert(numInserted == 2)
       assert(shouldBeFred == Some(fred))
       assert(shouldBeNone == None)
       assert(numUpdated == 2)
       assert(shouldBeFreddie == Some(freddie))
+      assert(everybody == Set(freddie, bob))
     }
 
     op.transact(xa).unsafeRunSync()
