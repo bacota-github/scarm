@@ -206,10 +206,6 @@ val op: ConnectionIO[Unit] = for {
       assert(everybody == Set(freddie, bob))
   }
 ```
-The entire table can be loaded with a `scan` operation.
-```
-```
-```
 Deletion also works.
 ```
 val deleteOp = for {
@@ -260,228 +256,263 @@ val trig = trigPrototype.copy(course=trigId)
 assert(run(courses(algebraId)) == Some(algebra.copy(course=algebraId)))
 assert(run(courses(trigId)) == Some(trig.copy(course=trigId)))
 ```
-All rows are returned by a scan.
-```
-assert(Set(algebra, trig) == run(courses.scan(Unit)))
- ```
-val sections = Table[SectionId,Section]("Section")
-    val students = Table[StudentId,Student]("Student")
-    val enrollments = Table[EnrollmentId, Enrollment]("enrollment")
-
-    Seq(sections, students, enrollments).foreach {
-      t => run(t.create)
-    }
-```
-
 To query a table on columns other than the primary key, create an index.
-     The index below has three type parameters
-     1. The indexed key type  (TeacherByName) defines the column(s) on which to query
-     2. The primary key type (TeacherId) is the primary key of the table.
-     The primary key type is redundant, but Ihaven't been able to get rid of it.
-     3. The entity type (Teacher) is the type of entity stored in the table.
-     The index has one parameter -- a Table[TeacherId,Teacher]
-```
-    val teachersByName = Index(teachers, classOf[TeacherName])
-```
-     The table can now be queried by name 
-```
-    val tom1 = Teacher(TeacherId(3), "Tom")
-    val tom2 = Teacher(TeacherId(4), "Tom")
-    run(teachers.insert(tom1,tom2))
-    assert(run(teachersByName(TeacherName("Tom"))) == Set(tom1,tom2))
-```
-We can use a UniqueIndex to return an Option instead of a Set. 
-```
-    val uniqueTeacherByName = UniqueIndex(teachers, classOf[TeacherName])
-    run(teachers.delete(tom2.teacher))  //or an exception will be thrown by the query
-    assert(run(uniqueTeacherByName(TeacherName("Tom"))) == Some(tom1))
-```
+The index below has three type parameters
+1. The indexed key type  (TeacherByName) defines the column(s) on which to query
+2. The primary key type (TeacherId) is the primary key of the table.
+The primary key type is redundant, but Ihaven't been able to get rid of it.
+3. The entity type (Teacher) is the type of entity stored in the table.
+The index has one parameter -- a Table[TeacherId,Teacher]
 
-     Through the magic of shapeless, if the fields in the key class
-     can't be found in the entity type, there will be compiler error
-     "could not find implicit value for parameter isProjection"  
+Assuming this class defined for the index key
 ```
-    assertDoesNotCompile(
-      "val teacherByBadName = Index(teachers,classOf[BadTeacherName])"
-    )
-    assertDoesNotCompile(
-      "val teacherByBadlyTypedName = Index(teachers, classOf[BadTeacherNameType])"
-    )
+case class TeacherName(name: String)
 ```
-     An index can be created in the database, though this is not necessary. 
+An index object can be created 
 ```
-    run(teachersByName.create)
+val teachersByName = Index(teachers, classOf[TeacherName])
+val tom1 = Teacher(TeacherId(3), "Tom")
+val tom2 = Teacher(TeacherId(4), "Tom")
+run(teachers.insert(tom1,tom2))
+assert(run(teachersByName(TeacherName("Tom"))) == Set(tom1,tom2))
 ```
+A UniqueIndex returns an Option instead of a Set. 
+```
+val uniqueTeacherByName = UniqueIndex(teachers, classOf[TeacherName])
+run(teachers.delete(tom2.teacher))  //or an exception will be thrown by the query
+assert(run(uniqueTeacherByName(TeacherName("Tom"))) == Some(tom1))
+```
+Through the magic of shapeless, if the fields in the key class
+can't be found in the entity type, there will be compiler error
+ "could not find implicit value for parameter isProjection".  So given index key classes like this
+```
+case class BadTeacherName(maim: String)
+case class BadTeacherNameType(name: Int)
+```
+The following indexes creations will fail to compile.
+```
+val teacherByBadName = Index(teachers,classOf[BadTeacherName])
+val teacherByBadlyTypedName = Index(teachers, classOf[BadTeacherNameType])
+```
+An index can be created in the database, though this is not necessary. 
+```
+run(teachersByName.create)
+```
+Multicolumn indexes work, too, but each field in the key class
+must have a corresponding field of the same type in the entity
+class, and the column names generated for those fields must
+match. 
 
-     Multicolumn indexes work, too, but each field in the key class
-     must have a corresponding field of the same type in the entity
-    class, and the column names generated for those fields must
-     match. 
+Given the following case classes
 ```
-    val sectionByRoom = Index(sections, classOf[SectionIndex])
-    val roomKey = SectionIndex("12A", SectionSemester(1), LocalTime.of(14,0))
-    //Note that we didn't insert any sections, so we get back an empty set
-    assert(run(sectionByRoom(roomKey)) == Set())
+case class SectionId(course: CourseId, semester: Int, number: Int)
+case class Section(section: SectionId,
+  instructor: TeacherId,
+  room: String,
+  meetingTime: LocalTime,
+  startDate: LocalDate,
+  endDate: LocalDate
+)
+
+case class SectionSemester(semester: Int)
+case class SectionIndex(room: String, section: SectionSemester, meetingTime: LocalTime)
 ```
-     Now define one of the relationships in the data model by a foreign key 
+We can define the following tables and indexes:
 ```
-    val sectionTeacher = MandatoryForeignKey(sections, teachers, classOf[SectionInstructor])
+val sections = Table[SectionId,Section]("Section")
+val sectionByRoom = Index(sections, classOf[SectionIndex])
+val roomKey = SectionIndex("12A", SectionSemester(1), LocalTime.of(14,0))
+//No sections have been inserted, so an empty set is returned.
+assert(run(sectionByRoom(roomKey)) == Set())
 ```
-     As with indexes, each field in the key class ("SectionInstructor"
-     in this case) must have a corresponding field of the same type
-      in the entity class, and the column names generated for those
-      fields must match.  
+Section has a composite primary key with fields named
+section_course_id, section_semester, and section_number.
+
+Also note the java.time fields, which can be stored in timestamp
+columns.  By default, the corresponding database columns are expected
+to use snake case, so they should be called "meeting_time",
+"start_date", and "end_date", but this behavior can be changed in the
+ScarmConfig object.
+
+Now define one of the relationships in the data model by a foreign key.  Again, an key class must have been defined.
+```
+case class SectionInstructor(instructor: TeacherId)
+```
+This can be used to define a foreign key between section and teacher.
+```
+val sectionTeacher = MandatoryForeignKey(sections, teachers, classOf[SectionInstructor])
+```
+As with indexes, each field in the key class ("SectionInstructor"
+in this case) must have a corresponding field of the same type
+in the entity class, and the column names generated for those
+fields must match.  
+
+Consider the following (wrong) key classes
+```
+case class BadSectionInstructorName(xinstructor: TeacherId)
+case class BadSectionSemester(section: SectionSemester)
+```
+   The following fails to compile with the error `could not find
+implicit value for parameter foreignKeyIsSubsetOfChildEntity`
+because the name of the field in `BadSectionInstructorName`
+ is mispelled.
+```
+val badSectionTeacher1 = MandatoryForeignKey(sections, teachers, classOf[BadSectionInstructorName])
+```
+In addition, the types (underlying HList) of the key class must
+align exactly with those of the referenced class's primary
+key.   
       
-       The following fails to compile with the error "could not find
-       implicit value for parameter foreignKeyIsSubsetOfChildEntity
-       .." because the name of the field in BadSectionInstructorName
-       is mispelled.
+The following fails to compile with the error `could not find
+implicit value for parameter foreignKeyStructureMatchesPrimaryKey 
 ```
-    assertDoesNotCompile(
-      "val badSectionTeacher1 = MandatoryForeignKey(sections, teachers, classOf[BadSectionInstructorName])"
-    )
+val badSectionTeacher2 = MandatoryForeignKey(sections, teachers, classOf[BadSectionSemester])
 ```
-     Furthermore, the types (underlying HList) of the key class must
-     align exactly with those of the referenced class's primary
-      key.   
-      
-       The following fails to compile with the error "could not find
-       implicit value for parameter
-       foreignKeyStructureMatchesPrimaryKey ..."
+A foreign key comes with an index that can be used to query the
+child table based on the primary key of the parent table. 
+  ```
+val sectionsTaughtByFred: Set[Section] =run(sectionTeacher.index(fred.teacher)) 
 ```
-    assertDoesNotCompile(
-      "val badSectionTeacher2 = MandatoryForeignKey(sections, teachers, classOf[BadSectionSemester])"
-    )
-```
-    Pause to populate some tables 
-```
-    run(teachers.insert(fred,robert))
-    val trigSection1 =
-      Section(SectionId(trigId, 1, 1), fred.teacher, "Olin Hall 101", 
-      LocalTime.of(1,0), LocalDate.of(2018,9,3), LocalDate.of(2018,12,3))
-    val trigSection2 =
-      Section(SectionId(trigId, 1, 2), fred.teacher, "Olin Hall 101", 
-      LocalTime.of(2,30), LocalDate.of(2018,9,3), LocalDate.of(2018,12,3))
-    val trigSection3 =
-      Section(SectionId(trigId, 1, 3), robert.teacher, "Olin Hall 102", 
-      LocalTime.of(2,30), LocalDate.of(2018,9,3), LocalDate.of(2018,12,3))
+But the most important use of foreign keys is to construct join
+queries.  The `oneToMany` property of the `sectionTeacher`
+foreign key is used to construct a join from the one side
+(`teachers`) to the many side (`sections`).
 
-    run(sections.insert(trigSection1,trigSection2,trigSection3))
+Given a teacher primary key, the query below returns a Teacher (if
+found) with all the sections taught by the teacher. 
 ```
-     Every foreign key comes with an index that can be used to query the
-     * child table based on the primary key of the parent table. 
-     ```
-    assert(
-      run(sectionTeacher.index(fred.teacher)) ==
-        Set(trigSection1, trigSection2)
-    )
+val teacherWithSectionsQ = teachers :: sectionTeacher.oneToMany
+val fredAndHisSections: Option[(Teacher, Set[Section])] =
+     run(teacherWithSectionsQ(fred.teacher))
 ```
-     The most important use of foreign keys is to construct join
-      queries.  The "oneToMany" property of the sectionTeacher
-      foreign key is used to construct a join from the one side
-      (teachers) to the many side (sections).
+Indexes can also be joined with. Note that the following query returns a Set
+instead of an Option.  Joining with a UniqueIndex would return
+an Option.
+ ```
+val teachersByNameWithSectionsQ = teachersByName :: sectionTeacher.oneToMany
+val fredSections: Set[(Teacher, Set[Section])] = run(teachersByNameWithSectionsQ(TeacherName("Fred")))
 ```
-    val teacherWithSectionsQ = teachers :: sectionTeacher.oneToMany
+Join queries are always outer joins.
 ```
-     Given a teacher primary key, the above query returns a Teacher (if
-     found) with all the sections taught by the teacher. 
-     ```
-    val fredAndHisSections: Option[(Teacher, Set[Section])] =
-      run(teacherWithSectionsQ(fred.teacher))
-    assert(fredAndHisSections.get == (fred, Set(trigSection1, trigSection2)))
-    ```
-
-     Indexes can also be joined with. Note that the query returns a Set
-     instead of an Option.  Joining with a UniqueIndex would return
-     an Option.  
-     ```
-    val teachersByNameWithSectionsQ = teachersByName :: sectionTeacher.oneToMany
-    val fredSections: Set[(Teacher, Set[Section])] = run(teachersByNameWithSectionsQ(TeacherName("Fred")))
-    assert(fredSections == Set((fred, Set(trigSection1,trigSection2))))
+val mary = Teacher(TeacherId(4), "Mary")
+run(for {
+    _ <- teachers.insert(mary)
+   maryAndHerClasses <- teacherWithSectionsQ(mary.teacher)
+} yield {
+   assert(maryAndHerClasses == Some((mary, Set())))
+})
 ```
-     Join queries are outer joins.
-     ```
-    val mary = Teacher(TeacherId(4), "Mary")
-    run(for {
-      _ <- teachers.insert(mary)
-      maryAndHerClasses <- teacherWithSectionsQ(mary.teacher)
-    } yield {
-      assert(maryAndHerClasses == Some((mary, Set())))
-    })
-```
-     Joins also work in the manyToOne direction. The result set consists
-      of pairs of entities, instead of an entity and a Set.
+Joins also work in the manyToOne direction. The result set consists
+of pairs of entities, instead of an entity and a Set.
 ```
     val sectionWithTeachersQ = sections :: sectionTeacher.manyToOne
     val sectionAndTeacher: Option[(Section,Teacher)] = run(sectionWithTeachersQ(trigSection1.section))
-    assert(sectionAndTeacher.get == (trigSection1, fred))
 ```
-     An optional foreign key is similar to a Mandatory Key, but some of
-      the fields can be Option.  Also note that the following is a
-      self-referential relationship. 
+An optional foreign key is similar to a Mandatory Key, but some of
+the fields can be Option.  Also note that the following is a
+self-referential relationship. 
 ```
-    val prerequisite = OptionalForeignKey(courses, courses, classOf[CoursePrerequisite])
+val prerequisite = OptionalForeignKey(courses, courses, classOf[CoursePrerequisite])
 ```
+One other difference of optional foreign keys is that when used in
+manyToOne joins, the result set is a pair of an entity and an
+ Optional entity 
+ ```
+val courseAndPrerequisiteQ = courses :: prerequisite.manyToOne
+val courseAndPrerequisite: Option[(Course,Option[Course])] = run(courseAndPrerequisiteQ(trigId))
+```
+Joins can be chained in any logical way.  
 
-     One other difference of optional foreign keys is that when used in
-      manyToOne joins, the result set is a pair of an entity and an
-      Optional entity 
-  ```
-    val courseAndPrerequisiteQ = courses :: prerequisite.manyToOne
-    val courseAndPrerequisite: Option[(Course,Option[Course])] =
-      run(courseAndPrerequisiteQ(trigId))
-    assert(courseAndPrerequisite.get == (trig, Some(algebra)))
+Given these additional case classes for the model and keys.
 ```
-     More foreign keys
+case class StudentId(id: Int) extends AnyVal
+case class Student(id: StudentId, name: String, level: Int)
+
+/**
+  Enrollment provides a many-to-many relationship between Student and Section.
+  The enrollment primary key is a composite of two foreign keys.  
+  There is also an optional (nullable) grade field.
+  */
+case class EnrollmentId(student: StudentId, section: SectionId)
+case class Enrollment(id: EnrollmentId, grade: Option[String])
+
+case class CoursePrerequisite(prerequisite: Option[CourseId])
+case class SectionCourse(section: CourseIdInSectionId)
+case class CourseIdInSectionId(course: CourseId)
+
+case class WrappedEnrollmentStudent(student: StudentId)
+case class EnrollmentStudent(id: WrappedEnrollmentStudent)
+
+case class WrappedEnrollmentSection(section: SectionId)
+case class EnrollmentSection(id: WrappedEnrollmentSection)
+
+case class SectionCount(sectionCourse: CourseId, count: Int)
 ```
-     val sectionCourse = MandatoryForeignKey(sections, courses, classOf[SectionCourse])
-     val enrollmentSection = MandatoryForeignKey(enrollments, sections, classOf[EnrollmentSection])
-    val enrollmentStudent = MandatoryForeignKey(enrollments, students, classOf[EnrollmentStudent])
+The following tables and foreign keys can be defined
 ```
-     Joins can be chained in any logical way 
+val students = Table[StudentId,Student]("Student")
+val enrollments = Table[EnrollmentId, Enrollment]("enrollment")
+val sectionCourse = MandatoryForeignKey(sections, courses, classOf[SectionCourse])
+val enrollmentSection = MandatoryForeignKey(enrollments, sections, classOf[EnrollmentSection])
+val enrollmentStudent = MandatoryForeignKey(enrollments, students, classOf[EnrollmentStudent])
 ```
-    val teacherAndStudentsQ = teachers :: sectionTeacher.oneToMany ::
+To support the following join using the `::` operator.
+```
+val teacherAndStudentsQ = teachers :: sectionTeacher.oneToMany ::
         enrollmentSection.oneToMany :: enrollmentStudent.manyToOne
 
-    val fredAndHisStudents: (Teacher,Set[(Section,Set[(Enrollment,Student)])]) =
-      run(teacherAndStudentsQ(fred.teacher)).get
 ```
-     "Nested Joins" are used to join multiple foreign keys to one parent
-     table with the ::: operator.
+and this join in the "opposite direction".
 ```
-    val sectionWithTeacherAndStudents =
+val sectionWithTeachersQ = sections :: sectionTeacher.manyToOne
+val sectionAndTeacher: Option[(Section,Teacher)] = run(sectionWithTeachersQ(trigSection1.section))
+```
+"Nested Joins" are used to join multiple foreign keys to one parent
+table with the `:::` operator.
+```
+val sectionWithTeacherAndStudents =
       (sections :: sectionTeacher.manyToOne) :::
       enrollmentSection.oneToMany :: enrollmentStudent.manyToOne
 
-    val trigSectionJoin: (Section, Teacher, Set[(Enrollment, Student)]) =
+val trigSectionJoin: (Section, Teacher, Set[(Enrollment, Student)]) =
       run(sectionWithTeacherAndStudents(trigSection1.section)).get
 ```
-     Any query can be further restricted using a doobie fragment 
+An optional foreign key is similar to a Mandatory Key, but some of
+he fields can be Option.  Also note that the following is a
+self-referential relationship.
+```
+val prerequisite = OptionalForeignKey(courses, courses, classOf[CoursePrerequisite])
+```
+When an OptionalForeignKey is used in manyToOne joins, the result set is a pair of an entity and an Optional entity
+```
+val courseAndPrerequisiteQ = courses :: prerequisite.manyToOne
+val courseAndPrerequisite: Option[(Course,Option[Course])] =  run(courseAndPrerequisiteQ(trigId))
+```
+Any query can be further restricted using a doobie fragment 
  ```
-    run(for {
-      _ <- teachers.insert(Teacher(TeacherId(5), "John Smith"))
-      _ <- teachers.insert(Teacher(TeacherId(6), "John Jones"))
-      _ <- teachers.insert(Teacher(TeacherId(7), "Jim Jones"))
-      johns <- teachers.scan.where(doobie.Fragment.const("name like 'John%'"))
-    } yield {
-      assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
-    })
+run(for {
+   _ <- teachers.insert(Teacher(TeacherId(5), "John Smith"))
+   _ <- teachers.insert(Teacher(TeacherId(6), "John Jones"))
+   _ <- teachers.insert(Teacher(TeacherId(7), "Jim Jones"))
+   johns <- teachers.scan.where(doobie.Fragment.const("name like 'John%'"))
+} yield {
+   assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
+})
 ```
-     There is an explicit shortcut for "in" Fragments. Unfortunately
-      this is of limited use because in queries do not work for
-      composite primary keys.
+There is an explicit shortcut for "in" Fragments. Unfortunately
+this is of limited use because in queries do not work for
+composite primary keys.
 ```
-    run(for {
-      johns <- teachers.in(TeacherId(5), TeacherId(6))
-    } yield {
-      assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
-    })
+run(for {
+   johns <- teachers.in(TeacherId(5), TeacherId(6))
+} yield {
+   assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
+})
 ```
-     As a final "escape hatch", a View object can be defined for any query 
+As a final "escape hatch", a View object can be defined for any query 
 ```
-    val sectionCountByCourse = View[CourseId, SectionCount](
-      "select section_course_id, count(*) as count from Section group by section_course_id"
-    )
-    assert(run(sectionCountByCourse(trigId)) == Set(SectionCount(trigId, 3)))
+val sectionCountByCourse = View[CourseId, SectionCount](
+    "select section_course_id, count(*) as count from Section group by section_course_id"
+)
+val sectionCount: Set[SectionCount] = run(sectionCountByCourse(trigId))
 ```
-    

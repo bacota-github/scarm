@@ -268,7 +268,7 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
     run(teachers.insert(tom1,tom2))
     assert(run(teachersByName(TeacherName("Tom"))) == Set(tom1,tom2))
 
-    /* We can use a UniqueIndex to return an Option instead of a Set. */
+    /* A UniqueIndex returns an Option instead of a Set. */
     val uniqueTeacherByName = UniqueIndex(teachers, classOf[TeacherName])
     run(teachers.delete(tom2.teacher))  //or an exception will be thrown by the query
     assert(run(uniqueTeacherByName(TeacherName("Tom"))) == Some(tom1))
