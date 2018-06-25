@@ -390,25 +390,25 @@ val sectionsTaughtByFred: Set[Section] =run(sectionTeacher.index(fred.teacher))
 
 ### Joins
 
-But the most important use of foreign keys is to construct join
+The most important use of foreign keys is to construct join
 queries.  The `oneToMany` property of the `sectionTeacher`
 foreign key is used to construct a join from the one side
 (`teachers`) to the many side (`sections`).
 
 Given a teacher primary key, the query below returns a Teacher (if
-found) with all the sections taught by the teacher. 
+found) with all the sections taught by the teacher (as a `Set`).
 ```
 val teacherWithSectionsQ = teachers :: sectionTeacher.oneToMany
 val fredAndHisSections: Option[(Teacher, Set[Section])] = run(teacherWithSectionsQ(fred.teacher))
 ```
-Indexes can also be joined with. Note that the following query returns a Set
-instead of an Option.  Joining with a UniqueIndex would return
+Indexes can also be joined with. Note that the following query returns a `Set`
+instead of an `Option`.  Joining with a UniqueIndex would return
 an Option.
  ```
 val teachersByNameWithSectionsQ = teachersByName :: sectionTeacher.oneToMany
 val fredSections: Set[(Teacher, Set[Section])] = run(teachersByNameWithSectionsQ(TeacherName("Fred")))
 ```
-Join queries are always outer joins.
+Join queries are always outer joins.  In the following query, Mary is a new teacher who has not been assigned to any sections, so the query returns Mary and an empty set.
 ```
 val mary = Teacher(TeacherId(4), "Mary")
 run(for {
@@ -424,22 +424,23 @@ pair of entities, instead of an entity and a Set.
     val sectionWithTeachersQ = sections :: sectionTeacher.manyToOne
     val sectionAndTeacher: Option[(Section,Teacher)] = run(sectionWithTeachersQ(trigSection1.section))
 ```
-An optional foreign key is similar to a Mandatory Key, but some of
-the fields can be Option.  Also note that the following is a
-self-referential relationship. 
+An `OptionalForeignKey` is similar to a `MandatoryForeignKey`, but some of
+the fields can be Option types even if the referenced primary key field is not.  (Of course, primary key fields are never optional).  
 ```
 val prerequisite = OptionalForeignKey(courses, courses, classOf[CoursePrerequisite])
 ```
 One other difference of optional foreign keys is that when used in
 manyToOne joins, the result set is a pair of an entity and an
- Optional entity 
+ Option entity (instead of a pair of entities)
  ```
 val courseAndPrerequisiteQ = courses :: prerequisite.manyToOne
 val courseAndPrerequisite: Option[(Course,Option[Course])] = run(courseAndPrerequisiteQ(trigId))
 ```
-Joins can be chained in any logical way.  
 
-Given these additional case classes for the model and keys.
+### Chaining Joins
+Joins can be chained in any logical way with an `::` operator.
+
+For example, given these additional case classes for  model objects and keys.
 ```
 case class StudentId(id: Int) extends AnyVal
 case class Student(id: StudentId, name: String, level: Int)
@@ -478,17 +479,13 @@ val teacherAndStudentsQ = teachers :: sectionTeacher.oneToMany :: enrollmentSect
 val fredAndHisStudents: (Teacher,Set[(Section,Set[(Enrollment,Student)])]) = run(teacherAndStudentsQ(fred.teacher)).get
 
 ```
-and this join in the "opposite direction".
-```
-val sectionWithTeachersQ = sections :: sectionTeacher.manyToOne
-val sectionAndTeacher: Option[(Section,Teacher)] = run(sectionWithTeachersQ(trigSection1.section))
-```
 "Nested Joins" are used to join multiple foreign keys to one parent
 table with the `:::` operator.
 ```
 val sectionWithTeacherAndStudents = (sections :: sectionTeacher.manyToOne) ::: enrollmentSection.oneToMany :: enrollmentStudent.manyToOne
 val sectionJoin: (Section, Teacher, Set[(Enrollment, Student)]) = run(sectionWithTeacherAndStudents(trigSection1.section)).get
 ```
+In the above example, rows from both `Teacher` and `Enrollment` are joined to the same `Section` via the `sectionTeacher` and `enrollmentSection` relationships, respectively.  But `Student` is joined to `Enrollment` via the `enrollmentStudent` relationship.
 
 ### Adding Additional Where Clauses
 
@@ -503,9 +500,7 @@ run(for {
    assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
 })
 ```
-There is an explicit shortcut for "in" Fragments. Unfortunately
-this is of limited use because in queries do not work for
-composite primary keys.
+There is an explicit shortcut for "in" Fragments. 
 ```
 run(for {
    johns <- teachers.in(TeacherId(5), TeacherId(6))
@@ -513,6 +508,8 @@ run(for {
    assert(johns.map(_.teacher) == Set(TeacherId(5),TeacherId(6)))
 })
 ```
+Unfortunately this is of limited use right now because in queries do not work for
+composite primary keys in Doobie.
 
 ### Using Raw SQL
 As a final "escape hatch", a View object can be defined for any SQL query 
