@@ -13,10 +13,11 @@ My goals with Scarm are
 3. Support for joins to load structures of related case classes from the database.
 
 
+
 ## Quick Overview
 
 A long example in contained in
-src/test/scala/com/vivi/demo/demo.scala.  That file also contains the
+[src/test/scala/com/vivi/demo/demo.scala](https://github.com/bacota-github/scarm/blob/master/src/test/scala/com/vivi/demo/demo.scala).  That file also contains the
 necessary imports and other setup.
 
 Here is a quick overview
@@ -116,6 +117,8 @@ espectively.
 
 
 ## Extended Example
+This is based on the contents of 
+[src/test/scala/com/vivi/demo/demo.scala](https://github.com/bacota-github/scarm/blob/master/src/test/scala/com/vivi/demo/demo.scala). 
 
 ### Setup
 
