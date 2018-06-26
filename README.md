@@ -117,7 +117,13 @@ espectively.
 
 
 ## Extended Example
-This is based on the contents of 
+This example is based on the following data model.
+    <object data="https://github.com/bacota-github/scarm/blob/master/demo-erd.pdf" type="application/pdf">
+        <embed src="https://github.com/bacota-github/scarm/blob/master/demo-erd.pdf">
+        </embed>
+    </object>
+
+Full code is in
 [src/test/scala/com/vivi/demo/demo.scala](https://github.com/bacota-github/scarm/blob/master/src/test/scala/com/vivi/demo/demo.scala). 
 
 ### Setup

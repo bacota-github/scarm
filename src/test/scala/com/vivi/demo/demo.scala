@@ -116,13 +116,13 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
   override def afterAll() {
     if (config.dialect == Hsqldb) {
       com.vivi.scarm.test.DSLSuite.hsqldbCleanup(xa)
-    } else 
+    } /*else 
       Seq(Table[TeacherId,Teacher]("Teacher"),
         Autogen[CourseId,Course]("Course"),
         Table[SectionId,Section]("Section"),
         Table[StudentId,Student]("Student"),
         Table[EnrollmentId, Enrollment]("enrollment")
-      ).foreach { t => run(t.drop) }
+      ).foreach { t => run(t.drop) }*/
   }
 
   test("Demo all the things") {
@@ -299,6 +299,7 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
 
     /* Now define one of the relationships in the data model by a foreign key */
     val sectionTeacher = MandatoryForeignKey(sections, teachers, classOf[SectionInstructor])
+    run(sectionTeacher.create)
 
     /* As with indexes, each field in the key class ("SectionInstructor"
      * in this case) must have a corresponding field of the same type
@@ -387,6 +388,7 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
      * the fields can be Option.  Also note that the following is a
      * self-referential relationship. */
     val prerequisite = OptionalForeignKey(courses, courses, classOf[CoursePrerequisite])
+    run(prerequisite.create)
 
     /* One other difference of optional foreign keys is that when used in
      * manyToOne joins, the result set is a pair of an entity and an
@@ -400,6 +402,10 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
      val sectionCourse = MandatoryForeignKey(sections, courses, classOf[SectionCourse])
      val enrollmentSection = MandatoryForeignKey(enrollments, sections, classOf[EnrollmentSection])
     val enrollmentStudent = MandatoryForeignKey(enrollments, students, classOf[EnrollmentStudent])
+
+    run(sectionCourse.create)
+    run(enrollmentSection.create)
+    run(enrollmentStudent.create)
 
     /* Joins can be chained in any logical way */
 
