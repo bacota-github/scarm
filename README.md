@@ -117,7 +117,8 @@ espectively.
 
 
 ## Extended Example
-This example is based on the following data model.
+This example is based on the following data model:
+[[/blob/master/demo-erd.pdf]]
     <object data="https://github.com/bacota-github/scarm/blob/master/demo-erd.pdf" type="application/pdf">
         <embed src="https://github.com/bacota-github/scarm/blob/master/demo-erd.pdf">
         </embed>
