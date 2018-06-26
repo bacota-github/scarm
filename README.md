@@ -118,7 +118,7 @@ espectively.
 
 ## Extended Example
 This example is based on the following data model:
-![https://github.com/bacota-github/scarm/blob/master/demo-erd.pdf" type="application/pdf]
+![https://github.com/bacota-github/scarm/blob/master/demo-erd.pdf]
 
 Full code is in
 [src/test/scala/com/vivi/demo/demo.scala](https://github.com/bacota-github/scarm/blob/master/src/test/scala/com/vivi/demo/demo.scala). 
@@ -130,7 +130,8 @@ These are the necessary imports for running the examples below
 import cats.effect.IO
 import doobie.ConnectionIO
 import doobie.util.transactor.Transactor
-import org.scalatest.{ BeforeAndAfterAll, FunSuite }
+import org.scalatest.{ BeforeAndAfterAll, FunSuit
+e }
 import com.vivi.scarm._
 import java.time._
 
