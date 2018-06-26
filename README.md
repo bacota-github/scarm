@@ -118,7 +118,7 @@ espectively.
 
 ## Extended Example
 This example is based on the following data model:
-![https://github.com/bacota-github/scarm/blob/master/demo-erd.pdf]
+![Example Data Model](https://github.com/bacota-github/scarm/blob/master/demo-erd.pdf)
 
 Full code is in
 [src/test/scala/com/vivi/demo/demo.scala](https://github.com/bacota-github/scarm/blob/master/src/test/scala/com/vivi/demo/demo.scala). 
