@@ -116,13 +116,14 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
   override def afterAll() {
     if (config.dialect == Hsqldb) {
       com.vivi.scarm.test.DSLSuite.hsqldbCleanup(xa)
-    } /*else 
-      Seq(Table[TeacherId,Teacher]("Teacher"),
-        Autogen[CourseId,Course]("Course"),
-        Table[SectionId,Section]("Section"),
-        Table[StudentId,Student]("Student"),
-        Table[EnrollmentId, Enrollment]("enrollment")
-      ).foreach { t => run(t.drop) }*/
+    } else 
+        Seq(
+          Table[EnrollmentId, Enrollment]("enrollment"),
+          Table[SectionId,Section]("Section"),
+          Table[StudentId,Student]("Student"),
+          Autogen[CourseId,Course]("Course"),
+          Table[TeacherId,Teacher]("Teacher")
+        ).foreach { t => run(t.drop) }
   }
 
   test("Demo all the things") {
