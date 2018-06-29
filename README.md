@@ -110,10 +110,12 @@ because `Child` does not have a field called `farent`.
 
 ## Current Status
 
-At the moment, Scarm has exactly one user, and that's me.  
+At the moment, Scarm has exactly one user, and that's me :)
 
 Scarm supports Postgresql, Mysql, and Hsqldb.  I test with 9.6, 5.7, and 2.4.0 r
 espectively.
+
+A Scala 2.12 package is deployed to maven central as com.vivi.scarm.
 
 
 ## Extended Example
