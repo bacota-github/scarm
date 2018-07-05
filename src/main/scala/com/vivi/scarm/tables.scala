@@ -213,7 +213,7 @@ case class Table[K, E](
 
 object Table {
 
-  def apply[K,E](name: String)(implicit
+  def apply[K,E](name: String, useKeyNamePrefix: Boolean=true)(implicit
     config: ScarmConfig,
     kmap: FieldMap[K],
     fmap: FieldMap[E],
@@ -221,18 +221,19 @@ object Table {
     ecomp: Composite[E],
     primaryKey: PrimaryKey[K,E]
   ): Table[K,E] = {
-    val prefixedKey = kmap.prefix(fmap.firstFieldName)
+    val prefixedKey = if (!useKeyNamePrefix) kmap else kmap.prefix(fmap.firstFieldName)
     val pkeyNames = prefixedKey.names(config)
-    Table[K,E](name, fmap, pkeyNames, false, config, kcomp,   ecomp, primaryKey)
+    val fieldMap = if (useKeyNamePrefix) fmap else fmap.stripFirstFieldName
+    Table[K,E](name, fieldMap, pkeyNames, false, config, kcomp, ecomp, primaryKey)
   }
 
-  def apply[K,E](name: String, kNames: Seq[String])
-    (implicit config: ScarmConfig,
-      fmap: FieldMap[E],
-      kcomp: Composite[K],
-      ecomp: Composite[E],
-      primaryKey: PrimaryKey[K,E]
-    ): Table[K,E] =
+  def apply[K,E](name: String, kNames: Seq[String])(implicit
+    config: ScarmConfig,
+    fmap: FieldMap[E],
+    kcomp: Composite[K],
+    ecomp: Composite[E],
+    primaryKey: PrimaryKey[K,E]
+  ): Table[K,E] =
     Table[K,E](name, fmap, kNames, false, config, kcomp,
       ecomp, primaryKey)
 
