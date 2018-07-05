@@ -22,7 +22,7 @@ case class TestWithNoKeyPrefix(
 
   private def randomCompositeKey2 = {
     val first = rand.nextLong()
-    val last = randomStringx
+    val last = randomString
     val innerKey = InnerKey2(rand.nextInt().toShort, rand.nextInt().toShort)
     CompositeKey2(first, innerKey, last)
   }
