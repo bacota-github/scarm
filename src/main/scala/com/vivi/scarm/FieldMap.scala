@@ -23,8 +23,6 @@ case class FieldMap[A](firstFieldName: String, fields: Seq[FieldMap.Item]) {
     fields.map(item => item.copy(names = pre +: item.names))
   )
 
-  def stripFirstFieldName = FieldMap[A](firstFieldName, fields.map(_.strip(firstFieldName)))
-
   def typeOf(field: Seq[String]): Option[Type] = mapping.get(field).map(_.tpe)
 
   override def toString = fields.toString
@@ -34,14 +32,10 @@ case class FieldMap[A](firstFieldName: String, fields: Seq[FieldMap.Item]) {
 object FieldMap {
 
   case class Item(names: Seq[String], tpe: Type, optional: Boolean) {
-
     def name(config: ScarmConfig) = {
       val nms = if (config.snakeCase) names.map(snakeCase(_)) else names
       nms.mkString(config.fieldNameSeparator)
     }
-
-    def strip(prefix: String) =
-      copy(names =   if (names.head == prefix) names.tail else names)
   }
 
   private lazy val snakeCaseRegex = """([A-Z])""".r
