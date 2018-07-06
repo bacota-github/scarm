@@ -19,8 +19,6 @@ case class TestWithStringPrimaryKey(
   val table = Table[StringId,StringKeyEntity]("string")
   override val  allTables = Seq(table)
 
-  override def afterAll() = {}
-
   test("After inserting an entity into a table with String primary key, the entity can be selected")  {
     val e1 = StringKeyEntity(StringId(randomString), randomString)
     val e2 = StringKeyEntity(StringId(randomString), randomString)

@@ -19,6 +19,8 @@ case class TestWithCompositePrimaryKey(
 ) extends FunSuite with DSLTestBase  {
   val table = Table[CompositeKey,CompositeKeyEntity]("composite")
   override val  allTables = Seq(table)
+//  override def afterAll() = {}
+
 
   private def randomCompositeKey = {
     val first = rand.nextLong()

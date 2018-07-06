@@ -30,7 +30,7 @@ case class Table[K, E](
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
 
   def autogenField = fieldMap.fields.head
-  lazy val autogenFieldName = autogenField.name(config)
+  lazy val autogenFieldName = fieldMap.fieldName(autogenField, config)
   lazy val fieldNames: Seq[String] = fieldMap.names(config)
   lazy val nonKeyFieldNames = fieldNames.filter(!keyNames.contains(_))
   lazy val primaryKeyIndex = UniqueIndex[K,K,E](name+"_pk", this, keyNames)
@@ -215,15 +215,13 @@ object Table {
 
   def apply[K,E](name: String)(implicit
     config: ScarmConfig,
-    kmap: FieldMap[K],
     fmap: FieldMap[E],
     kcomp: Composite[K],
     ecomp: Composite[E],
     primaryKey: PrimaryKey[K,E]
   ): Table[K,E] = {
-    val prefixedKey = kmap.prefix(fmap.firstFieldName)
-    val pkeyNames = prefixedKey.names(config)
-    Table[K,E](name, fmap, pkeyNames, false, config, kcomp,   ecomp, primaryKey)
+    val pkeyNames = fmap.primaryKey.names(config)
+    Table[K,E](name, fmap, pkeyNames, false, config, kcomp,  ecomp, primaryKey)
   }
 
   def apply[K,E](name: String, kNames: Seq[String])
@@ -254,7 +252,7 @@ object Table {
     overrides: PartialFunction[String,String]
   ) = {
     val nullable = if (item.optional) "" else "not null"
-    val columnName = item.name(table.config)
+    val columnName = table.fieldMap.fieldName(item, table.config)
     val dialect = table.config.dialect
     val auto =
       if (!table.autogen || item != table.autogenField) ""
@@ -270,7 +268,7 @@ object Table {
 
   def createSql[K,E](table: Table[K,E], typeOverrides: PartialFunction[String,String]): String = {
     val columns = table.fieldMap.fields.map(item => 
-             item.name(table.config) + " " + typeName(table, item, typeOverrides)
+             table.fieldMap.fieldName(item, table.config) + " " + typeName(table, item, typeOverrides)
     ).mkString(", ")
     val pkeyColumns = table.keyNames.mkString(",")
     s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"
@@ -306,7 +304,6 @@ object Autogen {
 
   def apply[K,E](name: String)
     (implicit config: ScarmConfig,
-      kmap: FieldMap[K],
       fmap: FieldMap[E],
       kcomp: Composite[K],
       ecomp: Composite[E],
