@@ -31,9 +31,12 @@ case class FieldMap[A](firstFieldName: String, fields: Seq[FieldMap.Item]) {
 
 object FieldMap {
 
-  case class Item(names: Seq[String], tpe: Type, optional: Boolean) {
+  case class Item(names: Seq[String], tpe: Type, optional: Boolean, isAnyVal: Boolean) {
     def name(config: ScarmConfig) = {
-      val nms = if (config.snakeCase) names.map(snakeCase(_)) else names
+      val useNames =
+        if (config.suffixAnyVal || !isAnyVal || names.length <= 1) names
+        else names.dropRight(1)
+      val nms = if (config.snakeCase) useNames.map(snakeCase(_)) else useNames
       nms.mkString(config.fieldNameSeparator)
     }
   }
@@ -44,7 +47,7 @@ object FieldMap {
 
   implicit def apply[A](implicit ttag: TypeTag[A]): FieldMap[A] = FieldMap[A](
     firstFieldNameOfType(ttag.tpe),
-    fieldsFromType(Seq(), ttag.tpe, false)
+    fieldsFromType(Seq(), ttag.tpe, false, ttag.tpe <:< typeOf[AnyVal])
   )
 
   private def firstFieldNameOfType(tpe: Type): String =
@@ -59,22 +62,22 @@ object FieldMap {
   private def isCaseClass(tpe: Type): Boolean =
     tpe.members.exists(isCaseMethod(_))
 
-  private def fieldsFromType(pre: Seq[String], tpe: Type, opt: Boolean): Seq[Item] =   {
+  private def fieldsFromType(pre: Seq[String], tpe: Type, opt: Boolean, anyVal: Boolean): Seq[Item] =   {
     val members = tpe.members.sorted.collect {
       case s if isCaseMethod(s) => {
         val m = s.asMethod
         val names = pre :+ m.name.toString
         if (m.returnType <:< typeOf[Option[Any]])
-          fieldsFromType(names, m.returnType.typeArgs.head, true)
+          fieldsFromType(names, m.returnType.typeArgs.head, true, false)
         else if (isCaseClass(m.returnType)) 
-          fieldsFromType(names, m.returnType, opt)
-        else Seq(Item(names, m.returnType, opt))
+          fieldsFromType(names, m.returnType, opt, m.returnType <:< typeOf[AnyVal])
+        else Seq(Item(names, m.returnType, opt, anyVal))
       }
     }
     if (!members.isEmpty)
       members.flatten
     else
-      Seq(Item(pre, tpe, opt))
+      Seq(Item(pre, tpe, opt, anyVal))
   }
 
 

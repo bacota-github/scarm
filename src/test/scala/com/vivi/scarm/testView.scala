@@ -36,7 +36,5 @@ case class TestView(
     ))
     assert(run(view("a",2)) == Set(8))
   }
-
-
 }
 

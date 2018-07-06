@@ -108,7 +108,7 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
     extends FunSuite with BeforeAndAfterAll {
 
   //ScarmConfig and Transactor are implicitly used in scarm methods
-  implicit val scarmConfig = config
+  implicit val scarmConfig = config.copy(suffixAnyVal = true)
   implicit val scarmXa = xa
 
   def run[T](op: ConnectionIO[T]) =   op.transact(xa).unsafeRunSync()

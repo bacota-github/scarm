@@ -33,7 +33,9 @@ package object scarm {
   case class ScarmConfig(
     dialect: SqlDialect,
     snakeCase: Boolean = true,
-    fieldNameSeparator: String = "_"
+    fieldNameSeparator: String = "_",
+    suffixAnyVal: Boolean = false,
+    prefixPrimaryKey: Boolean = true
   )
 }
 
