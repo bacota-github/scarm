@@ -49,22 +49,26 @@ object Index {
   private[scarm] def indexName(table: Table[_,_], ttag: TypeTag[_]) =
     table.name + "_" + ttag.tpe.typeSymbol.name + "_idx"
 
+  private[scarm] def keyNames[K,E](table: Table[_,E])
+    (implicit kmap: FieldMap[K], isProjection: Subset[K,E]) =
+    table.fieldMap.keyMap(kmap).names(table.config)
+
   def apply[K,PK,E](table: Table[PK,E])(implicit
     isProjection: Subset[K,E],
     kmap: FieldMap[K],
     ktag: TypeTag[K]
-  ): Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names(table.config))
+  ): Index[K,PK,E] = Index(indexName(table,ktag), table, keyNames(table))
 
   def apply[K,PK,E](table: Table[PK,E], keyClass: Class[K])(implicit
     isProjection: Subset[K,E],
     kmap: FieldMap[K],
     ktag: TypeTag[K]
-  ): Index[K,PK,E] = Index(indexName(table,ktag), table, kmap.names(table.config))
+  ): Index[K,PK,E] = Index(indexName(table,ktag), table, keyNames(table))
 
   def apply[K,PK,E](name: String, table: Table[PK,E])(implicit
     isProjection: Subset[K,E],
     kmap: FieldMap[K]
-  ): Index[K,PK,E] = Index(name, table, kmap.names(table.config))
+  ): Index[K,PK,E] = Index(name, table, keyNames(table))
 
   def tupled[K,PK,E,KList<:HList, T<:Product](table: Table[PK,E], keyClass: Class[K])(implicit
     isProjection: Subset[K,E],
@@ -72,8 +76,7 @@ object Index {
     ktag: TypeTag[K],
     kgen: Generic.Aux[K,KList],
     tupled: hlist.Tupler.Aux[KList,T],
-    config: ScarmConfig
-  ): Index[T,PK,E] = Index(indexName(table,ktag), table, kmap.names(config))
+  ): Index[T,PK,E] = Index(indexName(table,ktag), table, keyNames(table))
 }
 
 
@@ -98,17 +101,17 @@ object UniqueIndex {
     isProjection: Subset[K,E],
     kmap: FieldMap[K],
     ktag: TypeTag[K]
-  ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names(table.config))
+  ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, Index.keyNames(table))
 
   def apply[K,PK,E](table: Table[PK,E], keyClass: Class[K])(implicit
     isProjection: Subset[K,E],
     kmap: FieldMap[K],
     ktag: TypeTag[K]
-  ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names(table.config))
+  ): UniqueIndex[K,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, Index.keyNames(table))
 
   def apply[K,PK,E,KList<:HList,EList<:HList](name: String,  table: Table[PK,E])
     (implicit isProjection: Subset[K,E], kmap: FieldMap[K])
-      : UniqueIndex[K,PK,E] = UniqueIndex(name, table, kmap.names(table.config))
+      : UniqueIndex[K,PK,E] = UniqueIndex(name, table, Index.keyNames(table))
 
   def tupled[K,PK,E,KList<:HList, T<:Product](table: Table[PK,E], keyClass: Class[K])(implicit
     isProjection: Subset[K,E],
@@ -116,6 +119,6 @@ object UniqueIndex {
     ktag: TypeTag[K],
     kgen: Generic.Aux[K,KList],
     tupled: hlist.Tupler.Aux[KList,T]
-  ): UniqueIndex[T,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, kmap.names(table.config))
+  ): UniqueIndex[T,PK,E] = UniqueIndex(Index.indexName(table,ktag), table, Index.keyNames(table))
 }
 

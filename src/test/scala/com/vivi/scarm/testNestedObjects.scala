@@ -11,7 +11,7 @@ import com.vivi.scarm._
 
 case class Level2(x: Int, y: String)
 case class Level1(x: Int, y: Int, level2: Level2)
-case class DeeplyNestedEntity(id: Id, x: Int, nested: Level1)
+case class DeeplyNestedEntity(id: Id, z: Int, nested: Level1)
 
 case class TestNestedObjectTable(
   override val xa: Transactor[IO],

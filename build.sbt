@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
   "mysql" % "mysql-connector-java" % "5.1.46" % "test"
 )
 
-//testOptions in Test += Tests.Argument("-oDF")
+testOptions in Test += Tests.Argument("-oDF")
 
 // POM settings for Sonatype
 organization := "com.vivi"

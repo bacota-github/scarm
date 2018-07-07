@@ -22,7 +22,7 @@ case class WrongKeyName(parent: Id)
 case class WrongKeyType(name: String)
 case class OptionalChildToParent(parentId: Option[Id])
 
-case class OptChild(id: Id, parentId: Option[Id], x: Int)
+case class OptChild(pkey: Id, parentId: Option[Id], x: Int)
 case class OptChildToParent(parentId: Option[Id])
 
 case class ForeignKeyTests(
@@ -124,8 +124,8 @@ case class ForeignKeyTests(
     })
 
     val join = optChildTable :: fkey.manyToOne
-    assert(run(join(childOfSome.id)) == Some(childOfSome, Some(parent)))
-    assert(run(join(childOfNone.id)) == Some(childOfNone, None))
+    assert(run(join(childOfSome.pkey)) == Some(childOfSome, Some(parent)))
+    assert(run(join(childOfNone.pkey)) == Some(childOfNone, None))
   }
 
   test("A foreign key must be a subset of the from table") {

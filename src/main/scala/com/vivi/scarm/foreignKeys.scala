@@ -95,7 +95,8 @@ object MandatoryForeignKey {
       foreignKeyStructureMatchesPrimaryKey: EqualStructure[FK,TPK],
       fkmap: FieldMap[FK]
     ): MandatoryForeignKey[FPK,FROM,TPK,TO] = {
-    val fknames = fkmap.names(from.config)
+    //val fknames = fkmap.prefixedNames(from.config)
+    val fknames = from.fieldMap.keyMap(fkmap).names(from.config)
     if (to.keyNames.size != fknames.size)
       throw new RuntimeException(s"Foreign key ${fknames.mkString} from ${from.name} to ${to.name} does not match primary key ${to.keyNames.mkString}")
     MandatoryForeignKey(from,to, fknames.zip(to.keyNames))
@@ -126,7 +127,8 @@ object OptionalForeignKey {
       foreignKeyStructureMatchesPrimaryKey: SimilarStructure[FK,TPK],
       fkmap: FieldMap[FK]
     ): OptionalForeignKey[FPK,FROM,TPK,TO] = {
-    val fknames = fkmap.names(from.config)
+    //val fknames = fkmap.prefixedNames(from.config)
+    val fknames = from.fieldMap.keyMap(fkmap).names(from.config)
     if (to.keyNames.size != fknames.size)
       throw new RuntimeException(s"Foreign key ${fknames.mkString} from ${from.name} to ${to.name} does not match primary key ${to.keyNames.mkString}")
     OptionalForeignKey(from,to, fknames.zip(to.keyNames))

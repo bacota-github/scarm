@@ -30,7 +30,7 @@ case class Table[K, E](
 ) extends DatabaseObject with Queryable[K,Option,E,E] {
 
   def autogenField = fieldMap.fields.head
-  lazy val autogenFieldName = fieldMap.fieldName(autogenField, config)
+  lazy val autogenFieldName = autogenField.name(config)
   lazy val fieldNames: Seq[String] = fieldMap.names(config)
   lazy val nonKeyFieldNames = fieldNames.filter(!keyNames.contains(_))
   lazy val primaryKeyIndex = UniqueIndex[K,K,E](name+"_pk", this, keyNames)
@@ -220,8 +220,9 @@ object Table {
     ecomp: Composite[E],
     primaryKey: PrimaryKey[K,E]
   ): Table[K,E] = {
-    val pkeyNames = fmap.primaryKey.names(config)
-    Table[K,E](name, fmap, pkeyNames, false, config, kcomp,  ecomp, primaryKey)
+    val fieldMap = fmap.withPrimaryKey
+    val pkeyNames = fieldMap.primaryKey.names(config)
+    Table[K,E](name, fieldMap, pkeyNames, false, config, kcomp,  ecomp, primaryKey)
   }
 
   def apply[K,E](name: String, kNames: Seq[String])
@@ -231,7 +232,7 @@ object Table {
       ecomp: Composite[E],
       primaryKey: PrimaryKey[K,E]
     ): Table[K,E] =
-    Table[K,E](name, fmap, kNames, false, config, kcomp,
+    Table[K,E](name, fmap.withPrimaryKey, kNames, false, config, kcomp,
       ecomp, primaryKey)
 
   private def sequenceName(tableName: String, fieldName: String) =
@@ -252,7 +253,7 @@ object Table {
     overrides: PartialFunction[String,String]
   ) = {
     val nullable = if (item.optional) "" else "not null"
-    val columnName = table.fieldMap.fieldName(item, table.config)
+    val columnName = item.name(table.config)
     val dialect = table.config.dialect
     val auto =
       if (!table.autogen || item != table.autogenField) ""
@@ -268,7 +269,7 @@ object Table {
 
   def createSql[K,E](table: Table[K,E], typeOverrides: PartialFunction[String,String]): String = {
     val columns = table.fieldMap.fields.map(item => 
-             table.fieldMap.fieldName(item, table.config) + " " + typeName(table, item, typeOverrides)
+      item.name(table.config) + " " + typeName(table, item, typeOverrides)
     ).mkString(", ")
     val pkeyColumns = table.keyNames.mkString(",")
     s"CREATE TABLE ${table.name} (${columns}, PRIMARY KEY (${pkeyColumns}))"

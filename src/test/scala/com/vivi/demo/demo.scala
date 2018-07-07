@@ -102,7 +102,8 @@ case class EnrollmentStudent(id: WrappedEnrollmentStudent)
 case class WrappedEnrollmentSection(section: SectionId)
 case class EnrollmentSection(id: WrappedEnrollmentSection)
 
-case class SectionCount(sectionCourse: CourseId, count: Int)
+case class SectionCountCourseId(course: CourseId)
+case class SectionCount(section: SectionCountCourseId, count: Int)
 
 case class Demo(config: ScarmConfig, xa: Transactor[IO])
     extends FunSuite with BeforeAndAfterAll {
@@ -446,10 +447,14 @@ case class Demo(config: ScarmConfig, xa: Transactor[IO])
     })
 
     /* As a final "escape hatch", a View object can be defined for any query */
-    val sectionCountByCourse = View[CourseId, SectionCount](
-      "select section_course_id, count(*) as count from Section group by section_course_id"
-    )
-    assert(run(sectionCountByCourse(trigId)) == Set(SectionCount(trigId, 3)))
+    val sectionCountByCourse = View[SectionCountCourseId, SectionCount](
+      (if (config.prefixPrimaryKey) 
+        "select section_course_id, count(*) as count from Section group by section_course_id"
+      else
+        "select course_id, count(*) as count from Section group by course_id"
+    ))
+    assert(run(sectionCountByCourse(SectionCountCourseId(trigId))) ==
+      Set(SectionCount(SectionCountCourseId(trigId), 3)))
   }
 }
 

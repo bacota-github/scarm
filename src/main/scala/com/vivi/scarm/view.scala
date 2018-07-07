@@ -26,8 +26,13 @@ case class View[K,E](
 }
 
 object View {
-  def apply[K,E](definition: String)
-    (implicit fmap: FieldMap[E], primaryKey: PrimaryKey[K,E], config: ScarmConfig): View[K,E] = 
-    View(definition, fmap.primaryKey[K].names(config), fmap.names(config)
-    )
+  def apply[K,E](definition: String)(implicit
+    fmap: FieldMap[E],
+    primaryKey: PrimaryKey[K,E],
+    config: ScarmConfig
+  ): View[K,E] =  {
+    val fieldMap = fmap.withPrimaryKey
+    val keyMap = fieldMap.primaryKey[K]
+    View(definition, keyMap.names(config), fieldMap.names(config))
+  }
 }

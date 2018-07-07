@@ -24,7 +24,6 @@ object DSLSuite {
 }
 
 case class Id(id: Int) extends AnyVal
-
 case class IdEntity(id: Id, name: String)
 
 

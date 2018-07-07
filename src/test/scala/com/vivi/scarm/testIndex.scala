@@ -28,6 +28,7 @@ case class TestIndex(
 ) extends FunSuite with DSLTestBase  {
   val multiTable = Table[Id,MultiEntity]("multi")
   val nestedTable = Table[Id,NestedEntity]("nestedTable")
+
   override val allTables = Seq(multiTable,nestedTable)
 
   test("Query by multi-column Index") {
