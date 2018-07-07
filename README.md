@@ -527,11 +527,11 @@ val sectionCount: Set[SectionCount] = run(sectionCountByCourse(trigId))
 ```
 ## ScarmConfig and Column Naming Conventions
 
-There are some  options in the `ScarmConfig` object that can influence how field names in case classes are mapped to column mames in database tables.
+There are some  options in the `ScarmConfig` object that influence how field names in case classes are mapped to column mames in database tables.
 
 ### Snake Case
 
-By default, camel case field names (e.g. `aFieldName`) are mapped to snake case column names (`a_field_name`).  This can be turned off by setting `ScarmConfig.snakeCase` to `false.
+By default, camel case field names (e.g. `aFieldName`) are mapped to snake case column names (`a_field_name`).  This can be turned off by setting `ScarmConfig.snakeCase` to `false`.  The field name is then used verbatim.
 
 ### Field Name Separators.
 
@@ -539,16 +539,17 @@ Column names for nested fields are constructed by joining the nested field names
 ```
 case class InnerMost(x: Int)
 case class Inner(inner: InnerMost)
-case class (
+case class Entity(
    ...
    amount: Inner
-)
+   ...
+) 
 ```
 the field `amount` is mapped to a column `amount_inner_x`.  This `_` character is used to separate the field names by default, but any character (or string) can be used by setting `ScarmConfig.fieldNameSeparator`.
 
 ### Prefixing Primary Keys
 
-By default, all primary key columns have the name of the primary key field (in the case class) as a prefix.  But this isn't the usual convention for composite primary keys composed of foreign keys.  For example, consider a table like this:
+Since the first field is mapped to the primary key, it follows from the previous discussion that all columns in a composite primary key have the name of the primary key field (in the case class) as a prefix.  But this isn't the usual convention for composite primary keys composed of foreign keys.  For example, consider a table like this:
 ```
 CREATE TABLE order (
     customer_id INT NOT NULL,
@@ -573,11 +574,11 @@ CREATE TABLE order (
 );
 
 ```
-which isn't quite right.  But setting `ScarmConfig.prefixPrimaryKey` to `false`, drops the `id_` prefix from the primary key columns, which gives the result we need.
+which isn't quite right.  But setting `ScarmConfig.prefixPrimaryKey` to `false`, drops the `id_` prefix from the primary key columns, which gives the correct primary key column names.
 
 ### Dropping Suffixes from AnyVal Columns
 
-A common pattern in Scala is to wrap a primitive value in a case class to specify it's purpose, and then to  extend `AnyVal` so the run time environment treats the wrapped valued as a primitive value.
+A common pattern in Scala is to wrap a primitive value in a case class to specify it's purpose, and then to  extend `AnyVal` so the run time environment treats the case class as a primitive value.
 ```
 case class EntityId(id: Long) extends AnyVal
 case class Entity(entityId: EntityId, account: Int)
