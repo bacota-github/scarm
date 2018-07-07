@@ -1,6 +1,6 @@
 scalaVersion := "2.12.6"
 ensimeScalaVersion in ThisBuild := "2.12.6"
-version := "0.1.0"
+version := "0.2.0"
 
 scalacOptions ++= Seq("-Ypartial-unification", "-deprecation", "-feature")// "-Xlog-implicits")
 
