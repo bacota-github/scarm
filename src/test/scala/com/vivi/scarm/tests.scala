@@ -32,7 +32,7 @@ class DSLSuite extends Suites(
     "jdbc:hsqldb:file:testdb",
     "SA", "", Hsqldb,
     DSLSuite.hsqldbCleanup),
-
+/*
   DSLTest("org.postgresql.Driver",
     "jdbc:postgresql:scarm", "scarm", "scarm", Postgresql,
   ),
@@ -41,6 +41,7 @@ class DSLSuite extends Suites(
     "jdbc:mysql://localhost:3306/scarm?serverTimezone=UTC&useSSL=false&sql_mode=",
     "scarm", "scarm", Mysql
   )
+ */
 )
 
 object DSLTest {
