@@ -549,7 +549,7 @@ the field `amount` is mapped to a column `amount_inner_x`.  This `_` character i
 
 ### Prefixing Primary Keys
 
-Since the first field is mapped to the primary key, it follows from the previous discussion that all columns in a composite primary key have the name of the primary key field (in the case class) as a prefix.  But this isn't the usual convention for composite primary keys composed of foreign keys.  For example, consider a table like this:
+Since the first field is mapped to the primary key, it follows from the previous discussion that all columns in a composite primary key have the name of the primary key field (in the case class) as a prefix.  But this isn't the usual convention for composite primary keys in many-to-many relationship tables.  For example, consider a table like this:
 ```
 CREATE TABLE order (
     customer_id INT NOT NULL,
