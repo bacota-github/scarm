@@ -525,3 +525,73 @@ val sectionCountByCourse = View[CourseId, SectionCount](
 )
 val sectionCount: Set[SectionCount] = run(sectionCountByCourse(trigId))
 ```
+## ScarmConfig and Column Naming Conventions
+
+There are some  options in the `ScarmConfig` object that can influence how field names in case classes are mapped to column mames in database tables.
+
+### Snake Case
+
+By default, camel case field names (e.g. `aFieldName`) are mapped to snake case column names (`a_field_name`).  This can be turned off by setting `ScarmConfig.snakeCase` to `false.
+
+### Field Name Separators.
+
+Column names for nested fields are constructed by joining the nested field names together with a field name separator.  For example, given this
+```
+case class InnerMost(x: Int)
+case class Inner(inner: InnerMost)
+case class (
+   ...
+   amount: Inner
+)
+```
+the field `amount` is mapped to a column `amount_inner_x`.  This `_` character is used to separate the field names by default, but any character (or string) can be used by setting `ScarmConfig.fieldNameSeparator`.
+
+### Prefixing Primary Keys
+
+By default, all primary key columns have the name of the primary key field (in the case class) as a prefix.  But this isn't the usual convention for composite primary keys composed of foreign keys.  For example, consider a table like this:
+```
+CREATE TABLE order (
+    customer_id INT NOT NULL,
+    order_id INT NOT NULL,
+    price INT NOT NULL,
+    PRIMARY KEY (customer_id, order_id)
+);
+
+```
+These model classes
+```
+case class OrderId(customerId: Int, orderId: Int)
+case class Order(id: OrderId, price: Int)
+```
+map, by default, to the following table
+```
+CREATE TABLE order (
+    id_customer_id INT NOT NULL,
+    id_order_id INT NOT NULL,
+    price INT NOT NULL,
+    PRIMARY KEY (id_customer_id, id_order_id)
+);
+
+```
+which isn't quite right.  But setting `ScarmConfig.prefixPrimaryKey` to `false`, drops the `id_` prefix from the primary key columns, which gives the result we need.
+
+### Dropping Suffixes from AnyVal Columns
+
+A common pattern in Scala is to wrap a primitive value in a case class to specify it's purpose, and then to  extend `AnyVal` so the run time environment treats the wrapped valued as a primitive value.
+```
+case class EntityId(id: Long) extends AnyVal
+case class Entity(entityId: EntityId, account: Int)
+```
+`Entity` would, by default,  be mapped to a table like this
+```
+CREATE TABLE Entity(
+    entity_id_id: BigInt PRIMARY KEY,
+    account: Int NOT NULL
+)
+```
+It might be preferable for the primary key to be called `entity_id` instead of `entity_id_id`.  One way to accomplish this is to drop the `Id` from the field name in the case class:
+```
+case class Entity(entity: EntityId, account: Int)
+```
+But given the common convention of naming fields after their types, this can get confusing.  Another alternative is to set
+`ScarmConfig.suffixAnyVal` to `false`.  When this is set, the inner field name of any `AnyVal` field (primary key or not) is not considered as part of the column name.
