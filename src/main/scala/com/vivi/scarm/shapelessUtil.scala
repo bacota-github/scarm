@@ -2,11 +2,6 @@ package com.vivi.scarm
 import shapeless._
 import shapeless.labelled._
 
-import scala.language.implicitConversions
-
-import java.time._
-
-
 trait Subset[A,SET]
 
 trait LowestPrioritySubset {

@@ -1,7 +1,5 @@
 package com.vivi.scarm
 
-import scala.language.implicitConversions
-
 import scala.reflect.runtime.universe.{MethodSymbol,Type,TypeTag, typeOf}
 import scala.reflect.runtime.universe.{Symbol => ReflectionSymbol}
 
