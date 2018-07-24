@@ -1,16 +1,16 @@
 # Scarm (Scala Relational Mapping)
 
 Scarm is a library for using Doobie to conveniently store and retrieve
-case classes in a relational database.  It's more like an ORM than
-most Scala database libraries I've come across, but it does not use
-mutable objects, lazy loading, or any of the other
-unfunctional properties of JPA.
+case classes in a relational database.  
+
+As an old Java developer, I hate JPA(Hibernate) when I'm using it and miss it when I'm not.  I can do without the lazy loading, the inherent mutability, the strange effects of second level caching, etc, But I miss being able to treat a table as a repository of objects of a specified class and the ability to efficiently retrieve related sets of object with a join query.  And so ..
 
 My goals with Scarm are
 
-1. Automatic SQL generation.
-2. As much static type checking as possible.
-3. Support for joins to load structures of related case classes from the database.
+1. Automatic SQL generation for storing and retrieving case classes.
+2. Retrieval of structures of related case classes through SQL joins.
+3. As much static type checking as possible.
+
 
 
 
